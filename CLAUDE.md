@@ -212,8 +212,6 @@ them, and the script refuses a build where that stops being true.
 - `Tests/` - one XCTest target per module
 - `Example/PayabliDemo/` - sample app; needs `Secrets.swift` and `SDK/ExtraEnvironments.swift`, each
   copied from its `.sample`
-- `Bridges/` - Flutter, .NET MAUI and React Native wrappers. Not built by SPM; leave them alone during
-  Core, PayIn or TapToPay work.
 
 ### Package Manager Support
 

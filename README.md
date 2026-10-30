@@ -378,8 +378,139 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
   When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
   `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
-- **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
-  Use them as a starting point for your own integration.
+
+### Other technologies
+
+> [!NOTE]
+> **Guidance only:** This section suggests one way to take Payabli payments from a React Native or Flutter app.
+> It's guidance, not a supported implementation. Payabli doesn't state that any example here is a complete or
+> direct implementation, or that it fits your app as written. The examples are subject to limitations, including
+> the frameworks' own versions and requirements, and Payabli doesn't build or test them. Your team designs,
+> builds, tests and maintains its integration, and is responsible for it.
+
+There is no React Native or Flutter package. Your app adds a small native module that exposes a few calls to
+JavaScript or Dart, and runs this SDK underneath on iOS and the Payabli Android SDK on Android. The same applies to any
+other technology, such as .NET MAUI: it binds the Objective-C surface in [Language support](#language-support).
+
+A module keeps these rules:
+
+- **Card data never crosses into JavaScript or Dart.** The module presents the SDK's own form and the Tap to Pay
+  sheet, and returns only the outcome.
+- **The token is fetched natively.** The module's `tokenProvider` calls your token endpoint from Swift. If it
+  routes through JavaScript or Dart instead, give each request its own pending promise or future and fail it after
+  30 seconds: one shared slot can leave a request waiting forever.
+- **Every call resolves or rejects exactly once**, including when the customer closes the form.
+
+Give the module the same calls on both platforms, so your JavaScript or Dart has one code path:
+
+| Call | What it does | Result |
+|---|---|---|
+| `initialize(entryPoint, environment)` | Starts the app's one Payabli session | nothing, or an error with a `code` |
+| `payWithCard({ amount, orderId })` | Presents the card-not-present form | a `PaymentOutcome` |
+| `tapToPay({ amount, orderId })` | Takes a Tap to Pay payment | a `PaymentOutcome` |
+| `presentTerms()` | Shows Apple's Tap to Pay terms to the merchant | whether they accepted |
+| `activateDevice(code)` | Activates this phone with its 6-digit code | nothing, or an error with a `code` |
+| `sessionState` (a stream) | Tap to Pay readiness, one value per change | `idle`, `attestingDevice`, `fetchingConfig`, `initializingReader`, `ready`, `sessionExpired`, `reinitializing`, `pendingActivation`, `pendingTerms`, `charging` or `failed` |
+
+A `PaymentOutcome` maps [Handle the outcome](#handle-the-outcome) to three answers: `charged` (store
+`paymentTransId`, don't charge again), `notCharged` (the customer can try again) and `unknown` (look the payment
+up by `paymentTransId` before charging again; without one, find it by your `orderId` on card-not-present, or in
+the Payabli portal for Tap to Pay). `tapToPay` answers a fourth, `unsupported`,
+where Tap to Pay isn't available. A failure that isn't a payment outcome, such as a session that didn't start,
+rejects the call in React Native and throws a `PlatformException` in Flutter, with a `code`.
+
+**React Native.** Create the module with the [Expo Modules API](https://docs.expo.dev/modules/overview/)
+(`npx create-expo-module@latest --local`), and declare it in TypeScript:
+
+```ts
+import { NativeModule, requireNativeModule } from 'expo';
+
+export type PaymentRequest = { amount: number; orderId: string };
+export type PaymentOutcome =
+  | { status: 'charged' | 'notCharged' | 'unknown'; paymentTransId: string | null }
+  | { status: 'unsupported' };
+
+declare class PayabliModule extends NativeModule<{
+  onSessionState(event: { state: string }): void;
+}> {
+  initialize(entryPoint: string, environment: 'sandbox' | 'production'): Promise<void>;
+  payWithCard(request: PaymentRequest): Promise<PaymentOutcome>;
+  tapToPay(request: PaymentRequest): Promise<PaymentOutcome>;
+  presentTerms(): Promise<boolean>;
+  activateDevice(code: string): Promise<void>;
+}
+
+export const Payabli = requireNativeModule<PayabliModule>('Payabli');
+
+// const outcome = await Payabli.payWithCard({ amount: 12.34, orderId: 'A-1001' });
+```
+
+The Swift half is an `AsyncFunction` per call, run on the main queue so the SDK's screens can be presented.
+Expo Go can't load your own native code, so run a development build (`npx expo run:ios`). React Native's
+[Turbo Native Modules](https://reactnative.dev/docs/turbo-native-modules-introduction) work too: declare the same
+calls as a spec, and have the module's Objective-C++ class call a Swift file that makes the SDK calls. The
+card-not-present form is a SwiftUI view, which Objective-C can't present.
+
+**Flutter.** Describe the calls once with [Pigeon](https://pub.dev/packages/pigeon), which generates the Dart API
+and the Swift and Kotlin interfaces your native code implements:
+
+```dart
+import 'package:pigeon/pigeon.dart';
+
+enum PaymentStatus { charged, notCharged, unknown, unsupported }
+
+class PaymentRequest {
+  PaymentRequest({required this.amount, required this.orderId});
+  double amount;
+  String orderId;
+}
+
+class PaymentResult {
+  PaymentResult({required this.status});
+  PaymentStatus status;
+  String? paymentTransId;
+}
+
+@HostApi()
+abstract class PayabliHostApi {
+  @async
+  void initialize(String entryPoint, bool sandbox);
+  @async
+  PaymentResult payWithCard(PaymentRequest request);
+  @async
+  PaymentResult tapToPay(PaymentRequest request);
+  @async
+  bool presentTerms();
+  @async
+  void activateDevice(String code);
+}
+```
+
+Generate the code, naming where each file goes in your app:
+
+```sh
+dart run pigeon --input pigeons/payabli_api.dart \
+  --dart_out lib/payabli_api.g.dart \
+  --swift_out ios/Runner/PayabliApi.g.swift \
+  --kotlin_out android/app/src/main/kotlin/com/example/app/PayabliApi.g.kt \
+  --kotlin_package com.example.app
+```
+
+Then implement `PayabliHostApi` in Swift and set it up on the engine's binary messenger at startup. Without Pigeon, a `MethodChannel` and an `EventChannel`
+([platform channels](https://docs.flutter.dev/platform-integration/platform-channels)) carry the same calls.
+
+Each call is one SDK call underneath:
+
+| Call | iOS | Android |
+|---|---|---|
+| `initialize` | `PayabliSession.initialize(config:)` | `PayabliSession.initialize(config, HostBindings(context))` |
+| `payWithCard` | present `PayabliPayInView` for a `PayabliPayIn` with `operation: .capture` | show `PayabliPayInForm` in an activity |
+| `tapToPay` | `PayabliTTP.create()`, `initialize()`, then `charge(paymentDetails:)` | answer `unsupported` |
+| `presentTerms` | `presentTerms()`, then `areTermsAccepted()` | answer `false` |
+| `activateDevice` | `activateDevice(activationCode:)`, then `initialize()` | reject with `UNSUPPORTED` |
+| `sessionState` | `PayabliTTP`'s `$sessionState` | send `idle` once |
+
+Tap to Pay needs a physical iPhone, and the setup in the [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md).
 
 ## Sample app and testing
 

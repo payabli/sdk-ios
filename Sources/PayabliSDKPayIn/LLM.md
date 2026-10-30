@@ -809,13 +809,11 @@ xcodebuild test -scheme PayabliSDK-Package \
 xcrun xccov view --report build/TestResults/PayInCoverage.xcresult
 ```
 
-## Bridge Scope
+## Other Technologies
 
-Flutter, React Native, and .NET MAUI bridges currently expose stored card/bank account
-payment-method creation. Native Swift integrations should use
-`PayabliSDKPayIn` directly for capture, authorize, and
-capture-authorized transaction flows until those request models are promoted to
-the bridge APIs.
+An app written in another technology, such as React Native, Flutter or .NET MAUI,
+reaches `PayabliSDKPayIn` through `PayabliPayInObjC`, its Objective-C surface. The
+root README's "Other technologies" section shows how to write the native module.
 
 ## File Map
 

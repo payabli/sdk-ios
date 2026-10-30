@@ -305,12 +305,11 @@ try await paymentFlow.authorize(PayabliPayInRequest(
   and other MoneyIn response fields
 - `apiResponse` carries the full MoneyIn response for transaction operations
 
-## Bridge Scope
+## Other Technologies
 
-The Flutter, React Native and .NET MAUI bridges in `Bridges/` are examples of integrating the SDK from each
-technology. Use them as a starting point for your own integration. They show stored card and bank account
-payment-method creation. Capture, authorize, capture-authorized and void transaction flows are called from
-Swift with `PayabliSDKPayIn`.
+An app written in another technology, such as React Native, Flutter or .NET MAUI, reaches the SDK through its
+Objective-C surface. [Language support](../README.md#language-support) lists the Objective-C types, and
+[Other technologies](../README.md#other-technologies) shows how to write the native module.
 
 ## Reference Docs
 

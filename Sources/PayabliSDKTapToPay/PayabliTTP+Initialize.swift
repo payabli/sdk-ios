@@ -135,8 +135,8 @@ extension PayabliTTP {
         syncPublished()
     }
 
-    /// `@objc` companion to `initialize()` for ObjC / MAUI / Flutter / RN
-    /// consumers. Bridges the `async throws` Swift method to a callback-based
+    /// `@objc` companion to `initialize()` for Objective-C hosts.
+    /// Bridges the `async throws` Swift method to a callback-based
     /// signature: `completion(nil)` on success, `completion(NSError)` on
     /// failure, a ``TapToPayError`` with its catalog number as the code.
     ///
