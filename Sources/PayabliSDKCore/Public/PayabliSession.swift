@@ -42,6 +42,7 @@ public final class PayabliSession: @unchecked Sendable {
     private static let lock = NSLock()
     private static var installed: PayabliSession?
     private static var testTelemetryTransport: (any TelemetryTransport)?
+    private static var testInstallFailure: (any Error)?
 
     /// Written only by the machine of whichever session `install` installed, so it reads `uninitialized` before any.
     static let sink = SdkStateSink()
@@ -134,6 +135,11 @@ public final class PayabliSession: @unchecked Sendable {
         } catch let refusal as PayabliGenericError {
             await current?.reportRefusedInitialize(refusal, after: ContinuousClock.now - startedAt)
             throw refusal
+        } catch {
+            // The refusal above takes the errors the SDK classified; this converts what it did not.
+            guard let failure = error.payabliUnexpectedFailure else { throw error }
+            await current?.reportFailedInitialize(failure, original: error, after: ContinuousClock.now - startedAt)
+            throw failure
         }
     }
 
@@ -156,12 +162,38 @@ public final class PayabliSession: @unchecked Sendable {
         ])
     }
 
+    /// Reports an initialize that failed outside the refusals the SDK names, as a start and its
+    /// failure on this session's channel, so the start is answered.
+    ///
+    /// - Parameter failure: what the call is about to throw, converted.
+    /// - Parameter original: the error as it was thrown, before conversion, whose type the report names.
+    /// - Parameter duration: how long the call took.
+    private func reportFailedInitialize(_ failure: PayabliGenericError, original: any Error, after duration: Duration) async {
+        let (seconds, attoseconds) = duration.components
+        let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
+        await telemetry.emit([
+            (TelemetryEventName.sdkInitializeStarted, ["state": Self.reportedState]),
+            (TelemetryEventName.sdkInitializeFailed, [
+                "outcome": "failed",
+                "code": failure.type.rawValue,
+                "error_number": String(failure.code),
+                "reason": failure.reason,
+                "duration_ms": String(milliseconds),
+                "failure_type": String(describing: type(of: original))
+            ])
+        ])
+    }
+
     static func install(
         config: PayabliConfig,
         urlSession: URLSession? = nil,
         telemetryTransport: (any TelemetryTransport)? = nil
     ) throws -> PayabliSession {
         try lock.withLock {
+            if let failure = testInstallFailure {
+                testInstallFailure = nil
+                throw failure
+            }
             let identity = ConfigIdentity(config)
             let current = installed
             // The installed session's own machine: the process-wide state is one value, and a stray write to it must
@@ -224,6 +256,14 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock { installed }
     }
 
+    /// Makes the next install throw an error the test chose, leaving the installed session in place
+    /// so a failure lands on a live one. The next install alone takes it.
+    ///
+    /// - Parameter failure: what the next install throws.
+    static func failNextInstallForTesting(_ failure: any Error) {
+        lock.withLock { testInstallFailure = failure }
+    }
+
     /// Drops the installed session and puts the state back, so one test cannot decide the outcome of the next.
     ///
     /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
@@ -233,6 +273,7 @@ public final class PayabliSession: @unchecked Sendable {
             installed = nil
             sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
+            testInstallFailure = nil
         }
     }
 }

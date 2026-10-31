@@ -10,11 +10,19 @@ enum PayabliPayInFailureMessage {
     /// - Parameters:
     ///   - error: The failure the submission threw.
     ///   - operation: What the form submitted.
-    /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; otherwise the
-    ///   message for the error's category, or the default message for an error outside the catalog.
+    /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; the default
+    ///   message for a failure converted at the entry point, which left before any send; otherwise the message for
+    ///   the error's category, or the default message for an error outside the catalog.
     static func text(for error: any Error, operation: PayabliPayInOperation) -> String {
         if case .submissionInterrupted = error as? PayabliPayInError {
             return text(for: .outcomeUnknown, operation: operation)
+        }
+        if let converted = error as? PayabliGenericError,
+           converted.type == .unknown, converted.underlying is RedactedCause
+        {
+            // A converted failure left before any send, or the wrap above would own it, so no money
+            // moved and the payer is told only that it did not complete.
+            return text(for: .internal, operation: operation)
         }
         return text(for: (error as? any PayabliError)?.category ?? .internal, operation: operation)
     }

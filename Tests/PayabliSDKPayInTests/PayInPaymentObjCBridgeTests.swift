@@ -153,6 +153,21 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertNil(error.userInfo["capture"])
     }
 
+    func testAnUnrecognizedErrorThroughObjectiveCCarriesTheInternalErrorsDomainAndCode() async throws {
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: ForeignErrorTransport(failure: HostThrew()),
+            key: "reserved-1"
+        ))
+
+        let (result, error) = await call { bridge.capture(PayabliPayInRequestObjC.cash(totalAmount: 10), completion: $0) }
+
+        XCTAssertNil(result)
+        let failure = try XCTUnwrap(error)
+        XCTAssertEqual(failure.domain, "com.payabli.payIn")
+        XCTAssertEqual(failure.code, PayabliErrorType.unknown.number)
+        XCTAssertEqual(failure.userInfo["capture"] as? Int, 0, "nothing was sent, so nothing was taken")
+    }
+
     func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {
         let error = CancellationError().toPayabliPayInNSError(movesMoney: true)
 

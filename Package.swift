@@ -122,7 +122,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PayabliSDKPayInTests",
-            dependencies: ["PayabliSDKCore", "PayabliSDKPayIn"],
+            dependencies: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTestUtils"],
             path: "Tests/PayabliSDKPayInTests"
         ),
         .testTarget(

@@ -445,7 +445,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     }
 
     @MainActor
-    func testAnErrorOutsideTheCatalogDrawsTheDefaultMessage() async {
+    func testAnUnexpectedErrorArrivesConvertedAndDrawsTheDefaultMessage() async {
         let viewModel = PayabliPayInViewModel(
             component: PayabliPayIn(
                 entryPoint: "entry",
@@ -463,7 +463,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("Expected transport error")
-        } catch PaymentMethodTestError.transportBoom {
+        } catch let error as PayabliGenericError {
+            XCTAssertEqual(error.type, .unknown)
             XCTAssertEqual(viewModel.errorMessage, "The payment method couldn't be saved.")
         } catch {
             XCTFail("Wrong error: \(error)")
