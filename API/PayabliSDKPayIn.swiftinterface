@@ -41,7 +41,7 @@ import _SwiftConcurrencyShims
 }
 @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency::MainActor @objc(PayabliPayInObjC) final public class PayabliPayInObjC : ObjectiveC::NSObject {
   @objc @_Concurrency::MainActor public static func create() throws -> PayabliSDKPayIn::PayabliPayInObjC
-  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func readTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInTransactionObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
@@ -293,6 +293,36 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
 }
+public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::Sendable {
+  public var cardNumber: PayabliSDKPayIn::SensitiveDigits
+  public var expiry: Swift::String
+  public var holderName: Swift::String
+  public var securityCode: PayabliSDKPayIn::SensitiveDigits
+  public var postalCode: Swift::String
+  public init(cardNumber: PayabliSDKPayIn::SensitiveDigits, expiry: Swift::String, holderName: Swift::String, securityCode: PayabliSDKPayIn::SensitiveDigits, postalCode: Swift::String)
+  public var description: Swift::String {
+    get
+  }
+  public var debugDescription: Swift::String {
+    get
+  }
+}
+public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::Sendable {
+  public var accountNumber: PayabliSDKPayIn::SensitiveDigits
+  public var accountType: PayabliSDKPayIn::PayabliPayInAccountType
+  public var holderName: Swift::String
+  public var routingNumber: Swift::String
+  public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
+  public var holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
+  public var device: Swift::String?
+  public init(accountNumber: PayabliSDKPayIn::SensitiveDigits, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, routingNumber: Swift::String, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, device: Swift::String? = nil)
+  public var description: Swift::String {
+    get
+  }
+  public var debugDescription: Swift::String {
+    get
+  }
+}
 public enum PayabliPayInMethodType : Swift::RawRepresentable, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
   case card
   case bankAccount
@@ -428,24 +458,6 @@ public struct PayabliPayInSaveFailure : Swift::Codable, Swift::Sendable, Swift::
   public func encode(to encoder: any Swift::Encoder) throws
   public init(from decoder: any Swift::Decoder) throws
 }
-public struct PayabliPayInCardData : Swift::Sendable {
-  public var cardNumber: Swift::String
-  public var expiration: Swift::String
-  public var cardholderName: Swift::String
-  public var cvv: Swift::String
-  public var billingZip: Swift::String
-  public init(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String)
-}
-public struct PayabliPayInBankAccountData : Swift::Sendable {
-  public var accountNumber: Swift::String
-  public var accountType: PayabliSDKPayIn::PayabliPayInAccountType
-  public var holderName: Swift::String
-  public var routingNumber: Swift::String
-  public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
-  public var holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
-  public var device: Swift::String?
-  public init(accountNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, routingNumber: Swift::String, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, device: Swift::String? = nil)
-}
 public enum PayabliPayInMethodInput : Swift::Sendable {
   case card(PayabliSDKPayIn::PayabliPayInCardData)
   case bankAccount(PayabliSDKPayIn::PayabliPayInBankAccountData)
@@ -565,7 +577,7 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   @objc final public var requiresLuhnCheck: Swift::Bool
   @objc final public var validatesRoutingNumberChecksum: Swift::Bool
   @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
-  @objc public static func card(cardNumber: Swift::String, expiration: Swift::String, cardholderName: Swift::String, cvv: Swift::String, billingZip: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc public static func card(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
@@ -1025,6 +1037,21 @@ public enum PayabliPayInModule {
   public static var version: Swift::String {
     get
   }
+}
+@_hasMissingDesignatedInitializers final public class SensitiveDigits : @unchecked Swift::Sendable, Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible {
+  public static func of(_ digits: [Swift::UInt8]) -> PayabliSDKPayIn::SensitiveDigits
+  public static func ofString(_ source: Swift::String) -> PayabliSDKPayIn::SensitiveDigits
+  final public var length: Swift::Int {
+    get
+  }
+  final public func close()
+  final public var description: Swift::String {
+    get
+  }
+  final public var debugDescription: Swift::String {
+    get
+  }
+  @objc deinit
 }
 extension PayabliSDKPayIn::PayabliPayInObjC : Swift::Sendable {}
 extension PayabliSDKPayIn::PayabliPayIn : Swift::Sendable {}

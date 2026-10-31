@@ -74,7 +74,7 @@ final class PayInTelemetryTests: XCTestCase {
     func testABankAccountAndACheckReportTheirKind() {
         XCTAssertEqual(PayInReports.method(of: .bankAccount(PayabliPayInPaymentMethod.BankAccount(
             data: PayabliPayInBankAccountData(
-                accountNumber: "1111111111",
+                accountNumber: SensitiveDigits.ofString("1111111111"),
                 accountType: .checking,
                 holderName: "Jane",
                 routingNumber: "123456780"
@@ -451,11 +451,11 @@ final class PayInTelemetryTests: XCTestCase {
     private static func heldKeyRequest(_ attempt: PayabliAttempt, cvv: String) -> PayabliPayInRequest {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiration: "12/30",
-                cardholderName: "Jane",
-                cvv: cvv,
-                billingZip: "12345"
+                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                expiry: "12/30",
+                holderName: "Jane",
+                securityCode: SensitiveDigits.ofString(cvv),
+                postalCode: "12345"
             ))),
             options: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
@@ -466,11 +466,11 @@ final class PayInTelemetryTests: XCTestCase {
     }
 
     private static let card = PayabliPayInCardData(
-        cardNumber: "4111111111111111",
-        expiration: "12/30",
-        cardholderName: "Jane",
-        cvv: "123",
-        billingZip: "12345"
+        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        expiry: "12/30",
+        holderName: "Jane",
+        securityCode: SensitiveDigits.ofString("123"),
+        postalCode: "12345"
     )
 
     private static let stored = Data("""

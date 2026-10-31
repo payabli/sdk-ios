@@ -70,15 +70,17 @@ data:
 
 ```swift
 let stored = try await paymentFlow.addCard(PayabliPayInCardData(
-    cardNumber: "4111111111111111",
-    expiration: "02/28",
-    cardholderName: "Jane Doe",
-    cvv: "123",
-    billingZip: "33139"
+    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+    expiry: "02/28",
+    holderName: "Jane Doe",
+    securityCode: SensitiveDigits.ofString("123"),
+    postalCode: "33139"
 ))
 ```
 
 Direct card/bank account calls are PCI-sensitive because the host app supplies the data.
+
+Card numbers, security codes and bank account numbers are held as `SensitiveDigits`, a buffer whose `close()` overwrites the digits once the app no longer needs them.
 
 ## 4. Store A Payment Method
 
@@ -146,11 +148,11 @@ Direct stored card:
 ```swift
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
-        cardNumber: "4111111111111111",
-        expiration: "02/28",
-        cardholderName: "Jane Doe",
-        cvv: "123",
-        billingZip: "33139"
+        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        expiry: "02/28",
+        holderName: "Jane Doe",
+        securityCode: SensitiveDigits.ofString("123"),
+        postalCode: "33139"
     ),
     options: PayabliPayInOptions(
         createAnonymous: false,
@@ -170,7 +172,7 @@ Direct stored bank account:
 ```swift
 let storedBankAccount = try await paymentFlow.addBankAccount(
     PayabliPayInBankAccountData(
-        accountNumber: "111111111111",
+        accountNumber: SensitiveDigits.ofString("111111111111"),
         accountType: .checking,
         holderName: "Jane Doe",
         routingNumber: "123456780",
@@ -227,11 +229,11 @@ Direct capture with card:
 
 ```swift
 let cardData = PayabliPayInCardData(
-    cardNumber: "4111111111111111",
-    expiration: "02/28",
-    cardholderName: "Jane Doe",
-    cvv: "123",
-    billingZip: "33139"
+    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+    expiry: "02/28",
+    holderName: "Jane Doe",
+    securityCode: SensitiveDigits.ofString("123"),
+    postalCode: "33139"
 )
 
 let result = try await paymentFlow.capture(PayabliPayInRequest(

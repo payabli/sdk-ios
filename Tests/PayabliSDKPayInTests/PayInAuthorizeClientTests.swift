@@ -51,7 +51,7 @@ final class PayInAuthorizeClientTests: XCTestCase {
     func testABankAccountACheckAndCashAreRefusedBeforeAnythingIsSent() async throws {
         let methods: [PayabliPayInPaymentMethod] = [
             .bankAccount(PayabliPayInPaymentMethod.BankAccount(data: PayabliPayInBankAccountData(
-                accountNumber: "1111111111111",
+                accountNumber: SensitiveDigits.ofString("1111111111111"),
                 accountType: .checking,
                 holderName: "John Doe",
                 routingNumber: "123456780"
