@@ -56,7 +56,7 @@ final class TapToPayErrorEdgeTests: XCTestCase {
         attestation.activationResult = .failure(CancellationError())
 
         do {
-            try await ttp.activateDevice(activationCode: "ABC123")
+            try await ttp.activateDevice(activationCode: "123456")
             XCTFail("expected the cancellation")
         } catch is CancellationError {
         } catch {
@@ -69,7 +69,7 @@ final class TapToPayErrorEdgeTests: XCTestCase {
         attestation.activationResult = .failure(PayabliGenericError(type: .rateLimited, reason: "Too many requests"))
 
         do {
-            try await ttp.activateDevice(activationCode: "ABC123")
+            try await ttp.activateDevice(activationCode: "123456")
             XCTFail("expected the refusal")
         } catch let error as TapToPayError {
             XCTAssertEqual(error.type, .rateLimited)

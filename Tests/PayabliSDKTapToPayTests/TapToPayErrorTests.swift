@@ -55,4 +55,40 @@ final class TapToPayErrorTests: XCTestCase {
         XCTAssertEqual(bridged.userInfo["paymentTransId"] as? String, "txn")
         XCTAssertEqual(bridged.userInfo["capture"] as? Int, PayabliTTPCapture.unknown.rawValue)
     }
+
+    func testAFailureThatIsNotAChargesOwnRefusalCarriesNone() {
+        let error = TapToPayError(type: .validation, reason: "r", detail: nil)
+
+        XCTAssertNil(error.refusal)
+        XCTAssertNil((error as NSError).userInfo["refusal"])
+        XCTAssertNil((error as NSError).userInfo["requiredFields"])
+    }
+
+    func testACustomerDataRefusalReachesABridgedCallerWithTheFieldsItNames() {
+        let error: any Error = TapToPayError(
+            type: .validation,
+            reason: "r",
+            detail: nil,
+            refusal: .customerDataRefused(requiredFields: ["customerNumber", "billingEmail"])
+        )
+
+        let bridged = error.toPayabliNSError()
+
+        XCTAssertEqual((error as? TapToPayError)?.refusal, .customerDataRefused(requiredFields: ["customerNumber", "billingEmail"]))
+        XCTAssertEqual(bridged.code, 1016)
+        XCTAssertEqual(bridged.userInfo["refusal"] as? String, "customerDataRefused")
+        XCTAssertEqual(bridged.userInfo["requiredFields"] as? [String], ["customerNumber", "billingEmail"])
+    }
+
+    func testACustomerDataRefusalNamingNoFieldsStillReachesABridgedCaller() {
+        let error = TapToPayError(
+            type: .validation,
+            reason: "r",
+            detail: nil,
+            refusal: .customerDataRefused(requiredFields: [])
+        ) as NSError
+
+        XCTAssertEqual(error.userInfo["refusal"] as? String, "customerDataRefused")
+        XCTAssertEqual(error.userInfo["requiredFields"] as? [String], [])
+    }
 }

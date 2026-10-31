@@ -131,8 +131,8 @@ releases it or voids a transaction that hasn't settled.
 ### Retry safely
 
 A charge always sends an idempotency key, which the SDK makes and keeps; your app never handles one. Name each
-payment with `paymentReference` on the request's options, or leave it unset and the SDK names the payment. The
-reference stays on the device. Calling again is a new payment unless you say otherwise.
+payment with `paymentReference` on the request's options, or leave it unset on a new payment and the SDK names it.
+The reference stays on the device. Calling again is a new payment unless you say otherwise.
 
 When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
@@ -142,16 +142,24 @@ service refuses a repeat while it still recognises the key. When it refuses one,
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.
 
+Cancelling the task that runs a charge ends the call with a `CancellationError`, whether or not the request was
+sent, so treat its outcome as unknown. If your app cancels charges, name each payment with `paymentReference` and
+retry under it with `attempt: .retry`. The form reports a cancelled charge that may have been sent to its failure
+handler as `submissionInterrupted` with type `.userCancelled`.
+
 A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
 payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
 before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right
 retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
-with type `.paymentReferenceOpen`. A blank reference is refused as invalid input.
+with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
+retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
+is refused as invalid input, and so is a retry that names no reference.
 
-The SDK holds a payment's key in memory, on the `PayabliPayIn` it was sent from, for a few minutes after its latest
-send, and holds at most 16 at a time. A retry after that, from another `PayabliPayIn`, or after your app restarts
-sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that point, read
-the transaction back instead.
+Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
+from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after
+its latest send, and holds at most 16 for each entry point and environment. A retry after that, or after your app
+restarts, sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that
+point, read the transaction back instead.
 
 ## Outcomes and errors
 

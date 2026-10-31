@@ -187,9 +187,8 @@ extension PayInFailure {
 
     /// What an outcome nobody knows means for a reversal.
     ///
-    /// The SDK words this one for a payment, which is what every other call here is. After a reversal
-    /// it is the reversal whose fate is open, and reading it as the payment's sends an operator to
-    /// the wrong question.
+    /// The SDK's reason names the transaction. After a reversal it is the reversal whose fate is
+    /// open, so this words the open question for the operator reading it.
     private static let unknownReversalMessage =
         "The reversal may have been applied and the outcome is unknown. Read the "
             + "transaction back rather than reversing it again."
@@ -229,7 +228,7 @@ extension PayInFailure {
         if operation == .void, (error as? any PayabliError)?.type == .retryRefused {
             return reversalStillRunningMessage
         }
-        // The SDK words an open outcome as the payment's, because every other call here is one.
+        // A reversal's open outcome gets its own copy, so an operator reads what is open after one.
         if operation == .void, leavesOutcomeUnknown(error) {
             return unknownReversalMessage
         }

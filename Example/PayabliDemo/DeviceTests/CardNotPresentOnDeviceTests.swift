@@ -1,6 +1,6 @@
 @testable import PayabliDemo
 @testable import PayabliSDKCore
-import PayabliSDKPayIn
+@testable import PayabliSDKPayIn
 import XCTest
 
 /// The card-not-present surface against a live paypoint on real hardware:
@@ -74,14 +74,16 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     }
 
     private func makeFlow() throws -> PayabliPayIn {
-        PayabliPayIn(
-            session: PayabliSession(config: try PayabliConfig(
-                entryPoint: named.entry,
-                environment: named.environment,
+        PayabliPayIn(session: try makeSession())
+    }
 
-                tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
-            ))
-        )
+    private func makeSession() throws -> PayabliSession {
+        PayabliSession(config: try PayabliConfig(
+            entryPoint: named.entry,
+            environment: named.environment,
+
+            tokenProvider: { try await Secrets.fetchPaymentMethodAccessToken() }
+        ))
     }
 
     /// The request the app's capture screen builds, with this run's card in it.
@@ -310,6 +312,40 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         }
     }
 
+    /// A retry that names no payment is refused before anything is sent, so it cannot go out as a new payment.
+    func testJARetryNamingNoReferenceIsRefusedUnsent() async throws {
+        let recorder = RecordingTransport(sendingThrough: try makeSession().transport)
+        let flow = PayabliPayIn(entryPoint: named.entry, environment: named.environment, transport: recorder)
+        let fresh = PayInRequests.freshCapture(suppliesCustomer: true)
+        let unnamedRetry = PayabliPayInRequest(
+            paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: try card())),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: fresh.paymentDetails,
+                customerData: fresh.customerData,
+                orderDescription: fresh.orderDescription,
+                orderId: fresh.orderId,
+                source: fresh.source,
+                attempt: .retry,
+                forceCustomerCreation: fresh.forceCustomerCreation
+            )
+        )
+
+        do {
+            let charged = try await flow.capture(unnamedRetry)
+            if let transId = charged.transaction?.paymentTransId {
+                await reverse(transId, on: flow, whenLeftStanding: "a retry naming no payment was charged")
+            }
+            XCTFail("a retry naming no payment was not refused: code=\(charged.code)")
+        } catch {
+            XCTAssertEqual(
+                error as? PayabliPayInError,
+                .invalidInput("A retry must name the paymentReference of the payment it repeats.")
+            )
+        }
+        let sent = await recorder.sent
+        XCTAssertEqual(sent, 0, "a request was sent")
+    }
+
     // MARK: - Void
 
     /// Reverses a transaction through the SDK's own member, which is what gives this
@@ -349,6 +385,29 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 XCTFail("\(standing), and it needs voiding by hand: \(transId)")
             }
         }
+    }
+}
+
+/// Sends every request through the session's own transport and counts them, so a test can say none went out.
+private actor RecordingTransport: PayabliTransport {
+    private let base: any PayabliTransport
+    private(set) var sent = 0
+
+    init(sendingThrough base: any PayabliTransport) {
+        self.base = base
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        sent += 1
+        return try await base.perform(request)
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        sent += 1
+        return try await base.performV2(request, decoding: decoding)
     }
 }
 

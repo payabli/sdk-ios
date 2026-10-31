@@ -4,6 +4,11 @@ import PayabliSDKCore
 import XCTest
 
 final class PaymentMethodRejectedFieldsTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     // MARK: - What the caller catches
 
     @MainActor

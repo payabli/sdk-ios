@@ -775,7 +775,7 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 | `source` | Optional source string. |
 | `subdomain` | Optional subdomain. |
 | `subscriptionId` | Optional subscription ID. |
-| `paymentReference` | Optional. Your app's name for the payment, never sent; the SDK names it when unset. |
+| `paymentReference` | Optional. Your app's name for the payment, never sent; the SDK names a new payment when unset. A retry must set it. |
 | `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
 | `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client-side validation options. |
@@ -886,17 +886,11 @@ When customizing:
 - Test Dynamic Type, especially accessibility sizes.
 - Ensure custom colors have sufficient contrast.
 
-## 16. Bridge Scope
+## 16. Other Technologies
 
-The Flutter, React Native and .NET MAUI bridges in `Bridges/` are examples of integrating the SDK from each
-technology. Use them as a starting point for your own integration. They show stored card and bank account
-payment-method creation. Capture, authorize, capture-authorized and void transaction flows are called from
-Swift with `PayabliSDKPayIn`.
-
-The `@objc` interface covers `addCard` and `addBankAccount` only. Capture, authorize,
-`captureAuthorizedTransaction(_:)` and `voidTransaction(_:)` are called from Swift.
-
-The React Native example app is under `Example/PayabliReactNativeDemo`.
+An app written in another technology, such as React Native, Flutter or .NET MAUI, reaches the SDK through its
+Objective-C surface. [Language support](../README.md#language-support) lists the Objective-C types, and
+[Other technologies](../README.md#other-technologies) shows how to write the native module.
 
 ## 17. Testing
 
@@ -926,11 +920,4 @@ Run the native sample app:
 xcodebuild build -project Example/PayabliDemo/PayabliDemo.xcodeproj \
   -scheme PayabliDemo \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro,OS=26.4.1'
-```
-
-Run the React Native example type check:
-
-```bash
-cd Example/PayabliReactNativeDemo
-npm run typecheck
 ```
