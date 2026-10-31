@@ -3,18 +3,8 @@ import PayabliSDKCore
 
 // MARK: - ObjC companions for transaction-data structs
 
-//
-// These `*ObjC` classes are thin wrappers around the Swift value types in
-// `PayabliTTPTransactionData.swift` / `PayabliTTPTypes.swift` so ObjC, MAUI
-// (sharpie), Flutter, and React Native consumers can build the same payloads
-// that Swift callers express as `struct`s. Each class exposes immutable
-// `@objc` properties and an `init(...)` mirroring the Swift parameter labels;
-// the internal `toSwift()` / `init(_:)` helpers bridge to and from the
-// underlying `Sendable` value type.
-//
-// Maintenance contract: any change to a public field on the Swift struct
-// MUST be reflected here at the same time. The `*ObjC` classes are part of
-// the public API.
+// Objective-C companions to the value types in `PayabliTTPTransactionData.swift` and
+// `PayabliTTPTypes.swift`. A public field changed on a Swift struct changes here in the same commit.
 
 /// ObjC companion for `PayabliTTPCustomerData`.
 ///

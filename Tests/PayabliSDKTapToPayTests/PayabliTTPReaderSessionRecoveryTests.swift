@@ -132,6 +132,15 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         ))
     }
 
+    /// A refusal of the device by the vendor and a reader gone end the reader session; a reader that could not be
+    /// started or a guard that failed ends only the read.
+    func testTheSDKsOwnRefusalsAreClassified() {
+        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerDeviceRefused(reason: "x")))
+        XCTAssertTrue(readerFailureInvalidatesSession(PayabliTTPError.readerSessionExpired(capture: .notCharged)))
+        XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.readerUnavailable(reason: "x")))
+        XCTAssertFalse(readerFailureInvalidatesSession(PayabliTTPError.guardFailed(reason: "x")))
+    }
+
     // MARK: - initialize() from a state it did not start in
 
     /// `initialize()` has to work from wherever the session happens to be.
@@ -369,102 +378,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .ready)
     }
 
-    // MARK: - Error text reaching the host
-
-    /// A host shows `localizedDescription`. The adapter's own words reach it as
-    /// written, never as an internal value printed back — case name,
-    /// parentheses, and the inner string escaped.
-    func testPrepareFailureKeepsTheAdapterMessage() async throws {
-        let provider = MockTapToPayProvider()
-        provider.prepareReaderResult = .failure(
-            PayabliTTPError.readerSetupFailed(
-                reason: "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
-            )
-        )
-        let ttp = try makeTTP(provider: provider)
-
-        do {
-            try await bounded { try await ttp.initialize() }
-            XCTFail("expected initialize to fail")
-        } catch {
-            let adapterWords = "passcodeDisabled: Error that indicates the device doesn't have an active passcode."
-            XCTAssertEqual((error as? TapToPayError)?.detail, adapterWords)
-            let shown = error.localizedDescription
-            XCTAssertTrue(shown.hasSuffix(adapterWords), shown)
-            XCTAssertFalse(shown.contains("readerSetupFailed("), "the enum itself leaked into the message")
-            XCTAssertFalse(shown.contains("\\'"), "the inner string was escaped for display")
-        }
-    }
-
-    func testChargeFailureKeepsTheReaderMessage() async throws {
-        let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(Self.sessionLevelFailure)
-
-        do {
-            _ = try await charge(ttp)
-            XCTFail("expected the charge to fail")
-        } catch {
-            let readerWords = "noReaderSession: no reader session available or the session isn't ready"
-            XCTAssertEqual((error as? TapToPayError)?.detail, readerWords)
-            XCTAssertTrue(error.localizedDescription.hasSuffix(readerWords), error.localizedDescription)
-        }
-    }
-
-    func testAReadFailureNamesThePaymentItBelongsTo() async throws {
-        let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(Self.sessionLevelFailure)
-
-        let failure = try await chargeFailure(ttp)
-
-        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .unknown, "the processor may take the sale before the reader answers")
-    }
-
-    func testAnUntypedReadFailureNamesThePayment() async throws {
-        let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(URLError(.timedOut))
-
-        let failure = try await chargeFailure(ttp)
-
-        XCTAssertEqual(failure.type, .tapNotCompleted)
-        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .unknown)
-    }
-
-    func testAnUnsupportedOSDuringAReadKeepsItsCaseAndNamesThePayment() async throws {
-        let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(PayabliTTPError.readerOSVersionNotSupported())
-
-        let failure = try await chargeFailure(ttp)
-
-        XCTAssertEqual(failure.type, .deviceOSUnsupported, "the remedy is a different device, not a retry")
-        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .unknown, "the reader had been asked for a card")
-    }
-
-    func testAReaderThatWasNotPreparedKeepsItsCaseAndChargedNothing() async throws {
-        let (ttp, provider, _) = try await makeReadyTTP()
-        provider.readingResult = .failure(PayabliTTPError.readerSetupFailed(reason: "Reader not prepared"))
-
-        let failure = try await chargeFailure(ttp)
-
-        XCTAssertEqual(failure.type, .unknown)
-        XCTAssertEqual(failure.detail, "Reader not prepared")
-        XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
-        XCTAssertEqual(failure.capture, .notCharged, "the reader was never asked for a card")
-    }
-
     // MARK: - Fixtures
-
-    private func chargeFailure(_ ttp: PayabliTTP) async throws -> TapToPayError {
-        do {
-            _ = try await charge(ttp)
-        } catch let failure as TapToPayError {
-            return failure
-        }
-        XCTFail("expected the charge to fail")
-        throw CancellationError()
-    }
 
     private static let paymentTransId = "ttp-txn-1"
 

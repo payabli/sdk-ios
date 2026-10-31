@@ -330,7 +330,7 @@ final class PayabliTTPActivationIdTests: XCTestCase {
 
         XCTAssertEqual(ttp.activationId, "dev_e")
 
-        try await ttp.activateDevice(activationCode: "ABC123")
+        try await ttp.activateDevice(activationCode: "123456")
 
         XCTAssertNil(ttp.activationId)
     }

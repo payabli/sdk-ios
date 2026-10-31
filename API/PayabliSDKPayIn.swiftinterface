@@ -323,23 +323,23 @@ public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swif
     get
   }
 }
-public enum PayabliPayInMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
+public enum PayabliPayInMethodType : Swift::RawRepresentable, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
   case card
   case bankAccount
+  public init?(rawValue: Swift::String)
+  public var rawValue: Swift::String {
+    get
+  }
   public var id: Swift::String {
     get
   }
   public var displayName: Swift::String {
     get
   }
-  public init?(rawValue: Swift::String)
   public typealias AllCases = [PayabliSDKPayIn::PayabliPayInMethodType]
   public typealias ID = Swift::String
   public typealias RawValue = Swift::String
   nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInMethodType] {
-    get
-  }
-  public var rawValue: Swift::String {
     get
   }
 }
@@ -576,13 +576,13 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   @objc final public var forceCustomerCreation: Foundation::NSNumber?
   @objc final public var requiresLuhnCheck: Swift::Bool
   @objc final public var validatesRoutingNumberChecksum: Swift::Bool
+  @objc deinit
   @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func card(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
-  @objc deinit
 }
 @objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
   @objc final public let transId: Swift::String
@@ -819,20 +819,20 @@ public enum PayabliPayInResultKind : Swift::String, Swift::Sendable, Swift::Equa
     get
   }
 }
-public enum PayabliPayInStoredMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+public enum PayabliPayInStoredMethodType : Swift::RawRepresentable, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
   case card
   case bankAccount
+  public init?(rawValue: Swift::String)
+  public var rawValue: Swift::String {
+    get
+  }
   public var id: Swift::String {
     get
   }
-  public init?(rawValue: Swift::String)
   public typealias AllCases = [PayabliSDKPayIn::PayabliPayInStoredMethodType]
   public typealias ID = Swift::String
   public typealias RawValue = Swift::String
   nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInStoredMethodType] {
-    get
-  }
-  public var rawValue: Swift::String {
     get
   }
 }
@@ -1066,7 +1066,6 @@ extension PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement : Swift::Hashable 
 extension PayabliSDKPayIn::PayabliPayInErrorMessagePlacement : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInAccountType : Swift::Equatable {}
@@ -1087,5 +1086,4 @@ extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInView : Swift::Sendable {}

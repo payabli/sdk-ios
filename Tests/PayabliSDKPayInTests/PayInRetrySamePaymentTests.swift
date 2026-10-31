@@ -6,6 +6,11 @@ import XCTest
 /// refused before anything is sent, and the key stays for the right retry.
 @MainActor
 final class PayInRetrySamePaymentTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let transport = ScriptedTransport()
     private let clock = TestClock()
 
@@ -32,6 +37,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
             ("order", payment(.retry, orderId: "order-2"))
         ]
         for (field, retry) in variants {
+            PayInKeyStore.process.forgetHeld()
             let flow = makeFlow()
             transport.script = [.lost]
             _ = await failure { try await flow.capture(self.payment(.newPayment, orderId: "order-1")) }
@@ -57,6 +63,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
 
     func testASurchargeIsComparedWithNoneCountingAsZero() async throws {
         for retry in [payment(.retry, surcharge: 2), payment(.retry)] {
+            PayInKeyStore.process.forgetHeld()
             let flow = makeFlow()
             transport.script = [.lost]
             _ = await failure { try await flow.capture(self.payment(.newPayment, surcharge: 1)) }
@@ -65,6 +72,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
 
             XCTAssertEqual((refused as? any PayabliError)?.type, .retryNotSamePayment)
         }
+        PayInKeyStore.process.forgetHeld()
         let flow = makeFlow()
         transport.script = [.lost, .approved]
         _ = await failure { try await flow.capture(self.payment(.newPayment)) }
@@ -73,7 +81,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k1", "k1"])
     }
 
-    func testAKeyHeldAgainAfterItsRecordExpiredKeepsTheFirstPayment() throws {
+    func testAKeyResentAtTheEndOfItsWindowKeepsTheFirstPayment() throws {
         var keys = HeldIdempotencyKeys()
         let start = ContinuousClock.now
         let maxAge = payabliIdempotencyKeyMaxAge
@@ -81,13 +89,13 @@ final class PayInRetrySamePaymentTests: XCTestCase {
             scope: .capture(reference: "p1"), claimsHeld: false,
             payment: HeldPaymentDescription(payment(.newPayment)), now: start, mint: { "k1" }
         )
-        keys.settle(first, outcome: .unknown, now: start)
+        keys.settle(first, outcome: .unknown)
         let resent = try keys.reserve(
             scope: .capture(reference: "p1"), claimsHeld: true,
             payment: HeldPaymentDescription(payment(.retry, orderId: "order-1")),
             now: start.advanced(by: maxAge - .seconds(1)), mint: { "k-other" }
         )
-        keys.settle(resent, outcome: .unknown, now: start.advanced(by: maxAge))
+        keys.settle(resent, outcome: .unknown)
 
         let retried = try keys.reserve(
             scope: .capture(reference: "p1"), claimsHeld: true,

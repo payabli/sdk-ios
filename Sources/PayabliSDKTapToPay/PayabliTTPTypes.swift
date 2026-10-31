@@ -4,7 +4,7 @@ import Foundation
 ///
 /// A Swift enum rather than an `@objc` one, because some cases carry a value an
 /// `Int`-backed enum cannot hold. ``PayabliTTPSessionStateCode`` is the
-/// projection the bridges read.
+/// projection an Objective-C host reads.
 public enum PayabliTTPSessionState: Sendable, Equatable {
     case idle
     case attestingDevice
@@ -40,8 +40,8 @@ public enum PayabliTTPSessionState: Sendable, Equatable {
     case charging(activity: TapToPayChargeActivity)
 }
 
-/// ``PayabliTTPSessionState`` without its payloads, for ObjC, MAUI, React
-/// Native and Flutter, which cannot express an enum that carries one.
+/// ``PayabliTTPSessionState`` without its payloads, for Objective-C hosts,
+/// which cannot express an enum that carries one.
 ///
 /// Raw values are public API: do not reorder or renumber. A host reads the
 /// payloads through `PayabliTTP`'s own accessors.

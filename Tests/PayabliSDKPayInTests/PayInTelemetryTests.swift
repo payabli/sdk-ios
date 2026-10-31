@@ -6,6 +6,11 @@ import XCTest
 /// instrument or the payer.
 @MainActor
 final class PayInTelemetryTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private let recorder = RecordingTelemetryTransport()
     private var telemetry: TelemetryClient?
 
@@ -183,16 +188,67 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertNotNil(event.properties["duration_ms"])
     }
 
-    func testACancelledSendIsInterrupted() async throws {
+    func testACancelledSendIsInterruptedAndReportsUserCancelled() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(failure: CancellationError()))
 
         let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
 
+        XCTAssertTrue(told is CancellationError, "\(told)")
         let event = try await onlyEvent(of: flow)
         XCTAssertEqual(event.properties["outcome"], "interrupted")
-        XCTAssertEqual(event.properties["code"], (told as? any PayabliError)?.type.rawValue, "the code the caller was told")
-        XCTAssertNotNil(event.properties["error_number"])
+        XCTAssertEqual(event.properties["code"], "USER_CANCELLED")
+        XCTAssertEqual(event.properties["error_number"], "1015")
         XCTAssertEqual(event.properties["failure_type"], "CancellationError")
+    }
+
+    func testACancelledStoreIsNotOpenAndReportsUserCancelled() async throws {
+        let flow = makeFlow(RecordingIdempotencyTransport(failure: CancellationError()))
+
+        let told = await PayInFixture.failure { _ = try await flow.addCard(Self.card) }
+
+        XCTAssertTrue(told is CancellationError, "\(told)")
+        let event = try await onlyEvent(of: flow)
+        XCTAssertEqual(event.event, "payin.storeMethod.completed")
+        XCTAssertEqual(event.properties["outcome"], "interrupted")
+        XCTAssertEqual(event.properties["code"], "USER_CANCELLED")
+    }
+
+    func testAFormCaptureCancelledAfterTheHandOffHandsTheHostAnOpenOutcomeTypedUserCancelled() async throws {
+        let transport = ScriptedTransport()
+        transport.script = [.cancelled(afterHandOff: true), .approved]
+        let flow = makeFlow(transport, operation: .capture)
+        flow.configure(requestConfiguration: PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+            paymentReference: "p1"
+        ))
+        let viewModel = PayabliPayInViewModel(
+            component: flow,
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        )
+        viewModel.cardNumber = "4111111111111111"
+        viewModel.cardExpiration = "12/30"
+        viewModel.cardCvv = "123"
+        viewModel.cardholderName = "Jane"
+        viewModel.cardZip = "12345"
+
+        let told = await PayInFixture.failure { _ = try await viewModel.submit() }
+
+        guard case let .submissionInterrupted(type, causeType, _, reference) = told as? PayabliPayInError else {
+            return XCTFail("expected submissionInterrupted, got \(told)")
+        }
+        XCTAssertEqual(type, .userCancelled)
+        XCTAssertEqual(causeType, "Swift.CancellationError")
+        XCTAssertEqual(reference, "p1")
+        XCTAssertEqual(viewModel.errorMessage, PayabliPayInFailureMessage.text(for: .outcomeUnknown, operation: .capture))
+        let event = try await onlyEvent(of: flow)
+        XCTAssertEqual(event.properties["origin"], "form")
+        XCTAssertEqual(event.properties["outcome"], "interrupted")
+        XCTAssertEqual(event.properties["code"], "USER_CANCELLED")
+
+        _ = try await flow.capture(Self.heldKeyRequest(.retry, cvv: "123"))
+
+        XCTAssertEqual(transport.sentKeys.count, 2)
+        XCTAssertEqual(transport.sentKeys.first, transport.sentKeys.last, "the retry did not resend the held key")
     }
 
     func testAFailureNothingClassifiedIsFailed() async throws {
@@ -431,7 +487,7 @@ final class PayInTelemetryTests: XCTestCase {
 private actor RecordingTelemetryTransport: TelemetryTransport {
     private(set) var events: [TelemetryEvent] = []
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         events += batch
         return .delivered
     }

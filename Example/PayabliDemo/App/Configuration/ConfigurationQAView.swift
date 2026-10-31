@@ -10,11 +10,15 @@ import SwiftUI
 /// The card-not-present rows read from `PayInSharedConfiguration`, the same
 /// source the forms use, so this screen cannot drift from the real behaviour.
 struct ConfigurationQAView: View {
+    /// Answers the session's device ID.
+    let readDeviceId: () async -> String?
+
     @EnvironmentObject private var tokenProbes: TokenProbeResults
     @EnvironmentObject private var demoCustomer: DemoCustomerSetting
     @AppStorage(Self.showsSimpleCaptureKey) private var showsSimpleCapture = false
     @State private var healthCheckText = ""
     @State private var isWorking = false
+    @State private var deviceId = SupportDeviceId.reading
 
     static let showsSimpleCaptureKey = "showsSimpleCapture"
 
@@ -22,6 +26,7 @@ struct ConfigurationQAView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
+                    supportSection
                     integrationSection
                     tokenEndpointSection
                     terminalSection
@@ -31,6 +36,20 @@ struct ConfigurationQAView: View {
                 .padding(16)
             }
             .navigationTitle("Configuration")
+            // Read on each appearance: the keychain does not answer before the first unlock after a restart.
+            .task { deviceId = await SupportDeviceId(readDeviceId()) }
+        }
+    }
+
+    // MARK: - Support
+
+    private var supportSection: some View {
+        section("Support", note: "The value Payabli support asks for. Not the activation ID.") {
+            QADetailRow(
+                label: "Device ID",
+                value: deviceId.shown,
+                onCopy: deviceId.copyable.map { id in { UIPasteboard.general.string = id } }
+            )
         }
     }
 
@@ -299,7 +318,9 @@ struct ConfigurationQAView: View {
 }
 
 #Preview {
-    ConfigurationQAView()
-        .environmentObject(TokenProbeResults.inert())
-        .environmentObject(DemoCustomerSetting())
+    WithDemoSession { session, _ in
+        ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
+            .environmentObject(TokenProbeResults.inert())
+            .environmentObject(DemoCustomerSetting())
+    }
 }
