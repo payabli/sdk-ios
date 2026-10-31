@@ -576,13 +576,13 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   @objc final public var forceCustomerCreation: Foundation::NSNumber?
   @objc final public var requiresLuhnCheck: Swift::Bool
   @objc final public var validatesRoutingNumberChecksum: Swift::Bool
+  @objc deinit
   @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func card(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
-  @objc deinit
 }
 @objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
   @objc final public let transId: Swift::String

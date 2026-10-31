@@ -218,6 +218,165 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertNotNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "bankAccount", totalAmount: 1))
     }
 
+    /// The wrapper's factories build the SDK's own digit buffers from strings: no host can reach
+    /// them, so the wrapper overwrites them at its teardown and each payment task overwrites the
+    /// copies it was handed.
+    func testTheWrapperOverwritesItsCardBuffersWhenItIsReleased() {
+        let digits = autoreleasepool {
+            let wrapper = PayabliPayInRequestObjC.card(
+                cardNumber: "4111111111111111",
+                expiry: "02/30",
+                holderName: "Jane Doe",
+                securityCode: "999",
+                postalCode: "12345",
+                saveIfSuccess: false,
+                totalAmount: 10
+            )
+            return wrapper.paymentMethod.sensitiveDigits
+        }
+
+        XCTAssertEqual(digits.count, 2, "a card method holds its number and its security code")
+        XCTAssertTrue(digits[0].isWiped, "the wrapper overwrote the card number when released")
+        XCTAssertEqual(
+            digits[0].rawCopy(), Array(repeating: 0, count: 16),
+            "the card number is overwritten, not just released"
+        )
+        XCTAssertTrue(digits[1].isWiped, "the wrapper overwrote the security code when released")
+        XCTAssertEqual(
+            digits[1].rawCopy(), Array(repeating: 0, count: 3),
+            "the security code is overwritten, not just released"
+        )
+    }
+
+    func testTheWrapperOverwritesItsAccountNumberWhenItIsReleased() {
+        let digits: [SensitiveDigits] = autoreleasepool {
+            guard let wrapper = PayabliPayInRequestObjC.bankAccount(
+                accountNumber: "1111111111",
+                accountType: "Checking",
+                holderName: "Jane Doe",
+                routingNumber: "021000021",
+                secCode: nil,
+                holderType: nil,
+                totalAmount: 10
+            ) else { return [] }
+            return wrapper.paymentMethod.sensitiveDigits
+        }
+
+        XCTAssertEqual(digits.count, 1, "a bank method holds its account number")
+        XCTAssertTrue(digits[0].isWiped, "the wrapper overwrote the account number when released")
+        XCTAssertEqual(
+            digits[0].rawCopy(), Array(repeating: 0, count: 10),
+            "the account number is overwritten, not just released"
+        )
+    }
+
+    func testTheRequestHoldsItsOwnCopiesOfTheWrappersDigitBuffers() {
+        let cardDigits: [SensitiveDigits] = autoreleasepool {
+            let wrapper = PayabliPayInRequestObjC.card(
+                cardNumber: "4111111111111111",
+                expiry: "02/30",
+                holderName: "Jane Doe",
+                securityCode: "999",
+                postalCode: "12345",
+                saveIfSuccess: false,
+                totalAmount: 10
+            )
+            return wrapper.toSwift().paymentMethod.sensitiveDigits
+        }
+        let bankDigits: [SensitiveDigits] = autoreleasepool {
+            guard let wrapper = PayabliPayInRequestObjC.bankAccount(
+                accountNumber: "1111111111",
+                accountType: "Checking",
+                holderName: "Jane Doe",
+                routingNumber: "021000021",
+                secCode: nil,
+                holderType: nil,
+                totalAmount: 10
+            ) else { return [] }
+            return wrapper.toSwift().paymentMethod.sensitiveDigits
+        }
+
+        XCTAssertEqual(cardDigits[0].length, 16, "the request's card number is its own copy")
+        XCTAssertEqual(cardDigits[1].length, 3, "the request's security code is its own copy")
+        XCTAssertEqual(bankDigits[0].length, 10, "the request's account number is its own copy")
+    }
+
+    func testTheChargeTaskClosesTheRequestsCardBuffersOnARefusal() async {
+        let transport = RecordingIdempotencyTransport(
+            failure: PayabliGenericError(type: .networkError, reason: "lost")
+        )
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let request = PayInFixture.request(cardOnly: true)
+        let digits = request.paymentMethod.sensitiveDigits
+
+        let (result, error) = await call { bridge.capture(request, completion: $0) }
+
+        XCTAssertNil(result)
+        XCTAssertNotNil(error)
+        XCTAssertTrue(digits[0].isWiped, "the task closed the card number buffer")
+        XCTAssertEqual(
+            digits[0].rawCopy(), Array(repeating: 0, count: 19),
+            "the card number is overwritten, not just released"
+        )
+        XCTAssertTrue(digits[1].isWiped, "the task closed the security code buffer")
+        XCTAssertEqual(
+            digits[1].rawCopy(), Array(repeating: 0, count: 3),
+            "the security code is overwritten, not just released"
+        )
+    }
+
+    func testTheAuthorizationTaskClosesTheRequestsCardBuffersOnAnApproval() async {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let request = PayInFixture.request(cardOnly: true)
+        let digits = request.paymentMethod.sensitiveDigits
+
+        let (result, error) = await call { bridge.authorize(request, completion: $0) }
+
+        XCTAssertNil(error)
+        XCTAssertEqual(result?.code, "A0000")
+        XCTAssertTrue(digits[0].isWiped, "the task closed the card number buffer on the success exit")
+        XCTAssertEqual(
+            digits[0].rawCopy(), Array(repeating: 0, count: 19),
+            "the card number is overwritten on success, not just released"
+        )
+        XCTAssertTrue(digits[1].isWiped, "the task closed the security code buffer on the success exit")
+        XCTAssertEqual(
+            digits[1].rawCopy(), Array(repeating: 0, count: 3),
+            "the security code is overwritten on success, not just released"
+        )
+    }
+
+    func testARetryThroughTheSameWrapperStillCarriesItsDigits() async {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let wrapper = PayabliPayInRequestObjC.card(
+            cardNumber: "4111111111111111",
+            expiry: "02/30",
+            holderName: "Jane Doe",
+            securityCode: "999",
+            postalCode: "12345",
+            saveIfSuccess: false,
+            totalAmount: 10
+        )
+        wrapper.paymentReference = "order-42"
+
+        let first = await call { bridge.capture(wrapper, completion: $0) }
+        wrapper.attempt = .retry
+        let second = await call { bridge.capture(wrapper, completion: $0) }
+
+        XCTAssertEqual([first.0?.code, second.0?.code], ["A0000", "A0000"])
+        XCTAssertEqual(transport.count, 2, "the retry reached the service again")
+        XCTAssertEqual(
+            wrapper.paymentMethod.sensitiveDigits[0].length, 16,
+            "the first charge spent its own copy, leaving the wrapper's digits for the retry"
+        )
+        XCTAssertEqual(
+            wrapper.paymentMethod.sensitiveDigits[1].length, 3,
+            "the first charge spent its own copy, leaving the wrapper's security code for the retry"
+        )
+    }
+
     // MARK: -
 
     private func call(

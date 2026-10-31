@@ -610,14 +610,15 @@ public extension PayabliPayInMethodInput {
 
 extension PayabliPayInCardData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let digits = cardNumber.digitsOnly
-        guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
-            .contains(digits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
-        }
-        if validation.requiresLuhnCheck, !Self.passesLuhn(digits) {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+        try cardNumber.useDigitBytes(field: "Card number") { pan in
+            guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
+                .contains(pan.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
+            }
+            if validation.requiresLuhnCheck, !Self.passesLuhn(pan) {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+            }
         }
         _ = try normalizedExpiration()
         let trimmedCardholderName = holderName.trimmed
@@ -634,14 +635,15 @@ extension PayabliPayInCardData {
         guard trimmedBillingZip.count <= PayabliPayInInputLimits.maximumPostalCodeCharacters else {
             throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code must be 12 characters or fewer.")
         }
-        let cvvDigits = securityCode.digitsOnly
-        guard !cvvDigits.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
-        }
-        guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-            .contains(cvvDigits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+        try securityCode.useDigitBytes(field: "CVV") { cvv in
+            guard !cvv.isEmpty else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
+            }
+            guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
+                .contains(cvv.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+            }
         }
     }
 
@@ -658,13 +660,12 @@ extension PayabliPayInCardData {
         return "\(monthPrefix)/\(year)"
     }
 
-    static func passesLuhn(_ digits: String) -> Bool {
-        let reversed = digits.reversed().compactMap { Int(String($0)) }
-        guard reversed.count == digits.count else { return false }
-
-        let sum = reversed.enumerated().reduce(0) { partial, pair in
-            let (index, digit) = pair
-            guard index % 2 == 1 else { return partial + digit }
+    static func passesLuhn(_ digits: [UInt8]) -> Bool {
+        guard !digits.isEmpty, digits.allSatisfy({ (0x30 ... 0x39).contains($0) }) else { return false }
+        let sum = digits.reversed().enumerated().reduce(0) { partial, pair in
+            let (offset, byte) = pair
+            let digit = Int(byte - 0x30)
+            guard offset % 2 == 1 else { return partial + digit }
             let doubled = digit * 2
             return partial + (doubled > 9 ? doubled - 9 : doubled)
         }
@@ -674,12 +675,13 @@ extension PayabliPayInCardData {
 
 extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let account = accountNumber.digitsOnly
-        let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
-        let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
-        guard (minimumDigits ... maximumDigits).contains(account.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+        try accountNumber.useDigitBytes(field: "Account number") { account in
+            let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
+            let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
+            guard (minimumDigits ... maximumDigits).contains(account.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+            }
         }
         let routing = routingNumber.digitsOnly
         guard routing.count == PayabliPayInInputLimits.routingNumberDigits else {

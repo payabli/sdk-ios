@@ -304,6 +304,25 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertTrue(body.contains(#""serviceFee":5.00"#))
     }
 
+    /// The card's own bytes: one object, the payment method as its last member, and the card number
+    /// and security code as digits with the entry's separators dropped.
+    func testTheCardMethodIsWrittenAsBytesAsTheBodyLastMember() async throws {
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let client = PayInPaymentFlowClient(transport: transport)
+
+        _ = try await client.capture(entryPoint: "entry", request: cardRequest())
+
+        let request = try await firstRequest(from: transport)
+        let bodyText = try XCTUnwrap(String(data: XCTUnwrap(request.body), encoding: .utf8))
+        XCTAssertEqual(
+            bodyText,
+            #"{"customerData":{"customerId":4440},"entryPoint":"entry","ipaddress":"255.255.255.255","orderDescription":"SDK test transaction","orderId":"order-123","#
+                + #""paymentDetails":{"currency":"USD","serviceFee":5.00,"totalAmount":100.00},"#
+                + #""source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/27","#
+                + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card","saveIfSuccess":true}}"#
+        )
+    }
+
     private func cardRequest(
         totalAmount: Double = 100,
         serviceFee: Double? = 5,

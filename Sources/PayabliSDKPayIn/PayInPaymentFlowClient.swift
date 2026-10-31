@@ -53,7 +53,7 @@ final class PayInPaymentFlowClient: Sendable {
         }
         try request.paymentDetails.validate()
 
-        let body = AuthorizedCaptureBody(paymentDetails: request.paymentDetails)
+        let body = try PayInPaymentFlowJSONBody.encode(AuthorizedCaptureBody(paymentDetails: request.paymentDetails))
         let payabliRequest = try buildRequest(
             path: "/api/v2/MoneyIn/capture/\(PercentEncoding.segment(transId))",
             query: [],
@@ -175,28 +175,55 @@ final class PayInPaymentFlowClient: Sendable {
         try request.paymentDetails.validate()
         try request.paymentMethod.validate(request.options.validation)
 
-        let body = TransactionRequestBody(
-            accountId: request.options.accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            customerData: request.options.customerData,
-            entryPoint: entry,
-            ipaddress: request.options.ipAddress?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            orderDescription: request.options.orderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            orderId: request.options.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            paymentDetails: request.paymentDetails,
-            paymentMethod: request.paymentMethod,
-            source: request.options.source?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            subdomain: request.options.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
-            subscriptionId: request.options.subscriptionId
+        // The method's own bytes are written from the buffers, spliced in as the body's last member,
+        // and overwritten once the transport returns, whatever it returns.
+        var body = Data()
+        let result: PayabliPayInResult
+        do {
+            body = try encodedTransactionBody(entry: entry, request: request)
+            let payabliRequest = try buildRequest(
+                path: path,
+                query: request.queryItems(allowsACHValidation: allowsACHValidation),
+                idempotencyKey: idempotencyKey,
+                body: body
+            )
+            // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
+            // know that this route carries one so a failure that leaves the outcome open says so.
+            result = try await perform(
+                payabliRequest,
+                carriesKey: payabliRequest.headers[payabliIdempotencyKeyHeader] != nil
+            )
+        } catch {
+            PayInBodyWriter.wipe(&body)
+            throw error
+        }
+        PayInBodyWriter.wipe(&body)
+        return result
+    }
+
+    /// The transaction body: everything the request carries, encoded deterministically, with the
+    /// method's own bytes spliced in as the last member. The method is written straight out of its
+    /// buffers, so its digits never become a `String`.
+    ///
+    /// - Parameter entry: the paypoint's entry point, already trimmed.
+    /// - Parameter request: the payment to encode.
+    /// - Returns: the request body, for the caller to overwrite once the request has been written.
+    private func encodedTransactionBody(entry: String, request: PayabliPayInRequest) throws -> Data {
+        try PayInBodyWriter.splice(
+            outer: PayInPaymentFlowJSONBody.encode(TransactionRequestBody(
+                accountId: request.options.accountId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                customerData: request.options.customerData,
+                entryPoint: entry,
+                ipaddress: request.options.ipAddress?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                orderDescription: request.options.orderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                orderId: request.options.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                paymentDetails: request.paymentDetails,
+                source: request.options.source?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                subdomain: request.options.subdomain?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty,
+                subscriptionId: request.options.subscriptionId
+            )),
+            fragment: try PayInBodyWriter.captureFragment(request.paymentMethod)
         )
-        let payabliRequest = try buildRequest(
-            path: path,
-            query: request.queryItems(allowsACHValidation: allowsACHValidation),
-            idempotencyKey: idempotencyKey,
-            body: body
-        )
-        // Whether a key went out, not which one: nothing reports a key, and `perform` needs only to
-        // know that this route carries one so a failure that leaves the outcome open says so.
-        return try await perform(payabliRequest, carriesKey: payabliRequest.headers[payabliIdempotencyKeyHeader] != nil)
     }
 
     /// Builds the request. The transport's chain attaches the credential and the content type.
@@ -207,20 +234,20 @@ final class PayInPaymentFlowClient: Sendable {
     /// - Parameter path: the route's path, as `/api/v2/MoneyIn/getpaid`.
     /// - Parameter query: the query items the route reads, such as `achValidation`.
     /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header; nil sends none.
-    /// - Parameter body: the request's body, encoded as the route reads it.
+    /// - Parameter body: the request's body, already encoded as the route reads it.
     /// - Returns: the request the transport sends.
     private func buildRequest(
         path: String,
         query: [URLQueryItem],
         idempotencyKey: String?,
-        body: some Encodable
+        body: Data
     ) throws -> PayabliRequest {
         try PayabliRequest(
             method: .post,
             path: path,
             query: query,
             headers: Self.headers(idempotencyKey: idempotencyKey),
-            body: PayInPaymentFlowJSONBody.encode(body)
+            body: body
         )
     }
 
@@ -423,7 +450,6 @@ private struct TransactionRequestBody: Encodable {
     let orderDescription: String?
     let orderId: String?
     let paymentDetails: PayabliPayInPaymentDetails
-    let paymentMethod: PayabliPayInPaymentMethod
     let source: String?
     let subdomain: String?
     let subscriptionId: Int64?

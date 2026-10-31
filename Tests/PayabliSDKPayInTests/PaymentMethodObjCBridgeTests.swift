@@ -213,6 +213,73 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
     }
 
+    /// The buffers this facade builds from strings are the SDK's own: no host can reach them, so the
+    /// task that spends them overwrites them at its end, on a stored method and a refusal alike.
+    func testTheTaskClosesTheCardBuffersTheFacadeBuilt() async throws {
+        let component = try await makeBridge(
+            tokenHandler: { completion in completion(nil, nil) }
+        )
+        let cardNumber = SensitiveDigits.ofString("4111111111111111")
+        let securityCode = SensitiveDigits.ofString("123")
+        let completionExpectation = expectation(description: "closed card buffers completion")
+
+        component.addPaymentMethod(
+            .card(PayabliPayInCardData(
+                cardNumber: cardNumber,
+                expiry: "02/28",
+                holderName: "Jane Doe",
+                securityCode: securityCode,
+                postalCode: "33139"
+            )),
+            options: PayabliPayInOptions()
+        ) { method, error in
+            XCTAssertNil(method)
+            XCTAssertNotNil(error)
+            completionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
+        XCTAssertTrue(cardNumber.isWiped, "the task closed the card number buffer")
+        XCTAssertTrue(securityCode.isWiped, "the task closed the security code buffer")
+        XCTAssertEqual(
+            cardNumber.rawCopy(), Array(repeating: 0, count: 16),
+            "the card number is overwritten, not just released"
+        )
+        XCTAssertEqual(
+            securityCode.rawCopy(), Array(repeating: 0, count: 3),
+            "the security code is overwritten, not just released"
+        )
+    }
+
+    func testTheTaskClosesTheAccountNumberTheFacadeBuilt() async throws {
+        let component = try await makeBridge(
+            tokenHandler: { completion in completion(nil, nil) }
+        )
+        let accountNumber = SensitiveDigits.ofString("1111111111")
+        let completionExpectation = expectation(description: "closed account number completion")
+
+        component.addPaymentMethod(
+            .bankAccount(PayabliPayInBankAccountData(
+                accountNumber: accountNumber,
+                accountType: .checking,
+                holderName: "Jane Doe",
+                routingNumber: "123456780"
+            )),
+            options: PayabliPayInOptions()
+        ) { method, error in
+            XCTAssertNil(method)
+            XCTAssertNotNil(error)
+            completionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
+        XCTAssertTrue(accountNumber.isWiped, "the task closed the account number buffer")
+        XCTAssertEqual(
+            accountNumber.rawCopy(), Array(repeating: 0, count: 10),
+            "the account number is overwritten, not just released"
+        )
+    }
+
     // Cancellation coverage for the bridge's token provider lives in
     // `PayabliSDKCoreTests/BridgedTokenProviderTests.swift` now, against the shared
     // `bridgedTokenProvider` both this facade and TapToPay's call.
