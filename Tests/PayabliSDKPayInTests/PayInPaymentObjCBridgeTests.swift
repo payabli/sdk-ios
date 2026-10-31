@@ -359,6 +359,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             saveIfSuccess: false,
             totalAmount: 10
         )
+        wrapper.paymentReference = "order-42"
 
         let first = await call { bridge.capture(wrapper, completion: $0) }
         wrapper.attempt = .retry
