@@ -24,9 +24,26 @@ public enum PayabliPayInResultKind: String, Sendable, Equatable {
     case transaction
 }
 
-public enum PayabliPayInStoredMethodType: String, CaseIterable, Identifiable, Codable, Sendable {
+public enum PayabliPayInStoredMethodType: RawRepresentable, CaseIterable, Identifiable, Codable, Sendable {
     case card
-    case bankAccount = "ach"
+    case bankAccount
+
+    /// Finds the method the service names.
+    ///
+    /// - Parameter rawValue: the service's name for the method.
+    /// - Returns: the method, or nil when no case carries that name.
+    public init?(rawValue: String) {
+        guard let method = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
+        self = method
+    }
+
+    /// The service's name for the method.
+    public var rawValue: String {
+        switch self {
+        case .card: PayInMethodWireNames.card
+        case .bankAccount: PayInMethodWireNames.ach
+        }
+    }
 
     public var id: String {
         rawValue
@@ -200,11 +217,11 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     public let source: String?
     public let subdomain: String?
     public let subscriptionId: Int64?
-    /// Your app's own name for this payment, never sent. Left unset, the SDK makes one and returns it if the outcome
-    /// is unknown, so the payment can be retried by name. A blank one is refused.
+    /// Your app's own name for this payment, never sent. Left unset on a new payment, the SDK makes one and returns
+    /// it if the outcome is unknown, so the payment can be retried by name. A blank one is refused.
     public let paymentReference: String?
-    /// A new payment unless set to `.retry`, which resends the key held for ``paymentReference`` and must describe
-    /// that same payment. A new payment naming a reference whose outcome is still unknown is refused.
+    /// A new payment unless set to `.retry`, which resends the key held for ``paymentReference`` and must name and
+    /// describe that same payment. A new payment naming a reference whose outcome is still unknown is refused.
     public let attempt: PayabliAttempt
     /// Whether to verify a bank account before debiting it. `true` adds the check to any the merchant's account
     /// already applies; it never turns one off. A failed check is a decline.

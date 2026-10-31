@@ -10,6 +10,8 @@ struct QADetailRow: View {
     let label: String
     let value: String
     var problem: String?
+    /// When set, a copy button beside the value.
+    var onCopy: (() -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -22,6 +24,13 @@ struct QADetailRow: View {
                     .font(.subheadline.monospaced())
                     .multilineTextAlignment(.trailing)
                     .textSelection(.enabled)
+                if let onCopy {
+                    Button(action: onCopy) {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Copy \(label)")
+                }
             }
             if let problem {
                 Label(problem, systemImage: "exclamationmark.triangle.fill")

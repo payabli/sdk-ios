@@ -233,6 +233,12 @@ set one, invoice number. A retry that describes another payment is refused befor
 `.retryNotSamePayment` (1022), and the earlier charge's key stays for the right retry. Only the most recent charge
 whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
 
+One charge runs at a time across every `PayabliTTP` in the process. A charge made while another runs is refused
+before anything is sent. A retry fails with `.paymentReferenceOpen` (1023) while the key it would be handed, the newest
+held for its entry point, is being sent, whichever payment it describes; any other charge fails with
+`.terminalNotReady` (3029). Follow `capture`: `.unknown` means the retry describes a payment that may have been
+charged, so find it before charging again.
+
 The SDK holds a charge's key in memory for four minutes after its latest send, across every `PayabliTTP` in the
 process, for up to four entry points at once, counting an entry point once per environment. A charge for a fifth
 while four hold an unresolved charge is refused before anything is sent, with `.tooManyOpenCharges` (3030). A retry after the four minutes, or after your
@@ -268,9 +274,11 @@ These Tap to Pay causes are ones your app handles, with their codes:
 | `.activationAttemptsExhausted` | 3026 | `.configuration` | Too many incorrect activation codes were entered. |
 | `.activationCodeNotIssued` | 3027 | `.configuration` | No activation code has been issued for this device. |
 | `.deviceNotPending` | 3028 | `.invalidRequest` | This device is not waiting for activation. |
+| `.paymentReferenceOpen` | 1023 | `.invalidRequest` | Another call for this payment is still under way or its outcome is unknown, so this one was not sent. Check that payment's outcome first. |
 | `.terminalNotReady` | 3029 | `.invalidRequest` | The terminal is not ready for this call. |
 | `.tooManyOpenCharges` | 3030 | `.invalidRequest` | Too many charges are waiting to be resolved. |
 | `.chargeNotFinished` | 3034 | `.outcomeUnknown` | An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes. |
+| `.paymentNotTaken` | 3035 | `.retryLater` | The payment was not taken, and the card was not charged. Try again. |
 
 It also carries `capture` and `paymentTransId`:
 
@@ -312,7 +320,7 @@ From Objective-C, these errors arrive as `NSError`. See
 |---|---|
 | `.configurationRejected` | The paypoint, the app, the device or its setup is missing something, such as the app's Keychain entitlement. Retrying won't help; contact Payabli. A token, network or service failure while fetching the configuration lands on `.serviceUnavailable` instead. |
 | `.deviceSetupRequired` | This device must be set up again: its setup was refused or revoked, its registration was replaced, or its key is gone. Check the entitlements, then initialize again. |
-| `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available. Try again later. |
+| `.serviceUnavailable` | The service, Apple's attestation service or the reader wasn't available, or the token was refused again after the SDK renewed it. If the error thrown was `.tokenExpired`, waiting won't help: fix the credential, then call `initialize()` again. If that fails at once and your token provider isn't called, the session's credential is finished: call `PayabliSession.initialize`, then create the terminal again with `PayabliTTP.create()`. Otherwise try again when someone asks to, or wait longer before each attempt. |
 | `.deviceIneligible` | This iPhone or iOS version can't take Tap to Pay payments, the card reader refused it, or the app has no bundle identifier. If an iPhone that meets the requirements lands here, contact Payabli before replacing it. |
 | `.sdkInternalError` | Report it to Payabli. |
 | `.deviceKeyUnavailable` | This device's secure storage is unavailable, for example before the first unlock after a restart. Initialize again. If it keeps failing, the phone is the cause. |

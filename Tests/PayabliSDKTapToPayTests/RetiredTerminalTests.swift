@@ -80,6 +80,28 @@ final class RetiredTerminalTests: XCTestCase {
         XCTAssertEqual(requests.updates, 1, "the opened payment's close was attempted")
     }
 
+    /// The state names the close before it is sent, then the terminal's end once it has been.
+    func testAChargeRefusedAfterItsPaymentOpenedShowsClosingBeforeTheClose() async throws {
+        let live = LiveFlag()
+        let (ttp, _, _, requests) = try makeTTP(live: live)
+        try await ttp.initialize()
+        requests.onInitiate = { live.value = false }
+        var seen: [(state: PayabliTTPSessionState, closesSent: Int)] = []
+        let observation = ttp.addSessionStateObserver { [weak ttp] in
+            if let state = ttp?.sessionState {
+                seen.append((state, requests.updates))
+            }
+        }
+
+        _ = await failure { _ = try await self.charge(ttp) }
+        observation.cancel()
+
+        let opening = PayabliTTPSessionState.charging(activity: .opening)
+        let closing = PayabliTTPSessionState.charging(activity: .closing)
+        XCTAssertEqual(seen.map(\.state), [opening, closing, .failed(reason: .sessionEnded)])
+        XCTAssertEqual(seen.map(\.closesSent), [0, 0, 1], "closing is published before the close is sent")
+    }
+
     func testARetiredTerminalChargingWhileAnotherTerminalReadsIsRefusedAsRetired() async throws {
         let (other, otherProvider, _, _) = try makeTTP(live: true)
         try await other.initialize()

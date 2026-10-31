@@ -53,14 +53,14 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertEqual(failure.message, "Conflict (409)")
     }
 
-    /// The SDK words an open outcome as the payment's, which is what every other call here is.
+    /// A reversal's open outcome reads as the reversal's, in the demo's own copy.
     func testAnInterruptedReversalNamesTheReversalRatherThanThePayment() {
         let failure = PayInFailure(Self.interruptedReversal, operation: .void)
 
         XCTAssertTrue(failure.message.contains("reversal may have been applied"), failure.message)
         XCTAssertFalse(
-            failure.message.contains("payment may have been taken"),
-            "an open reversal must not read as an open payment: \(failure.message)"
+            failure.message.contains("The transaction's status is unknown"),
+            "an open reversal reads in the demo's own copy, not the SDK's reason: \(failure.message)"
         )
     }
 

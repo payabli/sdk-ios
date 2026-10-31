@@ -62,11 +62,8 @@ Or declare it in `Package.swift`, with the latest version from the
 [Releases](https://github.com/payabli/sdk-ios/releases) page:
 
 ```swift
-.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "0.1.1"))
+.package(url: "https://github.com/payabli/sdk-ios.git", .upToNextMinor(from: "<latest version>"))
 ```
-
-To build changes that aren't released yet, track the `main` branch instead, with Xcode's **Branch** rule
-or `branch: "main"`.
 
 Then link what you use:
 
@@ -225,15 +222,19 @@ freshly minted token is being rejected. Don't treat it as a signal to fetch a to
 app has to fix. The usual causes are a token for another environment or entry point, a missing permission, or a
 disabled paypoint. Apart from the two cases below, after a 1002 the session's credential is finished: every later
 call on that session fails at once with 1002, without sending a request or calling your provider. Fix the cause,
-then call `initialize` again; it starts a fresh session and calls your provider.
+then call `PayabliSession.initialize` again; it starts a fresh session, which calls your provider before its first
+request.
 
 Two kinds of 1002 leave the session usable:
 
 - One from Tap to Pay setting up the device (`PayabliTTP.initialize()`, `activateDevice`, or the repair `charge`
-  runs first). Those requests keep the token they were sent, so the session isn't finished. Fix the cause, then
-  call that setup again; it asks your provider for a new token.
-- One whose refused token another call had already replaced. Only that call fails; the next call uses the new
-  token, and `initialize` with the same configuration returns the same session.
+  runs first) when the setup's own request was refused, the SDK renewed the token, and the new one was refused
+  too. Fix the cause, then call that setup again; it asks your provider for a new token.
+- One whose refused token another call had already replaced, or was replacing. Only that call fails; the next
+  call uses the new token, and `initialize` with the same configuration returns the same session.
+
+If a setup called again fails at once with 1002 and your provider isn't called, the session's credential is
+finished: call `PayabliSession.initialize`, then create the terminal again from the new session.
 
 ### Device identity
 
@@ -307,7 +308,7 @@ retry.
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
 | **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
-| **Unknown** | `PayabliPayInError.submissionInterrupted` | an error whose `capture` is `.unknown` | Not until you've checked |
+| **Unknown** | `PayabliPayInError.submissionInterrupted`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
 When the outcome is unknown, look the transaction up before you charge again. On card-not-present, call
@@ -356,16 +357,157 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
-  number, with the type's name in `userInfo["PayabliErrorType"]`. Tap to Pay errors are in the
+  number, with the type's name in `userInfo["PayabliErrorType"]`. `PayabliErrorTypeCode` names every catalog
+  number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:
+
+  ```objc
+  if (error.userInfo[@"PayabliErrorType"] != nil && error.code == PayabliErrorTypeCodeDevicePendingActivation) {
+      // Ask for the activation code.
+  }
+  ```
+
+  Tap to Pay errors are in the
   `com.payabli.ttp` domain, where `userInfo["capture"]` holds the `PayabliTTPCapture` raw value (`0` not
   charged, `1` unknown, `2` charged), `userInfo["paymentTransId"]` is absent when there is no
   transaction ID, and `userInfo["retryAfter"]` holds the wait in seconds when the service asked for one.
   Card-not-present errors are in the `com.payabli.payIn` domain. An error from `capture`, `authorize`,
   `captureAuthorizedTransaction` or `voidTransaction` carries `userInfo["capture"]`: `1` when the payment may have been
-  taken, `0` when it wasn't. When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
+  taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
+  When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
   `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
-- **Flutter, .NET MAUI and React Native.** [`Bridges/`](Bridges/README.md) has an example integration for each.
-  Use them as a starting point for your own integration.
+
+### Other technologies
+
+> [!NOTE]
+> **Guidance only:** This section suggests one way to take Payabli payments from a React Native or Flutter app.
+> It's guidance, not a supported implementation. Payabli doesn't state that any example here is a complete or
+> direct implementation, or that it fits your app as written. The examples are subject to limitations, including
+> the frameworks' own versions and requirements, and Payabli doesn't build or test them. Your team designs,
+> builds, tests and maintains its integration, and is responsible for it.
+
+There is no React Native or Flutter package. Your app adds a small native module that exposes a few calls to
+JavaScript or Dart, and runs this SDK underneath on iOS and the Payabli Android SDK on Android. The same applies to any
+other technology, such as .NET MAUI: it binds the Objective-C surface in [Language support](#language-support).
+
+A module keeps these rules:
+
+- **Card data never crosses into JavaScript or Dart.** The module presents the SDK's own form and the Tap to Pay
+  sheet, and returns only the outcome.
+- **The token is fetched natively.** The module's `tokenProvider` calls your token endpoint from Swift. If it
+  routes through JavaScript or Dart instead, give each request its own pending promise or future and fail it after
+  30 seconds: one shared slot can leave a request waiting forever.
+- **Every call resolves or rejects exactly once**, including when the customer closes the form.
+
+Give the module the same calls on both platforms, so your JavaScript or Dart has one code path:
+
+| Call | What it does | Result |
+|---|---|---|
+| `initialize(entryPoint, environment)` | Starts the app's one Payabli session | nothing, or an error with a `code` |
+| `payWithCard({ amount, orderId })` | Presents the card-not-present form | a `PaymentOutcome` |
+| `tapToPay({ amount, orderId })` | Takes a Tap to Pay payment | a `PaymentOutcome` |
+| `presentTerms()` | Shows Apple's Tap to Pay terms to the merchant | whether they accepted |
+| `activateDevice(code)` | Activates this phone with its 6-digit code | nothing, or an error with a `code` |
+| `sessionState` (a stream) | Tap to Pay readiness, one value per change | `idle`, `attestingDevice`, `fetchingConfig`, `initializingReader`, `ready`, `sessionExpired`, `reinitializing`, `pendingActivation`, `pendingTerms`, `charging` or `failed` |
+
+A `PaymentOutcome` maps [Handle the outcome](#handle-the-outcome) to three answers: `charged` (store
+`paymentTransId`, don't charge again), `notCharged` (the customer can try again) and `unknown` (look the payment
+up by `paymentTransId` before charging again; without one, find it by your `orderId` on card-not-present, or in
+the Payabli portal for Tap to Pay). `tapToPay` answers a fourth, `unsupported`,
+where Tap to Pay isn't available. A failure that isn't a payment outcome, such as a session that didn't start,
+rejects the call in React Native and throws a `PlatformException` in Flutter, with a `code`.
+
+**React Native.** Create the module with the [Expo Modules API](https://docs.expo.dev/modules/overview/)
+(`npx create-expo-module@latest --local`), and declare it in TypeScript:
+
+```ts
+import { NativeModule, requireNativeModule } from 'expo';
+
+export type PaymentRequest = { amount: number; orderId: string };
+export type PaymentOutcome =
+  | { status: 'charged' | 'notCharged' | 'unknown'; paymentTransId: string | null }
+  | { status: 'unsupported' };
+
+declare class PayabliModule extends NativeModule<{
+  onSessionState(event: { state: string }): void;
+}> {
+  initialize(entryPoint: string, environment: 'sandbox' | 'production'): Promise<void>;
+  payWithCard(request: PaymentRequest): Promise<PaymentOutcome>;
+  tapToPay(request: PaymentRequest): Promise<PaymentOutcome>;
+  presentTerms(): Promise<boolean>;
+  activateDevice(code: string): Promise<void>;
+}
+
+export const Payabli = requireNativeModule<PayabliModule>('Payabli');
+
+// const outcome = await Payabli.payWithCard({ amount: 12.34, orderId: 'A-1001' });
+```
+
+The Swift half is an `AsyncFunction` per call, run on the main queue so the SDK's screens can be presented.
+Expo Go can't load your own native code, so run a development build (`npx expo run:ios`). React Native's
+[Turbo Native Modules](https://reactnative.dev/docs/turbo-native-modules-introduction) work too: declare the same
+calls as a spec, and have the module's Objective-C++ class call a Swift file that makes the SDK calls. The
+card-not-present form is a SwiftUI view, which Objective-C can't present.
+
+**Flutter.** Describe the calls once with [Pigeon](https://pub.dev/packages/pigeon), which generates the Dart API
+and the Swift and Kotlin interfaces your native code implements:
+
+```dart
+import 'package:pigeon/pigeon.dart';
+
+enum PaymentStatus { charged, notCharged, unknown, unsupported }
+
+class PaymentRequest {
+  PaymentRequest({required this.amount, required this.orderId});
+  double amount;
+  String orderId;
+}
+
+class PaymentResult {
+  PaymentResult({required this.status});
+  PaymentStatus status;
+  String? paymentTransId;
+}
+
+@HostApi()
+abstract class PayabliHostApi {
+  @async
+  void initialize(String entryPoint, bool sandbox);
+  @async
+  PaymentResult payWithCard(PaymentRequest request);
+  @async
+  PaymentResult tapToPay(PaymentRequest request);
+  @async
+  bool presentTerms();
+  @async
+  void activateDevice(String code);
+}
+```
+
+Generate the code, naming where each file goes in your app:
+
+```sh
+dart run pigeon --input pigeons/payabli_api.dart \
+  --dart_out lib/payabli_api.g.dart \
+  --swift_out ios/Runner/PayabliApi.g.swift \
+  --kotlin_out android/app/src/main/kotlin/com/example/app/PayabliApi.g.kt \
+  --kotlin_package com.example.app
+```
+
+Then implement `PayabliHostApi` in Swift and set it up on the engine's binary messenger at startup. Without Pigeon, a `MethodChannel` and an `EventChannel`
+([platform channels](https://docs.flutter.dev/platform-integration/platform-channels)) carry the same calls.
+
+Each call is one SDK call underneath:
+
+| Call | iOS | Android |
+|---|---|---|
+| `initialize` | `PayabliSession.initialize(config:)` | `PayabliSession.initialize(config, HostBindings(context))` |
+| `payWithCard` | present `PayabliPayInView` for a `PayabliPayIn` with `operation: .capture` | show `PayabliPayInForm` in an activity |
+| `tapToPay` | `PayabliTTP.create()`, `initialize()`, then `charge(paymentDetails:)` | answer `unsupported` |
+| `presentTerms` | `presentTerms()`, then `areTermsAccepted()` | answer `false` |
+| `activateDevice` | `activateDevice(activationCode:)`, then `initialize()` | reject with `UNSUPPORTED` |
+| `sessionState` | `PayabliTTP`'s `$sessionState` | send `idle` once |
+
+Tap to Pay needs a physical iPhone, and the setup in the [Tap to Pay guide](Sources/PayabliSDKTapToPay/README.md).
 
 ## Sample app and testing
 
@@ -388,6 +530,18 @@ Fill in `Secrets.swift`, then start the token server as its
 The SDK sends error and usage events to Payabli, with no card, payer or account data. The events are
 not listed.
 
+Core, PayIn and Tap to Pay each ship a privacy manifest declaring what they collect, so Xcode's privacy report
+for your app includes it:
+
+- `PayabliSDKCore`, which every product includes, collects the device ID, performance data, other diagnostic
+  data and product interaction, linked to the user, not used for tracking, for app functionality and analytics.
+- `PayabliSDKPayIn` collects the payment info, name, email address and customer number the payer enters in
+  its form, linked to the user, not used for tracking, for app functionality.
+- `PayabliSDKTapToPay` declares nothing beyond Core, because Apple's reader takes the card.
+
+The manifests don't cover data your app passes to the SDK, such as the customer record, invoice or order
+description on a payment. The SDK sends that data to Payabli with the payment, and your app declares it.
+
 Every request the SDK sends to Payabli carries an `X-Pyb-Client` header with the SDK version, the platform, the OS
 version, the device model, the locale and the device ID described under [Device identity](#device-identity).
 A value that's missing, blank or isn't printable ASCII is left out. The header can't be turned off.
@@ -400,8 +554,8 @@ A value that's missing, blank or isn't printable ASCII is left out. The header c
 
 - **Depend on the latest version** as [Installation](#installation) describes. Each version and its
   notes are on the [Releases](https://github.com/payabli/sdk-ios/releases) page.
-- **`main` holds changes that aren't released yet, and changes without notice.** A build that tracks
-  `main` takes whatever is there when the package resolves.
+- **`main` holds the latest release.** Work toward the next release isn't published for integration; depend on a
+  released version.
 - **When a stable version is released,** this section says so.
 
 ## Support

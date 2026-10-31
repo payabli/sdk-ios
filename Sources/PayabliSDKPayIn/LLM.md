@@ -316,8 +316,8 @@ authorize forms:
 | `source` | Optional integration source string. |
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
-| `paymentReference` | Optional. Your app's own name for the payment, kept on the device and never sent. Left unset, the SDK names the payment and returns the name on `submissionInterrupted`. A blank one is refused. The SDK makes and keeps every idempotency key; the app never sets one. |
-| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `submissionInterrupted`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `submissionInterrupted` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. With nothing held, a retry sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`. |
+| `paymentReference` | Optional. Your app's own name for the payment, kept on the device and never sent. Left unset on a new payment, the SDK names the payment and returns the name on `submissionInterrupted`. A call your app cancels throws `CancellationError`, whose outcome is unknown and which carries no name, so an app that cancels charges names each payment. A blank one is refused with `invalidInput("The paymentReference cannot be blank.")`. The SDK makes and keeps every idempotency key; the app never sets one. |
+| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `submissionInterrupted`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `submissionInterrupted` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. A retry that names no `paymentReference` is refused unsent with `invalidInput("A retry must name the paymentReference of the payment it repeats.")`; a retry naming a reference with nothing held sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`, as is any call, a retry included, on a payment or transaction another `PayabliPayIn` is still sending. Every `PayabliPayIn` for the same entry point and environment shares the held keys. |
 | `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
 | `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client validation toggles. |
@@ -809,13 +809,11 @@ xcodebuild test -scheme PayabliSDK-Package \
 xcrun xccov view --report build/TestResults/PayInCoverage.xcresult
 ```
 
-## Bridge Scope
+## Other Technologies
 
-Flutter, React Native, and .NET MAUI bridges currently expose stored card/bank account
-payment-method creation. Native Swift integrations should use
-`PayabliSDKPayIn` directly for capture, authorize, and
-capture-authorized transaction flows until those request models are promoted to
-the bridge APIs.
+An app written in another technology, such as React Native, Flutter or .NET MAUI,
+reaches `PayabliSDKPayIn` through `PayabliPayInObjC`, its Objective-C surface. The
+root README's "Other technologies" section shows how to write the native module.
 
 ## File Map
 

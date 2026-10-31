@@ -53,7 +53,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
-    private var heldKeys = HeldIdempotencyKeys()
+    private let heldKeys = PayInKeyStore.process
     private let logger = PayabliLogger(category: .tokenization)
     /// Nil on a flow built on a bare transport without a telemetry client.
     private(set) var reports: PayInReports?
@@ -303,10 +303,11 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 return try await sending(
                     .capture(reference: reference),
                     claimsHeld: request.options.attempt == .retry,
+                    origin: origin,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.capture(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.capture(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -337,10 +338,11 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 return try await sending(
                     .authorize(reference: reference),
                     claimsHeld: request.options.attempt == .retry,
+                    origin: origin,
                     payment: HeldPaymentDescription(request),
                     reference: reference
-                ) { key in
-                    try await client.authorize(entryPoint: entryPoint, request: request, idempotencyKey: key)
+                ) { client, entry, key in
+                    try await client.authorize(entryPoint: entry, request: request, idempotencyKey: key)
                 }
             }
         }
@@ -361,8 +363,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await submit {
                 try await sending(
                     .captureAuthorized(transId: request.transId.payabliCaptureTrimmed),
-                    claimsHeld: true
-                ) { key in
+                    claimsHeld: true,
+                    origin: .direct
+                ) { client, _, key in
                     try await client.captureAuthorized(request, idempotencyKey: key)
                 }
             }
@@ -390,8 +393,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             try await exclusively {
                 try await sending(
                     .void(transId: transId.payabliCaptureTrimmed),
-                    claimsHeld: true
-                ) { key in
+                    claimsHeld: true,
+                    origin: .direct
+                ) { client, _, key in
                     try await client.void(transId: transId, idempotencyKey: key)
                 }
             }
@@ -456,24 +460,33 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter scope: what the attempt belongs to.
     /// - Parameter claimsHeld: whether the attempt takes the key held for its scope.
+    /// - Parameter origin: whether the form or the host started it, which decides how a cancellation ends.
     /// - Parameter payment: the payment the attempt is for, compared with the held key's before taking it.
     /// - Parameter reference: the payment's reference, returned on an unknown outcome.
-    /// - Parameter send: sends the request under the key it is given.
+    /// - Parameter send: sends the request with the client, to the entry point and under the key it is given.
     /// - Returns: the result the service sent.
     private func sending(
         _ scope: HeldKeyScope,
         claimsHeld: Bool,
+        origin: PayInReports.Origin,
         payment: HeldPaymentDescription? = nil,
         reference: String? = nil,
-        _ send: (String) async throws -> PayabliPayInResult
+        _ send: (PayInPaymentFlowClient, String, String) async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
+        // Sent and settled where it was reserved, though `configure(config:)` may move the flow while it sends.
+        let (reservedEntry, reservedEnvironment, reservedClient) = (entryPoint, environment, client)
         let reservation = try heldKeys.reserve(
+            entry: reservedEntry,
+            environment: reservedEnvironment,
             scope: scope,
             claimsHeld: claimsHeld,
             payment: payment,
             now: now(),
             mint: newIdempotencyKey
         )
+        if reservation.foundNoRoom {
+            logger.warning("payin_retry_keys_full")
+        }
         let mark = PayabliSendMark()
         // The submission around this one, such as the form's, learns whether the payment left.
         let submission = PayabliSendMark.current
@@ -483,8 +496,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             }
         }
         do {
-            let result = try await PayabliSendMark.$current.withValue(mark) { try await send(reservation.key) }
-            heldKeys.settle(reservation, outcome: .answered, now: now())
+            let result = try await PayabliSendMark.$current.withValue(mark) {
+                try await send(reservedClient, reservedEntry, reservation.key)
+            }
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: .answered)
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
@@ -494,15 +509,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                     PayInLocalRefusal.current?.set()
                 }
             }
-            if heldKeys.settle(reservation, outcome: outcome, now: now()) {
-                logger.warning("payin_retry_keys_full")
-            }
+            heldKeys.settle(entry: reservedEntry, environment: reservedEnvironment, reservation, outcome: outcome)
             try Self.rethrow(
                 error,
                 as: outcome,
                 reused: reservation.reused,
                 mayHaveLeft: mark.mayHaveLeft,
-                reference: reference
+                reference: reference,
+                origin: origin
             )
         }
     }
@@ -533,23 +547,28 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Throws a failure as the caller receives it: a definite outcome as itself, and
-    /// ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)`` whenever a send of
-    /// this payment may have run.
+    /// Throws a failure as the caller receives it: a definite outcome as itself, a direct call's cancellation as
+    /// `CancellationError`, and ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)``
+    /// for any other failure once a send of this payment may have run.
     ///
     /// - Parameter error: what the attempt threw.
     /// - Parameter outcome: what it meant for the key.
     /// - Parameter reused: whether the attempt resent a held key, so an earlier send of this payment may have run.
     /// - Parameter mayHaveLeft: whether this send reached the HTTP layer.
     /// - Parameter reference: the payment's reference, which an unknown outcome carries.
+    /// - Parameter origin: whether the form or the host started the attempt.
     /// - Throws: the failure, with a refused held key reported as ``PayabliErrorType/retryRefused``.
     private static func rethrow(
         _ error: any Error,
         as outcome: HeldIdempotencyKeys.Outcome,
         reused: Bool,
         mayHaveLeft: Bool,
-        reference: String?
+        reference: String?,
+        origin: PayInReports.Origin
     ) throws -> Never {
+        if origin == .direct, PayInInterruption.isCancellation((error as? PayInOpenOutcome)?.cause ?? error) {
+            throw CancellationError()
+        }
         if let open = error as? PayInOpenOutcome {
             guard reused || mayHaveLeft else { throw open.cause }
             guard case let .submissionInterrupted(type, causeType, paymentTransId, _) = open.interruption
@@ -563,22 +582,29 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         guard reused, outcome != .answered else { throw error }
         throw PayabliPayInError.submissionInterrupted(
-            type: (error as? any PayabliError)?.type ?? .unknown,
+            type: PayInInterruption.type(of: error),
             causeType: RedactedCause(error).originalType,
             paymentTransId: nil,
             paymentReference: reference
         )
     }
 
-    /// The reference a capture or an authorization is held under: the host's, trimmed, or one made here.
+    /// The reference a capture or an authorization is held under: the host's, trimmed, or for a new payment one
+    /// made here.
     ///
     /// - Parameter request: the request whose options carry the host's payment reference.
     /// - Returns: the reference to hold the payment's key under.
-    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank.
+    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank, or when a retry names
+    ///   none.
     private func paymentReference(of request: PayabliPayInRequest) throws -> String {
-        guard let named = request.options.paymentReference else { return newPaymentReference() }
+        guard let named = request.options.paymentReference else {
+            guard request.options.attempt == .newPayment else {
+                throw PayabliPayInError.invalidInput("A retry must name the paymentReference of the payment it repeats.")
+            }
+            return newPaymentReference()
+        }
         guard let trimmed = named.payabliCaptureTrimmed.payabliCaptureNilIfEmpty else {
-            throw PayabliPayInError.invalidInput("The payment reference cannot be blank.")
+            throw PayabliPayInError.invalidInput("The paymentReference cannot be blank.")
         }
         return trimmed
     }

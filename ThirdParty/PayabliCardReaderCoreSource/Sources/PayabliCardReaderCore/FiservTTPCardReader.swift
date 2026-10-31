@@ -589,7 +589,7 @@ package class FiservTTPCardReader {
             do {
                 cardReadResult = try result.get()
             } catch {
-                throw FiservTTPCardReaderError(title: title, localizedDescription: error.localizedDescription)
+                throw FiservTTPCardReaderError(title: title, localizedDescription: error.localizedDescription, underlying: error)
             }
             
             guard let generalCardData = cardReadResult?.generalCardData,

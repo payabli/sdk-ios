@@ -285,7 +285,7 @@ def _last_commit_uncached(path: Path) -> dict[str, str] | None:
 
 
 def find_source(type_name: str) -> Path | None:
-    """The file declaring a Swift type, or None when the answer would be a guess.
+    """The file declaring a Swift or Objective-C type, or None when the answer would be a guess.
 
     Swift carries no package qualifier, so a filename is the only handle and it has to be unique across the
     whole tree. Several matches means the name alone cannot identify the file, and the honest answer is
@@ -301,7 +301,8 @@ def find_source(type_name: str) -> Path | None:
     matches = sorted(
         path
         for root in SOURCE_ROOTS
-        for path in (REPO_ROOT / root).glob(f"**/{type_name}.swift")
+        for extension in ("swift", "m")
+        for path in (REPO_ROOT / root).glob(f"**/{type_name}.{extension}")
     )
     found = matches[0].relative_to(REPO_ROOT) if len(matches) == 1 else None
     _SOURCE_CACHE[type_name] = found

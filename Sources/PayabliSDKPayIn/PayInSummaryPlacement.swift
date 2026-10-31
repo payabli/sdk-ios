@@ -15,9 +15,9 @@ struct PayInDrawnSection {
         section.style == .summary
     }
 
-    /// The heading drawn over the section. A summary without a title of its own reads "Payment".
+    /// The heading drawn over the section.
     var title: String? {
-        section.title ?? (isSummary ? "Payment" : nil)
+        section.heading
     }
 }
 

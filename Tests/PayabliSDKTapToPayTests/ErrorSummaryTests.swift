@@ -27,7 +27,7 @@ final class ErrorSummaryTests: XCTestCase {
     func testChargeFailuresAreNamedWithoutTheirReason() {
         let serversWords = "Card belongs to another merchant"
 
-        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.initiateFailed(reason: serversWords)), "initiateFailed")
+        XCTAssertEqual(ErrorSummary.of(PayabliTTPError.paymentNotOpened(reason: serversWords)), "paymentNotOpened")
         XCTAssertEqual(
             ErrorSummary.of(PayabliTTPError.updateFailed(reason: serversWords, paymentTransId: "TXN", capture: .unknown)),
             "updateFailed"
@@ -57,12 +57,21 @@ final class ErrorSummaryTests: XCTestCase {
             (.tokenExpired, "tokenExpired"),
             (.attestationRevoked(reason: reason), "attestationRevoked"),
             (.attestationFailed(reason: reason), "attestationFailed"),
+            (.deviceSetupRequired(reason: reason), "deviceSetupRequired"),
+            (.deviceSetupRefused(reason: reason), "deviceSetupRefused"),
+            (.entryPointRefused(reason: reason), "entryPointRefused"),
             (.configFailed(reason: reason), "configFailed"),
+            (.cardPresentNotEnabled, "cardPresentNotEnabled"),
             (.readerSetupFailed(reason: reason), "readerSetupFailed"),
+            (.readerHardwareUnsupported, "readerHardwareUnsupported"),
+            (.readerUnavailable(reason: reason), "readerUnavailable"),
+            (.guardFailed(reason: reason), "guardFailed"),
+            (.readerDeviceRefused(reason: reason), "readerDeviceRefused"),
             (.nfcFailed(reason: reason), "nfcFailed"),
             (.activationFailed(reason: reason), "activationFailed"),
+            (.activationCodeMalformed, "activationCodeMalformed"),
             (.networkError(reason: reason), "networkError"),
-            (.initiateFailed(reason: reason), "initiateFailed"),
+            (.paymentNotOpened(reason: reason), "paymentNotOpened"),
             (.updateFailed(reason: reason, paymentTransId: "TXN", capture: .unknown), "updateFailed"),
             (.termsNotAccepted, "termsNotAccepted"),
             (.readerOSVersionNotSupported(), "readerOSVersionNotSupported"),

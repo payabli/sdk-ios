@@ -7,6 +7,11 @@ import XCTest
 /// thrown error carries the real failure to the host.
 @MainActor
 final class PaymentMethodPayerFacingFailureTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testADeclineDrawsTheDeclinedMessage() async {
         await assertDraws(
             "The payment was declined. Try another payment method.",
