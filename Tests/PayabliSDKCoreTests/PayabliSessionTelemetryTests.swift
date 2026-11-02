@@ -70,15 +70,16 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         XCTAssertNotNil(Int(failed["duration_ms"] ?? ""))
     }
 
-    func testAFailureOutsideTheRefusalsIsConvertedAndReportedOnTheLiveSession() async throws {
+    func testAFailedBuildOfANewSessionIsConvertedAndReportedOnTheInstalledOne() async throws {
         let transport = InMemoryTelemetryTransport()
         let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+        // A finished credential is the state in which an initialize builds a new session.
+        live.machine.finish()
         struct Foreign: Error {}
-        PayabliSession.failNextInstallForTesting(Foreign())
 
         do {
-            try await PayabliSession.initialize(config: makeConfig())
-            XCTFail("the error install threw reached the caller unconverted")
+            try await PayabliSession.initialize(config: makeConfig()) { _, _, _, _ in throw Foreign() }
+            XCTFail("the error the session's build threw reached the caller unconverted")
         } catch let failure as PayabliGenericError {
             XCTAssertEqual(failure.type, .unknown)
             XCTAssertEqual(failure.reason, PayabliErrorType.unknown.message)

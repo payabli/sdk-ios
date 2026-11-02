@@ -42,7 +42,6 @@ public final class PayabliSession: @unchecked Sendable {
     private static let lock = NSLock()
     private static var installed: PayabliSession?
     private static var testTelemetryTransport: (any TelemetryTransport)?
-    private static var testInstallFailure: (any Error)?
 
     /// Written only by the machine of whichever session `install` installed, so it reads `uninitialized` before any.
     static let sink = SdkStateSink()
@@ -129,9 +128,18 @@ public final class PayabliSession: @unchecked Sendable {
     ///   is equal, or a new one.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
+        try await initialize(config: config, makeSession: defaultSessionBuilder)
+    }
+
+    /// Same, with the builder `install` calls for a new session, so a test can make that build fail.
+    ///
+    /// - Parameter config: the configuration to install; equal by entry point and environment.
+    /// - Parameter makeSession: builds the session `install` installs.
+    /// - Returns: the process's installed session.
+    static func initialize(config: PayabliConfig, makeSession: SessionBuilder) async throws -> PayabliSession {
         let startedAt = ContinuousClock.now
         do {
-            return try install(config: config)
+            return try install(config: config, makeSession: makeSession)
         } catch let refusal as PayabliGenericError {
             await current?.reportRefusedInitialize(refusal, after: ContinuousClock.now - startedAt)
             throw refusal
@@ -172,28 +180,41 @@ public final class PayabliSession: @unchecked Sendable {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
         await telemetry.emit([
-            (TelemetryEventName.sdkInitializeStarted, ["state": Self.reportedState]),
+            (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
-                "outcome": "failed",
-                "code": failure.type.rawValue,
-                "error_number": String(failure.code),
-                "reason": failure.reason,
-                "duration_ms": String(milliseconds),
-                "failure_type": String(describing: type(of: original))
+                TelemetryProperty.outcome.rawValue: "failed",
+                TelemetryProperty.code.rawValue: failure.type.rawValue,
+                TelemetryProperty.errorNumber.rawValue: String(failure.code),
+                TelemetryProperty.reason.rawValue: failure.reason,
+                TelemetryProperty.durationMs.rawValue: String(milliseconds),
+                TelemetryProperty.failureType.rawValue: String(describing: type(of: original))
             ])
         ])
+    }
+
+    /// Builds the session `install` installs: from the configuration, the URL session, the telemetry transport and the
+    /// finished session whose queue it inherits, or nil.
+    typealias SessionBuilder = (PayabliConfig, URLSession?, (any TelemetryTransport)?, TelemetryClient?) throws
+        -> PayabliSession
+
+    /// The builder every public path installs with.
+    private static let defaultSessionBuilder: SessionBuilder = { config, urlSession, telemetryTransport, predecessor in
+        PayabliSession(
+            config: config,
+            urlSession: urlSession,
+            telemetryTransport: telemetryTransport,
+            sink: PayabliSession.sink,
+            predecessor: predecessor
+        )
     }
 
     static func install(
         config: PayabliConfig,
         urlSession: URLSession? = nil,
-        telemetryTransport: (any TelemetryTransport)? = nil
+        telemetryTransport: (any TelemetryTransport)? = nil,
+        makeSession: SessionBuilder = defaultSessionBuilder
     ) throws -> PayabliSession {
         try lock.withLock {
-            if let failure = testInstallFailure {
-                testInstallFailure = nil
-                throw failure
-            }
             let identity = ConfigIdentity(config)
             let current = installed
             // The installed session's own machine: the process-wide state is one value, and a stray write to it must
@@ -213,12 +234,11 @@ public final class PayabliSession: @unchecked Sendable {
             // A finished credential refuses every send, so the old queue can only leave under the new session's token,
             // and only a session reporting for the same entry point and environment takes it.
             let inherits = current?.identity == identity
-            let session = PayabliSession(
-                config: config,
-                urlSession: urlSession,
-                telemetryTransport: telemetryTransport ?? testTelemetryTransport,
-                sink: sink,
-                predecessor: inherits ? current?.telemetry : nil
+            let session = try makeSession(
+                config,
+                urlSession,
+                telemetryTransport ?? testTelemetryTransport,
+                inherits ? current?.telemetry : nil
             )
             session.machine.markReady()
             installed = session
@@ -256,14 +276,6 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock { installed }
     }
 
-    /// Makes the next install throw an error the test chose, leaving the installed session in place
-    /// so a failure lands on a live one. The next install alone takes it.
-    ///
-    /// - Parameter failure: what the next install throws.
-    static func failNextInstallForTesting(_ failure: any Error) {
-        lock.withLock { testInstallFailure = failure }
-    }
-
     /// Drops the installed session and puts the state back, so one test cannot decide the outcome of the next.
     ///
     /// - Parameter telemetryTransport: what later installs report through, so a test reaches no network; nil restores the default.
@@ -273,7 +285,6 @@ public final class PayabliSession: @unchecked Sendable {
             installed = nil
             sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
-            testInstallFailure = nil
         }
     }
 }
