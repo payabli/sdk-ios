@@ -1,0 +1,49 @@
+name: Source branch
+
+# main holds only what has been released, so it takes pull requests from release and hotfix branches, from
+# Dependabot, whose bumps are proved on main where they land, and from ci/ branches, which change the
+# workflows a release is cut by: a release is dispatched from main and runs main's copy of them. A ruleset can
+# require a check but cannot name a pull request's source branch, so this job is the mechanism. It reads the
+# event and nothing in the repository, so it checks nothing out and holds no token.
+#
+# `pull_request_target` runs main's copy of this file, so a pull request that edits it is still judged by the
+# version it would replace. That trigger is safe here only because the job checks out nothing and holds no
+# token: nothing from the pull request runs.
+
+on:
+  pull_request_target:
+    branches: [main]
+    # `edited` as well, so a pull request retargeted to main is checked on the retarget.
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  source:
+    name: Source branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Through the environment, so a branch name is never parsed as shell. A fork's branch can carry any
+      # name, so the branch has to be this repository's before its name means anything.
+      - name: Check the pull request comes from a release, hotfix, Dependabot or ci branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then
+            echo "::error::main takes pull requests from this repository's own branches, not from '$HEAD_REPO'"
+            exit 1
+          fi
+          case "$HEAD_REF" in
+            release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;
+            *)
+              echo "::error::main takes pull requests from release/, hotfix/, dependabot/ and ci/ branches only, not '$HEAD_REF'"
+              exit 1
+              ;;
+          esac

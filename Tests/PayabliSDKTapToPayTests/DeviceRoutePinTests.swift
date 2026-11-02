@@ -3,9 +3,9 @@
 import PayabliSDKTestUtils
 import XCTest
 
-/// Which device routes pin their credential, over the wire: `/attest` and `/activate` send a refused token once and
-/// keep it for the session to renew, while `/challenge` and `/register`, which run before a binding exists, recover as
-/// any route does. A binding the service no longer holds is told apart from a refused token by its text.
+/// Device routes that pin their credential, over the wire: `/challenge`, `/register`, `/attest` and `/activate` each send
+/// a refused token once and keep it for the session to renew. On `/activate`, a 401 saying the binding is gone is told
+/// apart from a refused token by its text.
 final class DeviceRoutePinTests: XCTestCase {
     private static let challenge = "/api/v2/device/taptopay/challenge"
     private static let register = "/api/v2/device/taptopay/register"
@@ -19,9 +19,37 @@ final class DeviceRoutePinTests: XCTestCase {
 
     // MARK: - Pinned routes
 
+    func testA401OnChallengeIsSentOnceAndAsksTheProviderForNothing() async throws {
+        let paths = PathsBox()
+        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.challenge)
+        let provider = Counter()
+        let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
+
+        let failure = await failure { _ = try await sut.attest(entry: "myEntry") }
+
+        XCTAssertTrue(failure is PinnedTokenRefusal, "got \(failure)")
+        XCTAssertEqual(paths.values, [Self.challenge], "no replay, and nothing after it")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only: nothing was refreshed")
+    }
+
+    func testA401OnRegisterIsSentOnceAndAsksTheProviderForNothing() async throws {
+        let paths = PathsBox()
+        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.register)
+        let provider = Counter()
+        let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
+
+        let failure = await failure { _ = try await sut.attest(entry: "myEntry") }
+
+        XCTAssertTrue(failure is PinnedTokenRefusal, "got \(failure)")
+        XCTAssertEqual(paths.values, [Self.challenge, Self.register], "no replay, and nothing after it")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only: nothing was refreshed")
+    }
+
     func testA401OnAttestIsSentOnceAndAsksTheProviderForNothing() async throws {
         let paths = PathsBox()
-        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.attest, unless: nil)
+        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.attest)
         let provider = Counter()
         let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
 
@@ -56,32 +84,6 @@ final class DeviceRoutePinTests: XCTestCase {
         let calls = await provider.count
         XCTAssertEqual(calls, 1)
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "a refused token keeps the binding")
-    }
-
-    // MARK: - Routes that recover
-
-    func testA401OnChallengeIsStillRefreshedAndReplayed() async throws {
-        let paths = PathsBox()
-        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.challenge, unless: "renewed-2")
-        let provider = Counter()
-        let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
-
-        let result = try await sut.attest(entry: "myEntry")
-
-        XCTAssertEqual(result.deviceId, "dev_1")
-        XCTAssertEqual(paths.values, [Self.challenge, Self.challenge, Self.register, Self.attest])
-    }
-
-    func testA401OnRegisterIsStillRefreshedAndReplayed() async throws {
-        let paths = PathsBox()
-        StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: Self.register, unless: "renewed-2")
-        let provider = Counter()
-        let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
-
-        let result = try await sut.attest(entry: "myEntry")
-
-        XCTAssertEqual(result.deviceId, "dev_1")
-        XCTAssertEqual(paths.values, [Self.challenge, Self.register, Self.register, Self.attest])
     }
 
     // MARK: - A binding the service no longer holds
@@ -170,16 +172,12 @@ final class DeviceRoutePinTests: XCTestCase {
         }
     }
 
-    /// The cold sequence, with `refused` answering 401 to every token but `accepted`.
-    private static func coldSequence(
-        paths: PathsBox,
-        refusing refused: String,
-        unless accepted: String?
-    ) -> StubURLProtocol.Handler {
+    /// The cold sequence, with `refused` answering 401 to every token.
+    private static func coldSequence(paths: PathsBox, refusing refused: String) -> StubURLProtocol.Handler {
         { request in
             let path = request.url!.path
             paths.append(path)
-            if path == refused, bearer(of: request) != accepted {
+            if path == refused {
                 return status(401, request)
             }
             switch path {
@@ -208,10 +206,6 @@ final class DeviceRoutePinTests: XCTestCase {
 
     private static func status(_ code: Int, _ request: URLRequest) -> (HTTPURLResponse, Data) {
         (HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: "HTTP/1.1", headerFields: nil)!, Data())
-    }
-
-    private static func bearer(of request: URLRequest) -> String? {
-        request.value(forHTTPHeaderField: "Authorization")?.replacingOccurrences(of: "Bearer ", with: "")
     }
 
     /// What `block` threw. A success fails the test here, so the assertions after it are never quietly skipped.

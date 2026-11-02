@@ -91,6 +91,8 @@ package enum TelemetryEventName {
     package static let sdkInitialized = "sdk.initialized"
     package static let sdkInitializeStarted = "sdk.initialize.started"
     package static let sdkInitializeFailed = "sdk.initialize.failed"
+    /// Carries `dropped`: how many events the queue evicted since the last accepted batch, as text.
+    package static let sdkTelemetryOverflow = "sdk.telemetryOverflow"
     package static let authTokenAcquired = "auth.tokenAcquired"
     package static let authTokenFailed = "auth.tokenFailed"
     package static let authTokenRefreshed = "auth.tokenRefreshed"

@@ -34,7 +34,7 @@ final class StepStatusTests: XCTestCase {
 
     func testTheDemoKnowsEverySessionStateTheSDKHas() {
         // The projection is `@objc` and so cannot be `CaseIterable`; its raw
-        // values are what the bridges read, so a state added to the SDK without
+        // values are what an Objective-C host reads, so a state added to the SDK without
         // one fails here first.
         XCTAssertEqual(
             Set(everyTapToPaySession.map(\.code.rawValue)).count,

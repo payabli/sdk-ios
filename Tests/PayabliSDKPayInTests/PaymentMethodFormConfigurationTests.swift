@@ -5,6 +5,11 @@ import UIKit
 import XCTest
 
 final class PaymentMethodFormConfigurationTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testDetectsCardBrandFromCardNumberPrefix() {
         XCTAssertEqual(PayabliPayInCardBrand.detect(cardNumber: "4111 1111 1111 1111"), .visa)
         XCTAssertEqual(PayabliPayInCardBrand.detect(cardNumber: "5555 5555 5555 4444"), .mastercard)

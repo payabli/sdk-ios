@@ -200,7 +200,7 @@ public struct PayabliPayInForm: View {
     @ViewBuilder
     var header: some View {
         let title = labels.drawnTitle
-        let subtitle = labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        let subtitle = labels.drawnSubtitle
 
         if title != nil || subtitle != nil {
             VStack(alignment: .leading, spacing: resolvedStyle.layout.headerSpacing) {
@@ -315,8 +315,8 @@ public struct PayabliPayInForm: View {
     func fieldSection(_ section: PayabliPayInFieldSection) -> some View {
         let groups = fieldGroups(for: section.fields)
 
-        return VStack(alignment: .leading, spacing: section.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
-            if let title = section.title {
+        return VStack(alignment: .leading, spacing: section.heading == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
+            if let title = section.heading {
                 let titleStyle = section.titleStyle ?? resolvedStyle.sectionTitle
 
                 Text(title)

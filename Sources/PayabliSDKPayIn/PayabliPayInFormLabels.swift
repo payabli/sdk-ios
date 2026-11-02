@@ -70,19 +70,24 @@ public struct PayabliPayInFormLabels: Sendable {
     /// - Parameter field: the field whose label the form draws.
     /// - Returns: the label to draw: the host's, the default's, or the field's own name.
     public func label(for field: PayabliPayInField) -> String {
-        fieldLabels[field].flatMap { Self.isBlank($0) ? nil : $0 }
+        Self.nonBlank(fieldLabels[field])
             ?? Self.defaultFieldLabels[field]
             ?? field.rawValue
     }
 
-    /// The heading to draw, trimmed, or nil when the host's is absent or blank.
+    /// The heading to draw as given, or nil when the host's is absent or blank.
     var drawnTitle: String? {
-        title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        Self.nonBlank(title)
     }
 
-    /// The host's button wording, trimmed, or nil when it is absent or blank.
+    /// The line under the heading as given, or nil when the host's is absent or blank.
+    var drawnSubtitle: String? {
+        Self.nonBlank(subtitle)
+    }
+
+    /// The host's button wording as given, or nil when it is absent or blank.
     var hostSubmitButton: String? {
-        submitButton?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        Self.nonBlank(submitButton)
     }
 
     /// Blank when every scalar is a space, line or paragraph separator, or a control in U+0009–U+000D or
@@ -101,8 +106,20 @@ public struct PayabliPayInFormLabels: Sendable {
         }
     }
 
+    /// The text as given, or nil when it is absent or blank.
+    ///
+    /// - Parameter text: the host's string.
+    /// - Returns: the text, or nil when there is none to draw.
+    static func nonBlank(_ text: String?) -> String? {
+        text.flatMap { isBlank($0) ? nil : $0 }
+    }
+
+    /// The host's placeholder for `field` as given, or nil when it is absent or blank.
+    ///
+    /// - Parameter field: the field whose placeholder the form draws.
+    /// - Returns: the placeholder, or nil for none.
     public func placeholder(for field: PayabliPayInField) -> String? {
-        fieldPlaceholders[field]?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        Self.nonBlank(fieldPlaceholders[field])
     }
 
     public static let defaultFieldLabels: [PayabliPayInField: String] = [

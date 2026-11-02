@@ -4,6 +4,11 @@ import XCTest
 
 @MainActor
 final class PayabliPayInReadTransactionTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testAReadSendsNoKeyAndReturnsTheTransaction() async throws {
         let transport = RecordingIdempotencyTransport(body: Self.record)
         let flow = PayInFixture.makeFlow(transport: transport, key: "unused")

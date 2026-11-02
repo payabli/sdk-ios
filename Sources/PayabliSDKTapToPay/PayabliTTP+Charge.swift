@@ -27,8 +27,9 @@ extension PayabliTTP {
     ///      response travels; everything else was persisted at step 1.
     ///
     /// Every charge opens under a key of its own. One whose outcome is unknown keeps it for four minutes, and only
-    /// `attempt: .retry` resends it, describing the same amount, service fee, currency and, when the held charge set
-    /// one, invoice number; any other retry is refused with `RETRY_NOT_SAME_PAYMENT` before anything is sent.
+    /// `attempt: .retry` resends it, describing the same amount, service fee, currency and any invoice number it set.
+    /// A retry refused before anything is sent says why: `RETRY_NOT_SAME_PAYMENT`, `PAYMENT_REFERENCE_OPEN` or
+    /// `TERMINAL_NOT_READY`.
     ///
     /// - Parameters:
     ///   - paymentDetails: the amount, service fee and currency to charge.
@@ -45,23 +46,39 @@ extension PayabliTTP {
         attempt: PayabliAttempt = .newPayment
     ) async throws -> TransactionResult {
         let progress = ChargeProgress()
+        let sale = ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
         do {
-            return try await holdingSessionSetup {
-                try await runCharge(
-                    paymentDetails: paymentDetails,
-                    customer: customer,
-                    invoice: invoice,
-                    orderDescription: orderDescription,
-                    attempt: attempt,
-                    progress: progress
-                )
+            return try await holdingSessionSetup(attempt: attempt, sale: sale) {
+                do {
+                    return try await runCharge(
+                        paymentDetails: paymentDetails,
+                        customer: customer,
+                        invoice: invoice,
+                        orderDescription: orderDescription,
+                        attempt: attempt,
+                        sale: sale,
+                        progress: progress
+                    )
+                } catch {
+                    // A retry refused before its key was reserved still describes the held sale, whose outcome is
+                    // unknown. Asked while the gate is held, so no other charge can settle that key under the read.
+                    if attempt == .retry, !progress.reserved {
+                        progress.retriesHeldSale = chargeKeys.holdsRetryOf(
+                            entry: entryPoint,
+                            environment: environment,
+                            description: sale
+                        )
+                    }
+                    throw error
+                }
             }
         } catch {
             throw TapToPayErrorTranslation.hostError(
                 for: error,
                 chargeOf: progress.paymentTransId,
                 askedForCard: progress.askedForCard,
-                resentKey: progress.resentKey
+                resentKey: progress.resentKey,
+                retriesHeldSale: progress.retriesHeldSale
             )
         }
     }
@@ -72,6 +89,7 @@ extension PayabliTTP {
         invoice: PayabliTTPInvoiceData,
         orderDescription: String?,
         attempt: PayabliAttempt,
+        sale: ChargeDescription,
         progress: ChargeProgress
     ) async throws -> TransactionResult {
         // Called directly: `reinitialize()` would wait on the gate this charge holds. Its own task keeps a
@@ -111,8 +129,9 @@ extension PayabliTTP {
             entry: entryPoint,
             environment: environment,
             attempt: attempt,
-            description: ChargeDescription(paymentDetails: paymentDetails, invoice: invoice)
+            description: sale
         )
+        progress.reserved = true
         progress.resentKey = reservation.reused
         var arrivedAt: ContinuousClock.Instant? = reservation.reservedAt
         defer {
@@ -137,6 +156,12 @@ extension PayabliTTP {
                 }
                 // No card was asked for, so no money moved and a fresh key protects no sale.
                 settleFresh(reservation)
+                // A paypoint the service refuses card-present for stays refused, so the session says so rather
+                // than arming a reader for every later charge to refuse again.
+                if case PayabliTTPError.cardPresentNotEnabled = error {
+                    markError(error)
+                    syncPublished()
+                }
             }
             throw error
         }
@@ -198,6 +223,7 @@ extension PayabliTTP {
             readResult = try await provider.startReading(readRequest)
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
+            let touchedNoCard = Self.touchedNoCard(failure)
 
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
@@ -207,8 +233,14 @@ extension PayabliTTP {
                 payload: .nfcFailure(description: String(describing: error))
             )
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
-            // payment is the one answer that says nothing was captured.
+            // payment says nothing was captured, and so does a read that never reached a card, whatever the close
+            // answers.
             if case .failed(_, _, processorHasNoRecord: true) = close {
+                settleFresh(reservation)
+                if touchedNoCard {
+                    logger.info("[charge] the close found no record of a payment whose read never reached a card")
+                }
+            } else if touchedNoCard {
                 settleFresh(reservation)
             }
 
@@ -220,6 +252,12 @@ extension PayabliTTP {
                sessionManager.transition(to: .sessionExpired)
             {
                 syncPublished()
+            }
+            // The no-record close says this charge took nothing, so it replaces the read's failure — but only
+            // where this run minted the key: a resent key names an earlier charge, which it cannot settle. A read
+            // that never reached a card keeps its 3017, which already says nothing was taken.
+            if case .failed(_, _, processorHasNoRecord: true) = close, !reservation.reused, !touchedNoCard {
+                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId)
             }
             throw failure
         }
@@ -237,7 +275,15 @@ extension PayabliTTP {
         chargeKeys.settle(entry: entryPoint, environment: environment, key: reservation.key)
     }
 
-    /// The text the service refuses a close with when the processor has no record of the payment.
+    /// Whether a read failed before the reader reached a card, so the charge took nothing.
+    ///
+    /// - Parameter failure: the read's failure, as the caller is told it.
+    /// - Returns: `true` where the reader session was gone before the read began.
+    private static func touchedNoCard(_ failure: Error) -> Bool {
+        guard case PayabliTTPError.readerSessionExpired(_, .notCharged) = failure else { return false }
+        return true
+    }
+
     private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
 
     private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
@@ -384,8 +430,16 @@ extension PayabliTTP {
             return PayabliTTPError.nfcFailed(reason: reason, paymentTransId: paymentTransId)
         case let .readerSetupFailed(reason, _):
             return PayabliTTPError.readerSetupFailed(reason: reason, paymentTransId: paymentTransId)
+        case let .guardFailed(reason, _):
+            return PayabliTTPError.guardFailed(reason: reason, paymentTransId: paymentTransId)
         case .readerOSVersionNotSupported:
             return PayabliTTPError.readerOSVersionNotSupported(paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerDeviceRefused(reason, _, _):
+            return PayabliTTPError.readerDeviceRefused(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerUnavailable(reason, _, _):
+            return PayabliTTPError.readerUnavailable(reason: reason, paymentTransId: paymentTransId, capture: .unknown)
+        case let .readerSessionExpired(_, capture):
+            return PayabliTTPError.readerSessionExpired(paymentTransId: paymentTransId, capture: capture)
         case let .some(ttpError):
             return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
         case .none:

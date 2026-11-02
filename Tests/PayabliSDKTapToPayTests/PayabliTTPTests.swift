@@ -132,7 +132,7 @@ final class PayabliTTPTests: XCTestCase {
         _ = try? await ttp.initialize()
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev"))
 
-        try await ttp.activateDevice(activationCode: "ABC123")
+        try await ttp.activateDevice(activationCode: "123456")
         XCTAssertEqual(attestation.activateCalls, 1)
         XCTAssertEqual(ttp.sessionState, .idle)
     }

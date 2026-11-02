@@ -12,7 +12,7 @@ name: Public interface
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, 'release/**', 'hotfix/**']
 
 concurrency:
   group: public-interface-${{ github.ref }}
@@ -21,6 +21,11 @@ concurrency:
 # Runs the pull request's own code, so it holds no token beyond reading the repository.
 permissions:
   contents: read
+
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   interface:
@@ -31,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -68,7 +73,7 @@ jobs:
       # The generated files, so an author on another Xcode can take the ones this image produced.
       - name: Upload the generated interface
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: public-interface
           path: API/

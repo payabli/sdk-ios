@@ -11,6 +11,11 @@ import XCTest
 /// questions this platform has.
 @MainActor
 final class PaymentMethodReseedTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     // MARK: - What an update reaches
 
     /// An update carrying a different configuration leaves every typed value alone.

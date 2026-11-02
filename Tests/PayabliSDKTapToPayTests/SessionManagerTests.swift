@@ -167,7 +167,7 @@ final class SessionManagerTests: XCTestCase {
         for from in TapToPayChargeActivity.allCases {
             for to in TapToPayChargeActivity.allCases {
                 let expected: Bool = switch from {
-                case .opening: to == .opening || to == .waitingForCard
+                case .opening: to == .opening || to == .waitingForCard || to == .closing
                 case .closing: to == .closing
                 default: to != .opening
                 }

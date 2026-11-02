@@ -1,9 +1,9 @@
 name: Release
 
 # A consumer resolves this package by git tag, so the tag is the publication. This one cuts
-# `PayabliCore.version` from the commit on main that the dispatch names, after the suite passes on it, and
-# gives it a GitHub Release carrying the XCFrameworks for integrators who do not use SwiftPM. Only a release
-# is ever tagged.
+# `PayabliCore.version` from the commit the dispatch names, which is on the release or hotfix branch of that
+# version and passed CI there, after the suite passes on it, and gives it a GitHub Release carrying the
+# XCFrameworks for integrators who do not use SwiftPM. Only a release is ever tagged.
 #
 # Four jobs. `check` reads the named commit and its version. `test` and `build` then run beside each other,
 # each with a read-only token and no secret, so "Re-run failed jobs" repeats a failed suite without rebuilding
@@ -15,16 +15,20 @@ on:
     inputs:
       # The commit that ships, so a merge landing between the decision and the dispatch is not released.
       commit:
-        description: "Full 40-character SHA of the commit on main to release"
+        description: "Full 40-character SHA of the commit to release, on release/<version> or hotfix/<version>"
         required: true
         type: string
       release_notes:
         description: "Release notes (markdown), published as the release body"
         required: true
 
-concurrency:
-  group: release
-  cancel-in-progress: false
+# Granted per job, never here.
+permissions: {}
+
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
 
 jobs:
   # Reads the commit and the version, and holds nothing that can tag or publish.
@@ -41,6 +45,15 @@ jobs:
       COMMIT: ${{ inputs.commit }}
 
     steps:
+      # The workflow's own definition is main's, so a dispatch from any other ref is refused before anything
+      # else runs. The publish job refuses it again, and the release environment deploys from main only.
+      - name: Check the release is dispatched from main
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"
+            exit 1
+          fi
+
       # A full SHA and nothing shorter, so the commit approved is not a prefix that resolves to another.
       - name: Check the commit is named in full
         run: |
@@ -49,38 +62,32 @@ jobs:
             exit 1
           fi
 
-      # Nothing is published from a commit whose CI on main has not passed, and a run still in progress has
-      # not.
-      - name: Require a passing CI run on main for this commit
+      # Notes are written for the release, because commit subjects carry tracker references no release page
+      # should name. A run that cannot publish is refused here, before anyone is asked to approve it.
+      - name: Check the release notes are written
         env:
-          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
         run: |
-          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=main&event=push&per_page=1" \
-            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
-          if [ "$state" != "completed success" ]; then
-            echo "::error::CI on main for $COMMIT is '${state:-not run}', not a completed success. Re-run it, then dispatch again."
+          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then
+            echo "::error::release_notes is blank, and a release is published with notes written for it"
             exit 1
           fi
 
-      # All of history, so the check below can see main.
+      # All of history, so the checks below can see every branch and every tag.
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.commit }}
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Check the commit is on main
-        run: |
-          if [ "$(git merge-base "$COMMIT" origin/main)" != "$COMMIT" ]; then
-            echo "::error::$COMMIT is not on main"
-            exit 1
-          fi
-
+      # Main's copy of the script, reading the commit's tree as data. Nothing from the commit runs before the
+      # checks below have found it on its branch with CI passed there.
       - name: Check the version
         id: version
         run: |
-          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"
+          git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh
+          VERSION="$(bash .github/scripts/release-version.sh "$GITHUB_REF")"
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tagging $VERSION"
@@ -92,6 +99,39 @@ jobs:
             echo
             echo "The workflow runs from \`$GITHUB_SHA\` on main."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The branch is named by the version the commit declares, so a commit on another version's branch, or
+      # only on main, is refused rather than released under a number it was not worked as.
+      - name: Check the commit is on its release or hotfix branch
+        id: branch
+        run: |
+          branch=
+          for candidate in "release/$VERSION" "hotfix/$VERSION"; do
+            if git show-ref --verify --quiet "refs/remotes/origin/$candidate" \
+                && git merge-base --is-ancestor "$COMMIT" "refs/remotes/origin/$candidate"; then
+              branch="$candidate"
+              break
+            fi
+          done
+          if [ -z "$branch" ]; then
+            echo "::error::$COMMIT is not on release/$VERSION or hotfix/$VERSION, the branches of the version it declares"
+            exit 1
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      # Nothing is published from a commit whose CI on its branch has not passed, and a run still in progress
+      # has not.
+      - name: Require a passing CI run on the branch for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          state="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&branch=$BRANCH&event=push&per_page=1" \
+            --jq '.workflow_runs[0] // empty | "\(.status) \(.conclusion)"')"
+          if [ "$state" != "completed success" ]; then
+            echo "::error::CI on $BRANCH for $COMMIT is '${state:-not run}', not a completed success. Re-run it, then dispatch again."
+            exit 1
+          fi
 
       # A tag on this commit is a run that failed after pushing it, and is resumed.
       - name: Check an existing tag names this commit
@@ -114,6 +154,26 @@ jobs:
             exit 1
           fi
 
+      # Every earlier release is merged back into main, and main into this release's branch, before the next
+      # is cut: main then holds each tagged commit, and the commit released carries every earlier fix. The
+      # version's own tag is this release resumed.
+      - name: Check every earlier release is in main and in the commit
+        run: |
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          for tag in $(printf '%s\n' "$tags" | { grep -E "$release" || true; }); do
+            if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ]; then
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
+                echo "::error::release $tag is not in main: its release or hotfix branch has not merged back with a merge commit"
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then
+                echo "::error::release $tag is not in $COMMIT: merge main into the branch and pass CI there before cutting $VERSION"
+                exit 1
+              fi
+            fi
+          done
+
   # The suite, on its own so a failed test is re-run without rebuilding the XCFrameworks.
   test:
     name: Test the release
@@ -126,7 +186,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
@@ -164,6 +224,18 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcpretty && exit ${PIPESTATUS[0]}
 
+      # The sample app's step sequences, as CI runs them, so the release re-runs every suite CI runs without a
+      # device.
+      - name: Test the sample app's step sequences
+        run: |
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoFlowTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+
   # The XCFrameworks, beside the suite rather than after it. Publish uploads what this job built, so a re-run
   # of the suite alone leaves them as they are.
   build:
@@ -179,7 +251,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.check.outputs.commit }}
           persist-credentials: false
@@ -241,7 +313,7 @@ jobs:
       # Kept past the 30 days in which GitHub allows a run to be re-run, so a re-run of the suite still finds
       # these files to publish. Replaced when this job itself is re-run, since an artifact name is written once.
       - name: Hand the release files to the publish job
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-files
           path: |
@@ -259,6 +331,11 @@ jobs:
     # Its required reviewers are who may release, it deploys from main only, and it holds the one key the
     # tag ruleset lets create a tag.
     environment: release
+    # One publish at a time, and none cancelled. Two releases check, test and build side by side, and each
+    # checks the newest release and the tag again just before tagging.
+    concurrency:
+      group: release
+      cancel-in-progress: false
     permissions:
       contents: write
 
@@ -279,7 +356,7 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.check.outputs.commit }}
           fetch-depth: 0
@@ -319,8 +396,27 @@ jobs:
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "TAGGED=$tagged" >> "$GITHUB_ENV"
 
+      # Again here, with refs fetched after the approval: an earlier release cut while this one waited is not
+      # in main yet, and this commit does not hold it. The same lines as the check job's step.
+      - name: Check again that every earlier release is in main and in the commit
+        run: |
+          release='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          tags="$(git for-each-ref --format='%(refname:strip=2)' refs/tags)"
+          for tag in $(printf '%s\n' "$tags" | { grep -E "$release" || true; }); do
+            if [ "$tag" != "$VERSION" ] && [ "$(printf '%s\n%s\n' "$tag" "$VERSION" | sort -V | head -n 1)" = "$tag" ]; then
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then
+                echo "::error::release $tag is not in main: its release or hotfix branch has not merged back with a merge commit"
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then
+                echo "::error::release $tag is not in $COMMIT: merge main into the branch and pass CI there before cutting $VERSION"
+                exit 1
+              fi
+            fi
+          done
+
       - name: Download the release files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-files
           path: build/release
@@ -334,12 +430,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
-          # Notes are written for the release, because commit subjects carry
-          # tracker references no release page should name.
-          if [ -z "${RELEASE_NOTES//[[:space:]]/}" ]; then
-            echo "::error::release_notes is blank, and a release is published with notes written for it"
-            exit 1
-          fi
           printf '%s\n' "$RELEASE_NOTES" > release-notes.md
           bundle="build/release/payabli-ios-sdk-$VERSION.zip"
           if [ ! -f "$bundle" ]; then
@@ -385,7 +475,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           if [ -z "$TAGGED" ]; then
-            git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" "$COMMIT"
+            git tag -a "$VERSION" -m "Payabli iOS SDK $VERSION" -m "Released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$COMMIT"
             GIT_SSH_COMMAND="ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$hosts" \
               git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$VERSION"
           fi

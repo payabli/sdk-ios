@@ -224,6 +224,109 @@ final class AppAttestFailureCodeTests: XCTestCase {
         XCTAssertFalse(paths.values.contains("/api/v2/device/taptopay/register"), "\(paths.values)")
     }
 
+    // MARK: - A cold route's refusal names its own cause
+
+    /// Every cold route refuses a closed entry point with the same words, and the
+    /// words — not the status alone — decide the answer a host gets.
+    func testAnEntryPointRefusalOnEveryColdRouteReportsItsOwnCode() async throws {
+        let routes = [
+            "/api/v2/device/taptopay/register",
+            "/api/v2/device/taptopay/challenge",
+            "/api/v2/device/taptopay/attest"
+        ]
+        for route in routes {
+            stubColdRoutes(refusing: route, status: 403, text: "Entry point is not available for this request.")
+            let (sut, _, _) = try AttestFixture.makeService()
+
+            await assertAttestThrows(sut, .entryPointRefused, route)
+        }
+    }
+
+    /// A 400 whose words say the attestation did not verify is a refusal of this
+    /// device's setup, not a malformed request.
+    func testAnAttestationThatFailedVerificationReportsSetupRefused() async throws {
+        stubColdRoutes(
+            refusing: "/api/v2/device/taptopay/attest",
+            status: 400,
+            text: "Attestation verification failed: nonce mismatch"
+        )
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertAttestThrows(sut, .deviceSetupRefused)
+    }
+
+    /// The root-unavailable sentence is ruled to keep the validation answer, so the
+    /// verification match above must be the whole sentence, not a prefix.
+    func testAnAttestationRootUnavailableFailureKeepsTheValidationError() async throws {
+        stubColdRoutes(
+            refusing: "/api/v2/device/taptopay/attest",
+            status: 400,
+            text: "Attestation verification failed: Apple attestation root is unavailable."
+        )
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertAttestThrows(sut, .validation)
+    }
+
+    /// A device the service no longer holds is set up again, whichever words told
+    /// the route so.
+    func testADeviceTheServiceNoLongerHoldsReportsSetupRequired() async throws {
+        let cases: [(String, Int, String)] = [
+            ("/api/v2/device/taptopay/attest", 404, "Device not found."),
+            ("/api/v2/device/taptopay/attest", 403, "Device is not in a state that allows this operation.")
+        ]
+        for (route, status, text) in cases {
+            stubColdRoutes(refusing: route, status: status, text: text)
+            let (sut, _, _) = try AttestFixture.makeService()
+
+            await assertAttestThrows(sut, .deviceSetupRequired, text)
+        }
+    }
+
+    /// A refusal none of the tables knows keeps the status's own answer.
+    func testAnUnmatchedRefusalKeepsItsStatusAnswer() async throws {
+        stubColdRoutes(refusing: "/api/v2/device/taptopay/attest", status: 403, text: "Some other refusal.")
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertAttestThrows(sut, .permissionDenied)
+    }
+
+    // MARK: - The activation code itself
+
+    /// A code that is not six digits is refused before anything is sent, and the
+    /// session still waits for a valid one.
+    @available(iOS 16.7, *)
+    @MainActor
+    func testAnActivationCodeThatIsNotSixDigitsIsRefusedBeforeTheServiceSeesIt() async throws {
+        for code in ["12345", "1234567", "12345a", "abcdef", ""] {
+            let (ttp, attestation) = try await makePendingActivationTTP()
+
+            do {
+                try await ttp.activateDevice(activationCode: code)
+                XCTFail("\(code): the attempt proceeded")
+            } catch {
+                let host = TapToPayErrorTranslation.hostError(for: error)
+                XCTAssertEqual((host as? TapToPayError)?.type, .activationCodeMalformed, "\(code): \(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_1"), "\(code)")
+            XCTAssertEqual(attestation.activateCalls, 0, "\(code)")
+        }
+    }
+
+    /// Activating with nothing stored names the missing setup as its own cause:
+    /// the remedy is to run the setup again, not an unknown failure.
+    func testActivatingWithNothingStoredReportsSetupRequired() async throws {
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        do {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+            XCTFail("activation succeeded with nothing stored")
+        } catch {
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, .deviceSetupRequired, "\(error)")
+        }
+    }
+
     // MARK: - Helpers
 
     private func deviceCheck(_ code: Int) -> NSError {
@@ -239,6 +342,34 @@ final class AppAttestFailureCodeTests: XCTestCase {
         }
     }
 
+    /// Answers the cold routes: the refused one with its status and words, `/challenge`
+    /// with its fixture, and every other route with a device id.
+    private func stubColdRoutes(refusing refusedPath: String, status: Int, text: String) {
+        StubURLProtocol.handler = { request in
+            let path = request.url!.path
+            if path == refusedPath {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.refusalBody(status: status, text: text)
+                )
+            }
+            if path == "/api/v2/device/taptopay/challenge" {
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            return AttestFixture.ok(request, ["deviceId": "dev_1"])
+        }
+    }
+
+    /// A legacy-envelope refusal, the shape every device route answers one in: the
+    /// status as the result code, the service's words as the result text.
+    private static func refusalBody(status: Int, text: String) -> Data {
+        let payload: [String: Any] = [
+            "isSuccess": false,
+            "responseData": ["resultCode": status, "resultText": text]
+        ]
+        return try! JSONSerialization.data(withJSONObject: payload)
+    }
+
     private func assertAttestThrows(
         _ sut: AppAttestService,
         _ type: PayabliErrorType,
@@ -249,8 +380,32 @@ final class AppAttestFailureCodeTests: XCTestCase {
             _ = try await sut.attest(entry: "myEntry")
             XCTFail("the attempt proceeded. \(message)", line: line)
         } catch {
-            XCTAssertEqual((error as? TapToPayError)?.type, type, "\(error) \(message)", line: line)
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, type, "\(error) \(message)", line: line)
         }
+    }
+
+    /// A facade waiting for an activation code, the state `activateDevice` runs from.
+    @available(iOS 16.7, *)
+    @MainActor
+    private func makePendingActivationTTP() async throws -> (PayabliTTP, MockDeviceAttestationService) {
+        let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: { "seed" })
+        let attestation = MockDeviceAttestationService()
+        attestation.pendingRegistration = "dev_1"
+        let ttp = PayabliTTP(
+            config: config,
+            provider: MockTapToPayProvider(),
+            attestation: attestation,
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
+        _ = try? await ttp.initialize()
+        XCTAssertEqual(
+            ttp.sessionState,
+            .pendingActivation(activationId: "dev_1"),
+            "the fixture itself is broken if this fails"
+        )
+        return (ttp, attestation)
     }
 }
 

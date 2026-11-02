@@ -11,6 +11,14 @@ import Foundation
 /// - Parameter error: the failure the read ended with, typed or rebuilt as text.
 /// - Returns: whether the session is gone with it.
 func readerFailureInvalidatesSession(_ error: Error) -> Bool {
+    if case PayabliTTPError.readerDeviceRefused = error {
+        // The processor refused the device, and it will refuse the next read the same way until a fresh
+        // config arms a new reader session.
+        return true
+    }
+    if case PayabliTTPError.readerSessionExpired = error {
+        return true
+    }
     #if canImport(ProximityReader)
         if let readError = error as? PaymentCardReaderSession.ReadError {
             return sessionLevelReadErrorNames.contains(String(describing: readError))

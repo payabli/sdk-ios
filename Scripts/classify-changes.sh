@@ -50,7 +50,6 @@ classify_path() {
         Sources/*)  echo "Production code (ships in the SDK)" ;;
         Tests/*)    echo "Test code" ;;
         Example/*)  echo "Sample app" ;;
-        Bridges/*)  echo "Bridge wrappers" ;;
         .github/*|Scripts/*|*.yml|*.xcconfig|.swiftformat|.swiftlint.yml|sonar-project.properties|Package.swift|.gitignore)
                     echo "Build, CI and tooling" ;;
         *)          echo "Other" ;;

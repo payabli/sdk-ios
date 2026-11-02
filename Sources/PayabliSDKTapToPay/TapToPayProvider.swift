@@ -16,7 +16,7 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     func checkEligibility() async -> Result<Void, PayabliTTPError>
 
     /// Applies the raw credentials block from `/api/v2/device/taptopay/config/{entry}`, validating its keys and
-    /// throwing a `PayabliTTPError` such as `.readerSetupFailed(reason:)` before `prepareReader()` when one is
+    /// throwing a `PayabliTTPError` such as `.readerCredentialsUnusable` before `prepareReader()` when one is
     /// missing or malformed. Credentials live only in RAM and must be cleared in `cleanUp()`.
     ///
     /// - Parameter credentials: the raw `providerCredentials` block, keyed as the configuration route sent it.
@@ -39,23 +39,14 @@ package protocol TapToPayProvider: AnyObject, Sendable {
     /// outside this process.
     ///
     /// - Returns: whether the merchant has accepted; a platform that requires no acceptance answers `true`.
-    /// - Throws: `.readerSetupFailed` when there is no reader to ask, so a caller can tell "not accepted" from "cannot answer".
+    /// - Throws: `.guardFailed` when there is no reader to ask, so a caller can tell "not accepted" from "cannot answer".
     func areTermsAccepted() async throws -> Bool
 
-    /// Asks the platform to present its own terms so the merchant can accept, and
-    /// returns once the request is done.
+    /// Presents the platform's own terms and returns once the request is done. Returning without error says the
+    /// request completed, not that a sheet was shown, so `areTermsAccepted()` answers where the merchant stands.
+    /// Nothing here accepts on the merchant's behalf.
     ///
-    /// Nothing here accepts on the merchant's behalf. The sheet belongs to the
-    /// platform and the merchant taps it, so returning without error means the
-    /// request completed, not that a sheet was shown: a platform that requires no
-    /// acceptance returns without presenting anything. `areTermsAccepted()` is what
-    /// answers where the merchant stands afterwards.
-    ///
-    /// Called by the facade on demand, from a screen the host chose. A platform
-    /// that requires no acceptance returns without doing anything.
-    ///
-    /// Must throw `PayabliTTPError.readerSetupFailed(reason:)` when there is no
-    /// reader to present from, for the same reason `areTermsAccepted()` does.
+    /// - Throws: `PayabliTTPError.guardFailed(reason:)` when there is no reader to present from.
     func presentTerms() async throws
 
     /// Runs the NFC interaction and (for atomic providers like Fiserv) the

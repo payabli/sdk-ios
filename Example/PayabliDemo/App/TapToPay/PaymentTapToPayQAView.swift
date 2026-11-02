@@ -457,20 +457,18 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.presentTerms()
             } catch {
-                termsMessage = "✗ Presenting failed: \(error.localizedDescription)"
+                termsMessage = TermsPresentation.failed(error).line
                 return
             }
             // Asked in its own scope: presenting has already returned by here, so a failure to
             // ask afterwards must not be reported as the presentation having failed.
+            let accepted: Result<Bool, Error>
             do {
-                let accepted = try await terminal.termsAccepted()
-                termsMessage = accepted
-                    ? "returned; now ✓ Accepted"
-                    : "returned; still ✗ Not accepted"
+                accepted = try await .success(terminal.termsAccepted())
             } catch {
-                termsMessage = "returned; could not ask whether accepted: "
-                    + error.localizedDescription
+                accepted = .failure(error)
             }
+            termsMessage = TermsPresentation.returned(accepted: accepted).line
         }
     }
 
@@ -483,7 +481,7 @@ struct PaymentTapToPayQAView: View {
                 try await terminal.initialize()
                 enableMessage = "✓ Reader ready"
             } catch {
-                enableMessage = "✗ \(error.localizedDescription)"
+                enableMessage = ActionLine.failed(error)
             }
         }
     }
@@ -504,7 +502,7 @@ struct PaymentTapToPayQAView: View {
                 )
                 chargeMessage = "✓ Charged · txn \(paymentTransId)"
             } catch {
-                chargeMessage = "✗ \(error.localizedDescription)"
+                chargeMessage = ActionLine.failed(error)
             }
         }
     }
@@ -553,7 +551,7 @@ struct PaymentTapToPayQAView: View {
                 // `enableMessage`, and the activation row is not `.failed` here,
                 // so writing only to `activationMessage` would discard the error.
                 activationOutcome = .enableFailed
-                enableMessage = "✗ \(error.localizedDescription)"
+                enableMessage = ActionLine.failed(error)
                 activationMessage = "✓ Activated. Enabling the terminal failed — see step 2."
             }
         }

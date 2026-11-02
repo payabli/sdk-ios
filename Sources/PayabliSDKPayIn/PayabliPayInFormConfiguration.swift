@@ -130,17 +130,22 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         fieldVerticalSpacings: [PayabliPayInField: CGFloat] = [:],
         style: PayabliPayInSectionStyle = .inputs
     ) {
-        let resolvedTitle = title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         self.id = id?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? resolvedTitle
+            ?? PayabliPayInFormLabels.nonBlank(title)?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
             ?? fields.map(\.rawValue).joined(separator: "-")
-        self.title = resolvedTitle
+        self.title = title
         self.titleStyle = titleStyle
         self.fields = fields
         self.inputVerticalSpacing = inputVerticalSpacing.map { max(0, $0) }
         self.inputHorizontalSpacing = inputHorizontalSpacing.map { max(0, $0) }
         self.fieldVerticalSpacings = fieldVerticalSpacings.mapValues { max(0, $0) }
         self.style = style
+    }
+
+    /// The heading drawn over the section: the host's title as given unless blank, else "Payment" on a summary.
+    /// An inputs section without one has no heading.
+    var heading: String? {
+        PayabliPayInFormLabels.nonBlank(title) ?? (style == .summary ? "Payment" : nil)
     }
 
     func replacingFields(_ fields: [PayabliPayInField]) -> PayabliPayInFieldSection {

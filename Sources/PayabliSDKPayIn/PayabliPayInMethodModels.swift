@@ -1,9 +1,26 @@
 import Foundation
 import PayabliSDKCore
 
-public enum PayabliPayInMethodType: String, CaseIterable, Identifiable, Sendable {
+public enum PayabliPayInMethodType: RawRepresentable, CaseIterable, Identifiable, Sendable {
     case card
-    case bankAccount = "ach"
+    case bankAccount
+
+    /// Finds the method the service names.
+    ///
+    /// - Parameter rawValue: the service's name for the method.
+    /// - Returns: the method, or nil when no case carries that name.
+    public init?(rawValue: String) {
+        guard let method = Self.allCases.first(where: { $0.rawValue == rawValue }) else { return nil }
+        self = method
+    }
+
+    /// The service's name for the method.
+    public var rawValue: String {
+        switch self {
+        case .card: PayInMethodWireNames.card
+        case .bankAccount: PayInMethodWireNames.ach
+        }
+    }
 
     public var id: String {
         rawValue

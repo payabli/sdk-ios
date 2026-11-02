@@ -29,6 +29,28 @@ final class PaymentMethodWireNameTests: XCTestCase {
         XCTAssertEqual(PayabliPayInMethodType.allCases.map(\.rawValue), ["card", "ach"])
     }
 
+    func testMethodEnumsReadTheServiceWordsBack() {
+        XCTAssertEqual(PayabliPayInMethodType(rawValue: "card"), .card)
+        XCTAssertEqual(PayabliPayInMethodType(rawValue: "ach"), .bankAccount)
+        XCTAssertNil(PayabliPayInMethodType(rawValue: "bankAccount"))
+        XCTAssertNil(PayabliPayInMethodType(rawValue: "cloud"))
+
+        XCTAssertEqual(PayabliPayInStoredMethodType(rawValue: "card"), .card)
+        XCTAssertEqual(PayabliPayInStoredMethodType(rawValue: "ach"), .bankAccount)
+        XCTAssertNil(PayabliPayInStoredMethodType(rawValue: "bankAccount"))
+        XCTAssertNil(PayabliPayInStoredMethodType(rawValue: "wallet"))
+    }
+
+    func testStoredMethodTypeCodesAsTheServiceWord() throws {
+        let encoded = try JSONEncoder().encode(PayabliPayInStoredMethodType.allCases)
+        XCTAssertEqual(String(bytes: encoded, encoding: .utf8), #"["card","ach"]"#)
+        XCTAssertEqual(
+            try JSONDecoder().decode([PayabliPayInStoredMethodType].self, from: encoded),
+            PayabliPayInStoredMethodType.allCases
+        )
+        XCTAssertThrowsError(try JSONDecoder().decode(PayabliPayInStoredMethodType.self, from: Data(#""wallet""#.utf8)))
+    }
+
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
         expiration: "02/28",

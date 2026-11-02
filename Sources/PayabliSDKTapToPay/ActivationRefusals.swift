@@ -34,14 +34,15 @@ enum ActivationRefusals {
     /// - Parameter reason: the service's refusal text, matched exactly against its fixed words.
     /// - Returns: whether the session should move off the state it waited in.
     static func movesSession(resultCode: Int?, reason: String) -> Bool {
-        discardsBinding(resultCode: resultCode, reason: reason) || (resultCode == 403 && reason == entryPointUnusable)
+        discardsBinding(resultCode: resultCode, reason: reason)
+            || (resultCode == 403 && reason == ColdRouteRefusals.entryPointUnusable)
     }
 
     static func catalogType(resultCode: Int?, reason: String) -> PayabliErrorType {
         switch resultCode {
         case 400:
             return badRequestType(reason: reason)
-        case 403 where reason == entryPointUnusable:
+        case 403 where reason == ColdRouteRefusals.entryPointUnusable:
             return .entryPointRefused
         case 403 where reason == notPending:
             return .deviceNotPending
@@ -81,7 +82,6 @@ enum ActivationRefusals {
     private static let notPending = "Device is not in a state that allows this operation."
     private static let assertionFailedPrefix = "Assertion verification failed: "
     private static let deviceNotFound = "Device not found."
-    private static let entryPointUnusable = "Entry point is not available for this request."
 
     /// The fixed body and header complaints, each one a request this SDK built wrong.
     private static let malformedRequest: Set<String> = [

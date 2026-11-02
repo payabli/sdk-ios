@@ -5,6 +5,11 @@ import XCTest
 
 @MainActor
 final class PayabliPayInTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testCaptureFacadeTracksSubmissionStateAndLastResult() async throws {
         let transport = FacadeTransport(responseBody: """
         {

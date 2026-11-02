@@ -5,6 +5,11 @@ import XCTest
 /// An unknown outcome carries the transaction the answer named, so a host can read it back.
 @MainActor
 final class PayInUnknownOutcomeTransactionTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testAnUnknownOutcomeCarriesTheTransactionTheAnswerNamed() async {
         let transport = RecordingIdempotencyTransport(
             body: Data(#"{"code":"E9999","reason":"Error","data":{"paymentTransId":"101-abc"}}"#.utf8),

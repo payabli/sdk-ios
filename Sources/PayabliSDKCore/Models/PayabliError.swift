@@ -60,7 +60,7 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case retryRefused = "RETRY_REFUSED"
     /// A retry described a different payment from the one whose outcome is unknown, so nothing was sent.
     case retryNotSamePayment = "RETRY_NOT_SAME_PAYMENT"
-    /// A new payment named a reference whose earlier payment is still unresolved, so nothing was sent.
+    /// Another call for this payment is still under way or its outcome is unknown, so nothing was sent.
     case paymentReferenceOpen = "PAYMENT_REFERENCE_OPEN"
 
     // Card-present.
@@ -97,16 +97,22 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case paymentNotHeld = "PAYMENT_NOT_HELD"
     case deviceIdentityUnavailable = "DEVICE_IDENTITY_UNAVAILABLE"
     case chargeNotFinished = "CHARGE_NOT_FINISHED"
+    case paymentNotTaken = "PAYMENT_NOT_TAKEN"
+    /// The device's contactless radio is switched off. Part of the published catalog, and never reported on iOS:
+    /// an iPhone has no switch for its contactless radio.
+    case contactlessDisabled = "CONTACTLESS_DISABLED"
 }
 
 /// What a host does about a failure. Each ``PayabliErrorType`` belongs to one.
 public enum PayabliErrorCategory: String, Sendable, CaseIterable {
     /// The SDK could not obtain or use a credential, a token or this device's setup. A provider that
     /// failed is asked again on the next call. `tokenExpired` means a fresh token was refused too, so
-    /// the session is finished until `initialize`, once the cause is fixed. It leaves the session usable
-    /// when another call had already replaced the refused token, and when it comes from Tap to Pay device
-    /// setup, where the next setup call asks again. A device setup that has ended, which the state
-    /// reports, is established again by calling `initialize`.
+    /// the session is finished until `PayabliSession.initialize`, once the cause is fixed. It leaves the session usable
+    /// when another call had already replaced the refused token, or was replacing it, and when a Tap to Pay
+    /// device setup's own request was refused after the renewal, where the next setup call asks again. A
+    /// setup call that fails with it at once, without calling the provider, means the session is finished:
+    /// call `PayabliSession.initialize`, then create the terminal again from the new session. A device
+    /// setup that has ended, which the state reports, is established again by calling `PayabliTTP.initialize()`.
     case credential = "CREDENTIAL"
 
     /// The same call may work later.
@@ -134,65 +140,73 @@ public enum PayabliErrorCategory: String, Sendable, CaseIterable {
 /// The catalog: one number, message and category per code, the same on every platform the SDK ships on.
 /// Numbers are allocated by area, core in the 1000s and card-present in the 3000s, and are never reused.
 public extension PayabliErrorType {
-    var number: Int {
+    /// This code's Objective-C name, whose raw value is the catalog number.
+    var code: PayabliErrorTypeCode {
         switch self {
-        case .missingToken: 1001
-        case .tokenExpired: 1002
-        case .tokenMalformed: 1003
-        case .tokenProviderFailed: 1004
-        case .invalidSignature: 1005
-        case .permissionDenied: 1006
-        case .sessionBurned: 1007
-        case .paymentDeclined: 1008
-        case .serverError: 1009
-        case .rateLimited: 1010
-        case .conflict: 1011
-        case .invalidConfiguration: 1012
-        case .networkError: 1013
-        case .decodingError: 1014
-        case .userCancelled: 1015
-        case .validation: 1016
-        case .unknown: 1017
-        case .sdkInternalError: 1018
-        case .sessionNotInitialized: 1019
-        case .transactionNotFound: 1020
-        case .retryRefused: 1021
-        case .retryNotSamePayment: 1022
-        case .paymentReferenceOpen: 1023
-        case .deviceKeyUnavailable: 3001
-        case .deviceSetupUnsupported: 3002
-        case .deviceServicesOutdated: 3003
-        case .devicePendingActivation: 3004
-        case .deviceSetupRequired: 3005
-        case .deviceSetupRefused: 3006
-        case .deviceSetupUnavailable: 3007
-        case .deviceSetupNotConfigured: 3008
-        case .entryPointRefused: 3009
-        case .readerCredentialsUnusable: 3010
-        case .deviceOSUnsupported: 3011
-        case .deviceHardwareUnsupported: 3012
-        case .termsNotAccepted: 3013
-        case .cardPresentNotEnabled: 3014
-        case .readerDeviceRefused: 3015
-        case .readerUnavailable: 3016
-        case .readerSessionExpired: 3017
-        case .tapNotCompleted: 3018
-        case .paymentNotOpened: 3019
-        case .cardDeclined: 3020
-        case .paymentOutcomeUnknown: 3021
-        case .paymentNotClosed: 3022
-        case .activationCodeMalformed: 3023
-        case .activationCodeIncorrect: 3024
-        case .activationCodeExpired: 3025
-        case .activationAttemptsExhausted: 3026
-        case .activationCodeNotIssued: 3027
-        case .deviceNotPending: 3028
-        case .terminalNotReady: 3029
-        case .tooManyOpenCharges: 3030
-        case .paymentNotHeld: 3031
-        case .deviceIdentityUnavailable: 3033
-        case .chargeNotFinished: 3034
+        case .missingToken: .missingToken
+        case .tokenExpired: .tokenExpired
+        case .tokenMalformed: .tokenMalformed
+        case .tokenProviderFailed: .tokenProviderFailed
+        case .invalidSignature: .invalidSignature
+        case .permissionDenied: .permissionDenied
+        case .sessionBurned: .sessionBurned
+        case .paymentDeclined: .paymentDeclined
+        case .serverError: .serverError
+        case .rateLimited: .rateLimited
+        case .conflict: .conflict
+        case .invalidConfiguration: .invalidConfiguration
+        case .networkError: .networkError
+        case .decodingError: .decodingError
+        case .userCancelled: .userCancelled
+        case .validation: .validation
+        case .unknown: .unknown
+        case .sdkInternalError: .sdkInternalError
+        case .sessionNotInitialized: .sessionNotInitialized
+        case .transactionNotFound: .transactionNotFound
+        case .retryRefused: .retryRefused
+        case .retryNotSamePayment: .retryNotSamePayment
+        case .paymentReferenceOpen: .paymentReferenceOpen
+        case .deviceKeyUnavailable: .deviceKeyUnavailable
+        case .deviceSetupUnsupported: .deviceSetupUnsupported
+        case .deviceServicesOutdated: .deviceServicesOutdated
+        case .devicePendingActivation: .devicePendingActivation
+        case .deviceSetupRequired: .deviceSetupRequired
+        case .deviceSetupRefused: .deviceSetupRefused
+        case .deviceSetupUnavailable: .deviceSetupUnavailable
+        case .deviceSetupNotConfigured: .deviceSetupNotConfigured
+        case .entryPointRefused: .entryPointRefused
+        case .readerCredentialsUnusable: .readerCredentialsUnusable
+        case .deviceOSUnsupported: .deviceOSUnsupported
+        case .deviceHardwareUnsupported: .deviceHardwareUnsupported
+        case .termsNotAccepted: .termsNotAccepted
+        case .cardPresentNotEnabled: .cardPresentNotEnabled
+        case .readerDeviceRefused: .readerDeviceRefused
+        case .readerUnavailable: .readerUnavailable
+        case .readerSessionExpired: .readerSessionExpired
+        case .tapNotCompleted: .tapNotCompleted
+        case .paymentNotOpened: .paymentNotOpened
+        case .cardDeclined: .cardDeclined
+        case .paymentOutcomeUnknown: .paymentOutcomeUnknown
+        case .paymentNotClosed: .paymentNotClosed
+        case .activationCodeMalformed: .activationCodeMalformed
+        case .activationCodeIncorrect: .activationCodeIncorrect
+        case .activationCodeExpired: .activationCodeExpired
+        case .activationAttemptsExhausted: .activationAttemptsExhausted
+        case .activationCodeNotIssued: .activationCodeNotIssued
+        case .deviceNotPending: .deviceNotPending
+        case .terminalNotReady: .terminalNotReady
+        case .tooManyOpenCharges: .tooManyOpenCharges
+        case .paymentNotHeld: .paymentNotHeld
+        case .deviceIdentityUnavailable: .deviceIdentityUnavailable
+        case .chargeNotFinished: .chargeNotFinished
+        case .paymentNotTaken: .paymentNotTaken
+        case .contactlessDisabled: .contactlessDisabled
         }
+    }
+
+    /// The catalog number, the same on every platform.
+    var number: Int {
+        code.rawValue
     }
 
     /// Fixed SDK text. The service's own words stay in ``PayabliError/reason`` and ``PayabliError/detail``.
@@ -227,8 +241,8 @@ public extension PayabliErrorType {
             "This retry describes a different payment from the one still unresolved, so it was not sent. "
                 + "Check that payment first; to charge a different payment, send it as a new payment."
         case .paymentReferenceOpen:
-            "A payment with this reference is still unresolved, so this one was not sent. "
-                + "Check that payment first, or retry it."
+            "Another call for this payment is still under way or its outcome is unknown, so this one was not sent. "
+                + "Check that payment's outcome first."
         case .deviceKeyUnavailable: "This device's secure storage is unavailable."
         case .deviceSetupUnsupported: "This device cannot be set up for card-present payments."
         case .deviceServicesOutdated: "Google Play on this device must be installed, updated or signed in."
@@ -263,6 +277,8 @@ public extension PayabliErrorType {
         case .deviceIdentityUnavailable: "This device cannot be identified."
         case .chargeNotFinished:
             "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
+        case .paymentNotTaken: "The payment was not taken, and the card was not charged. Try again."
+        case .contactlessDisabled: "Contactless (NFC) is turned off on this device. Turn it on in Settings."
         }
     }
 
@@ -273,7 +289,8 @@ public extension PayabliErrorType {
             .credential
         case .permissionDenied, .invalidConfiguration, .deviceServicesOutdated, .devicePendingActivation,
              .deviceSetupNotConfigured, .entryPointRefused, .readerCredentialsUnusable, .termsNotAccepted,
-             .cardPresentNotEnabled, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued:
+             .cardPresentNotEnabled, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
+             .contactlessDisabled:
             .configuration
         case .paymentDeclined, .paymentNotOpened, .cardDeclined:
             .declined
@@ -281,7 +298,7 @@ public extension PayabliErrorType {
              .tapNotCompleted, .paymentOutcomeUnknown, .paymentNotClosed, .chargeNotFinished:
             .outcomeUnknown
         case .rateLimited, .deviceKeyUnavailable, .deviceSetupUnavailable, .readerUnavailable, .readerSessionExpired,
-             .transactionNotFound:
+             .transactionNotFound, .paymentNotTaken:
             .retryLater
         case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
              .tooManyOpenCharges, .paymentNotHeld, .retryNotSamePayment, .paymentReferenceOpen:

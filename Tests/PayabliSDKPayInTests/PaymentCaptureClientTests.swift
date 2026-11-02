@@ -3,6 +3,11 @@
 import XCTest
 
 final class PayInPaymentFlowClientTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testCaptureSerializesCardTransactionWithBearerAuthorization() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(

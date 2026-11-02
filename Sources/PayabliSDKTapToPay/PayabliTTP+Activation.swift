@@ -26,6 +26,11 @@ public extension PayabliTTP {
         guard case let .pendingActivation(activationId) = sessionState else {
             throw TapToPayError(type: .deviceNotPending, reason: PayabliErrorType.deviceNotPending.message, detail: nil)
         }
+        // The service reads six digits and nothing else, so a code it cannot read is refused here rather than
+        // sent: no answer the service could give changes what the code is.
+        guard activationCode.count == 6, activationCode.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+            throw PayabliTTPError.activationCodeMalformed
+        }
         try await renewingRefusedToken(landsSecondRefusal: false) {
             try await self.sendActivation(activationCode: activationCode, activationId: activationId)
         }
@@ -65,19 +70,43 @@ public extension PayabliTTP {
             // The reason is the error's parsed description rather than a rendering
             // of its fields.
             let mapped = PayabliTTPError.activationFailed(reason: error.localizedDescription)
-            // A setup failure lands by its code, since no activation code repairs it.
-            // Anything else marks the state from the activation's failure, which leaves
-            // it where it is. A core error or a cancellation is thrown as it arrived, so
-            // its code and its wait reach the caller.
-            let failure: Error = error is any PayabliError || error is CancellationError ? error : mapped
+            // A thrown TapToPayError marks itself, since it names the setup failure it is; anything else marks
+            // the activation's failure, which leaves the session where it waits.
+            let failure: Error = activationSendFailure(error)
             markError(error is TapToPayError ? error : mapped)
             syncPublished()
             throw failure
         }
     }
 
-    /// `@objc` companion to `activateDevice(activationCode:)` for ObjC /
-    /// MAUI / Flutter / RN consumers. `completion(nil)` on success,
+    /// What a failure to send the activation is thrown as, by its kind.
+    ///
+    /// A core error or a cancellation keeps its own code and its wait, and a request `URLSession` reported
+    /// cancelled is a cancellation. A network refusal is the network's own failure; anything else is the SDK's.
+    private func activationSendFailure(_ error: Error) -> Error {
+        if error is any PayabliError || error is CancellationError {
+            return error
+        }
+        if let urlError = error as? URLError {
+            if urlError.code == .cancelled {
+                return CancellationError()
+            }
+            return PayabliGenericError(
+                type: .networkError,
+                reason: "Network request failed",
+                underlying: urlError
+            )
+        }
+        let nsError = error as NSError
+        return TapToPayError(
+            type: .sdkInternalError,
+            reason: "The activation could not be sent",
+            detail: "\(nsError.domain) \(nsError.code)"
+        )
+    }
+
+    /// `@objc` companion to `activateDevice(activationCode:)` for
+    /// Objective-C hosts. `completion(nil)` on success,
     /// `completion(NSError)` on failure, a ``TapToPayError`` with its catalog
     /// number as the code.
     ///

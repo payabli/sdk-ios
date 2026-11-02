@@ -22,7 +22,7 @@ final class TapToPayReports {
     /// - Parameter duration: how long the run took.
     func initializeSucceeded(after duration: Duration) {
         let now = Date()
-        let properties = ["duration_ms": Self.milliseconds(duration)]
+        let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
         enqueue { await $0.emit(TelemetryEventName.ttpInitializeSucceeded, properties: properties, occurredAt: now) }
     }
 
@@ -35,22 +35,22 @@ final class TapToPayReports {
     func initializeEnded(_ error: Error, after duration: Duration) {
         let now = Date()
         let told = TapToPayErrorTranslation.hostError(for: error) as? TapToPayError
-        var properties = ["duration_ms": Self.milliseconds(duration)]
+        var properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
         let name: String
         switch told?.type {
         case .userCancelled:
             name = TelemetryEventName.ttpInitializeCancelled
         case .devicePendingActivation:
             name = TelemetryEventName.ttpInitializePending
-            properties["state"] = "pending_activation"
+            properties[TelemetryProperty.state.rawValue] = "pending_activation"
         case .termsNotAccepted:
             name = TelemetryEventName.ttpInitializePending
-            properties["state"] = "pending_terms"
+            properties[TelemetryProperty.state.rawValue] = "pending_terms"
         default:
             name = TelemetryEventName.ttpInitializeFailed
-            properties["outcome"] = "failed"
+            properties[TelemetryProperty.outcome.rawValue] = "failed"
             if let told {
-                properties["error_number"] = String(told.code)
+                properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
         }
         enqueue { [properties] in await $0.emit(name, properties: properties, occurredAt: now) }
@@ -64,7 +64,7 @@ final class TapToPayReports {
     /// - Parameter duration: how long the attestation took.
     func attestationSucceeded(after duration: Duration) {
         let now = Date()
-        let properties = ["duration_ms": Self.milliseconds(duration)]
+        let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
         enqueue { await $0.emit(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now) }
     }
 
@@ -75,9 +75,9 @@ final class TapToPayReports {
     /// - Parameter duration: how long the attestation took.
     func attestationFailed(_ error: Error, after duration: Duration) {
         let now = Date()
-        var properties = ["duration_ms": Self.milliseconds(duration), "outcome": "failed"]
+        var properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration), TelemetryProperty.outcome.rawValue: "failed"]
         if let told = TapToPayErrorTranslation.hostError(for: error) as? any PayabliError {
-            properties["error_number"] = String(told.code)
+            properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
         }
         guard !(error is PinnedTokenRefusal) else {
             held.append { [properties] in

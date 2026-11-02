@@ -12,7 +12,7 @@ package extension AppAttestService {
 
     private func runActivate(activationCode: String, entry: String, activationId: String) async throws {
         guard let held = try cachedDeviceId(for: entry) else {
-            throw PayabliTTPError.attestationFailed(reason: "Missing deviceId — run initialize() before activateDevice")
+            throw PayabliTTPError.deviceSetupRequired(reason: "Missing deviceId — run initialize() before activateDevice")
         }
         guard held == activationId else {
             throw ActivationRegistrationChanged()

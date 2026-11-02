@@ -65,6 +65,12 @@ package final class TTPTransactionClient: Sendable {
             if response.statusCode == 409, !Self.isJSONObject(response.body) {
                 throw ChargeKeyRefusal()
             }
+            if response.statusCode == 404 {
+                throw PayabliTTPError.cardPresentNotEnabled
+            }
+            if let refusal = CustomerDataRefusal(response: response) {
+                throw refusal
+            }
             try mapPayabliHTTPError(response: response)
             envelope = try decodePayabliV2Envelope(InitiateData.self, from: response)
         } catch {
@@ -77,10 +83,25 @@ package final class TTPTransactionClient: Sendable {
                 "[initiate] ← isApproved=\(envelope.isApproved) code=\(envelope.code) paymentTransId=\(envelope.data?.paymentTransId ?? "<nil>")"
             )
 
-        guard envelope.isApproved, let data = envelope.data else {
-            throw PayabliTTPError.initiateFailed(reason: envelope.reason ?? envelope.code)
+        guard envelope.isApproved else {
+            throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
+        }
+        // A blank or dot-segment identifier counts as none: the close could not address it, and the card would
+        // already be taken.
+        guard let data = envelope.data, Self.isAddressable(data.paymentTransId) else {
+            throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
         }
         return data.paymentTransId
+    }
+
+    /// Whether `paymentTransId` names a payment the close can address. `.` and `..` pass percent-encoding unchanged
+    /// and would name a route instead.
+    ///
+    /// - Parameter paymentTransId: the payment an approved opening named.
+    /// - Returns: `false` when it is blank, `.` or `..` once trimmed.
+    private static func isAddressable(_ paymentTransId: String) -> Bool {
+        let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {
@@ -182,5 +203,76 @@ struct ChargeKeyRefusal: PayabliError {
 
     var detail: String? {
         nil
+    }
+}
+
+/// A 400 with code `E7020` blaming `customerData`: the customer the charge sent was refused before any card was read.
+/// It reads as the validation error it is wherever it is not translated for a host.
+struct CustomerDataRefusal: PayabliError {
+    let validation: PayabliValidationError
+    let requiredFields: [String]
+
+    /// The refusal a response carries, or nil for any other response.
+    ///
+    /// - Parameter response: the opening's response.
+    /// - Returns: the refusal, with the fields its text names, or nil when the response is not this refusal.
+    init?(response: PayabliResponse) {
+        guard response.statusCode == 400,
+              let validation = try? JSONDecoder().decode(PayabliValidationError.self, from: response.body),
+              validation.rawCode == "E7020",
+              let entries = validation.errors?["customerData"]
+        else { return nil }
+        self.validation = validation
+        requiredFields = entries.lazy.compactMap { Self.fieldsNamed(in: $0.message) }.first ?? []
+    }
+
+    var type: PayabliErrorType {
+        validation.type
+    }
+
+    var reason: String {
+        validation.reason
+    }
+
+    var detail: String? {
+        validation.detail
+    }
+
+    var errorDescription: String? {
+        validation.errorDescription
+    }
+
+    private static let identifiersPrefix = "Missing customer identifiers: "
+
+    /// The ``PayabliTTPCustomerData`` property that sets each identifier key, by the key lowercased.
+    private static let propertyForKey: [String: String] = [
+        "customernumber": "customerNumber",
+        "firstname": "firstName",
+        "lastname": "lastName",
+        "company": "company",
+        "phone": "billingPhone",
+        "email": "billingEmail",
+        "city": "billingCity",
+        "state": "billingState",
+        "zip": "billingZip",
+        "country": "billingCountry",
+        "shippingcity": "shippingCity",
+        "shippingstate": "shippingState",
+        "shippingzip": "shippingZip",
+        "shippingcountry": "shippingCountry"
+    ]
+
+    /// The field names a refusal's text lists after its fixed prefix, or nil for text that lists none.
+    ///
+    /// - Parameter message: the refusal's text for the customer.
+    /// - Returns: the names in the order given, each as the customer property that sets it, or as given when no
+    ///   property does.
+    private static func fieldsNamed(in message: String) -> [String]? {
+        guard message.hasPrefix(identifiersPrefix) else { return nil }
+        return message.dropFirst(identifiersPrefix.count)
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+            .map { propertyForKey[$0.lowercased()] ?? $0 }
     }
 }

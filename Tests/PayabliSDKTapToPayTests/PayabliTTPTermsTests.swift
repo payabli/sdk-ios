@@ -86,14 +86,14 @@ final class PayabliTTPTermsTests: XCTestCase {
     func testAReaderThatCannotAnswerThrowsRatherThanReportingNotAccepted() async throws {
         let (ttp, provider) = try makeTTP()
         provider.areTermsAcceptedResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         do {
             _ = try await ttp.areTermsAccepted()
             XCTFail("expected the provider's failure to surface")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.type, .sdkInternalError)
             XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
@@ -213,14 +213,14 @@ final class PayabliTTPTermsTests: XCTestCase {
     func testAFailureToPresentIsRaised() async throws {
         let (ttp, provider) = try makeTTP()
         provider.presentTermsResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         do {
             try await ttp.presentTerms()
             XCTFail("expected the failure to reach the caller")
         } catch let error as TapToPayError {
-            XCTAssertEqual(error.type, .unknown)
+            XCTAssertEqual(error.type, .sdkInternalError)
             XCTAssertEqual(error.detail, "Reader not prepared")
         }
     }
@@ -256,8 +256,8 @@ final class PayabliTTPTermsTests: XCTestCase {
         await fulfillment(of: [done], timeout: 1)
     }
 
-    /// The bridge every wrapper calls: three of them reach the sheet through this
-    /// selector rather than the Swift member, so its success path is theirs.
+    /// The `@objc` companion an Objective-C host calls: it reaches the sheet
+    /// through this selector rather than the Swift member, so its success path is the host's.
     func testObjCCompanionPresentsAndReportsNoError() async throws {
         let (ttp, provider) = try makeTTP()
 
@@ -271,13 +271,13 @@ final class PayabliTTPTermsTests: XCTestCase {
         XCTAssertEqual(provider.presentTermsCalls, 1)
     }
 
-    /// A failure crosses the bridge as an `NSError` in the SDK's own domain, so a
-    /// wrapper can tell a reader that could not present from a merchant who
+    /// A failure crosses the bridge as an `NSError` in the SDK's own domain, so an
+    /// Objective-C host can tell a reader that could not present from a merchant who
     /// declined. Its code is the taxonomy's, not a bridging invention.
     func testObjCCompanionReportsAFailureAsAnNSError() async throws {
         let (ttp, provider) = try makeTTP()
         provider.presentTermsResult = .failure(
-            PayabliTTPError.readerSetupFailed(reason: "Reader not prepared")
+            PayabliTTPError.guardFailed(reason: "Reader not prepared")
         )
 
         let done = expectation(description: "completion")

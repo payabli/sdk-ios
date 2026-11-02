@@ -44,12 +44,11 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     }
 
     @discardableResult
-    package func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    package func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         guard let entry = batch.first?.entry else { return .delivered }
         let body = TelemetryBatchBody(
             entry: entry,
-            events: batch.map { TelemetryEventBody($0, facts: deviceFacts) },
-            droppedSinceLastSend: droppedSinceLastSend
+            events: batch.map { TelemetryEventBody($0, facts: deviceFacts) }
         )
         do {
             let response = try await transport.perform(

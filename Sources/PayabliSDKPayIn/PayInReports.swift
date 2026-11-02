@@ -56,20 +56,20 @@ final class PayInReports {
     ) {
         let now = Date()
         let outcome = error.map { refusedLocally ? "refused_locally" : Self.outcome(of: $0) } ?? "approved"
-        var properties = ["outcome": outcome, "origin": origin.rawValue]
+        var properties = [TelemetryProperty.outcome.rawValue: outcome, TelemetryProperty.origin.rawValue: origin.rawValue]
         if let method {
-            properties["method"] = method
+            properties[TelemetryProperty.method.rawValue] = method
         }
         // A second submission refused while one runs is counted by its outcome alone.
         if let error, !Self.isSingleFlightRefusal(error) {
             let told = (error as? any PayabliError)
                 ?? PayabliGenericError(type: Self.isCancellation(error) ? .userCancelled : .unknown, reason: "")
-            properties["code"] = told.type.rawValue
-            properties["error_number"] = String(told.code)
-            properties["failure_type"] = Self.failureType(of: error)
+            properties[TelemetryProperty.code.rawValue] = told.type.rawValue
+            properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
+            properties[TelemetryProperty.failureType.rawValue] = Self.failureType(of: error)
         }
         if outcome != "refused_locally", let duration {
-            properties["duration_ms"] = Self.milliseconds(duration)
+            properties[TelemetryProperty.durationMs.rawValue] = Self.milliseconds(duration)
         }
         enqueue { [properties] in await $0.emit(operation.event, properties: properties, occurredAt: now) }
     }
@@ -159,7 +159,7 @@ final class PayInReports {
     }
 
     private static func isCancellation(_ error: any Error) -> Bool {
-        if error is CancellationError {
+        if PayInInterruption.isCancellation(error) {
             return true
         }
         guard case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error else { return false }

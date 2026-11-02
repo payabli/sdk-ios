@@ -16,8 +16,9 @@ import Foundation
 ///      from the initiate step, so update bodies carry only the provider
 ///      response verbatim.
 ///
-/// All fields are optional; an empty instance is equivalent to "no customer
-/// provided" and the backend will accept it as an anonymous payor.
+/// All fields are optional, and an empty instance is sent as a charge with no
+/// customer. A paypoint that requires customer fields refuses such a charge
+/// before any card is read, with ``TapToPayError/refusal`` naming the fields.
 public struct PayabliTTPCustomerData: Sendable, Equatable {
     public let firstName: String?
     public let lastName: String?

@@ -41,7 +41,88 @@ extension FiservCardReader {
             }
 
             let detail = readerDetail(error)
+            if let refusal = vendorRefusal(error, shown: detail) {
+                return refusal
+            }
             return fallback(detail.isEmpty ? error.localizedDescription : detail)
+        }
+
+        /// Translates a read's failure: a reader session found spent is the session's expiry, not charged where the
+        /// card reader refused to read without one, and unknown where it ended during the read, because the processor
+        /// may take the sale before the reader answers. Any other failure is mapped as an NFC one.
+        ///
+        /// - Parameter error: what the read threw, before it was translated for the host.
+        /// - Returns: the typed error a host receives.
+        static func mapReadError(_ error: Error) -> PayabliTTPError {
+            if refusedToReadWithoutASession(error) {
+                return .readerSessionExpired(capture: .notCharged)
+            }
+            if let platform = platformError(behind: error), readerFailureInvalidatesSession(platform) {
+                return .readerSessionExpired(capture: .unknown)
+            }
+            return mapError(error) { .nfcFailed(reason: $0) }
+        }
+
+        /// The card reader's refusal to read without a session, raised before any card is asked for. It names
+        /// itself only in text, and its description is looked up in the app's strings as the reader looks it up,
+        /// so an app that translates it changes both sides alike.
+        static var noSessionRefusal: (title: String, description: String) {
+            (
+                title: "Invalid Session",
+                description: NSLocalizedString("The card reader session has not been initialized.", comment: "")
+            )
+        }
+
+        /// Whether the card reader refused the read because it holds no session, either directly or kept behind
+        /// the charge's own failure.
+        ///
+        /// - Parameter error: what the read threw, before it was translated for the host.
+        /// - Returns: `true` where the refusal is the card reader's own missing-session check.
+        static func refusedToReadWithoutASession(_ error: Error) -> Bool {
+            [error, platformError(behind: error)].contains { candidate in
+                guard let refusal = candidate as? FiservTTPCardReaderError else { return false }
+                return refusal.title == noSessionRefusal.title
+                    && refusal.localizedDescription == noSessionRefusal.description
+            }
+        }
+
+        /// The refusal the vendor named, where the failure reason it kept carries the processor's own code.
+        ///
+        /// Only a code that decodes out names a refusal; an error whose reason is not the vendor's JSON keeps the
+        /// caller's own classification.
+        ///
+        /// - Parameter error: what the reader stack threw, before it was translated for the host.
+        /// - Parameter shown: the detail a host is shown, which the refusal carries as its reason.
+        /// - Returns: the vendor's refusal, or `nil` where it named none.
+        static func vendorRefusal(_ error: Error, shown: String) -> PayabliTTPError? {
+            guard let readerError = error as? FiservTTPCardReaderError,
+                  let body = readerError.failureReason?.data(using: .utf8),
+                  let codes = try? JSONDecoder().decode(VendorFailure.self, from: body).codes,
+                  !codes.isEmpty
+            else { return nil }
+            if codes.contains(where: deviceDeniedCodes.contains) {
+                return .readerDeviceRefused(reason: shown)
+            }
+            return .readerUnavailable(reason: shown)
+        }
+
+        /// The vendor's codes that say it refused the handset, the refusal confirmed or not.
+        private static let deviceDeniedCodes: Set<String> = ["677", "018", "670", "202", "745", "705"]
+
+        /// The vendor's failure reason, decoded: a top-level `responseCode`, and the `code` of each entry in the
+        /// `error` list its server error envelope carries.
+        private struct VendorFailure: Decodable {
+            let responseCode: String?
+            let error: [VendorFailureEntry]?
+
+            var codes: [String] {
+                [responseCode].compactMap(\.self) + (error ?? []).compactMap(\.code)
+            }
+        }
+
+        /// One entry in the `error` list of the vendor's server error envelope.
+        private struct VendorFailureEntry: Decodable {
+            let code: String?
         }
 
         /// The platform error behind a card-reader component error, where it kept one.

@@ -3,11 +3,20 @@
 import PayabliSDKTestUtils
 import XCTest
 
+#if canImport(PayabliCardReaderCore)
+    import PayabliCardReaderCore
+#endif
+
 /// Where `initialize` leaves the session when setting the device up fails, read through the facade a
 /// host calls.
 @available(iOS 16.7, *)
 @MainActor
 final class PayabliTTPSetupLandingTests: XCTestCase {
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
     /// Each way setting the device up fails reaches the state its remedy repairs, and none of them
     /// asks for the device to be set up again.
     func testAFailedSetupLandsWhereItsRemedyRepairsIt() async throws {
@@ -164,6 +173,91 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
         }
     }
 
+    // MARK: - A reader's own failures
+
+    /// A network failure while the code is being activated keeps the network's
+    /// own answer — the attempt can be retried when the connection returns — and
+    /// the session still waits for the code.
+    func testANetworkFailureWhileActivatingKeepsTheNetworksAnswerAndTheWait() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.pendingRegistration = "dev_e"
+        _ = try? await ttp.initialize()
+        XCTAssertEqual(
+            ttp.sessionState,
+            .pendingActivation(activationId: "dev_e"),
+            "the fixture itself is broken if this fails"
+        )
+        attestation.activationFailuresFirst = [URLError(.timedOut)]
+
+        do {
+            try await ttp.activateDevice(activationCode: "123456")
+            XCTFail("activation succeeded past a network failure")
+        } catch {
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, .networkError, "\(error)")
+        }
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"))
+    }
+
+    /// A device the platform refuses needs no wire to say so: the refusal is the
+    /// device's own, and the session lands where only a different device repairs it.
+    func testAnUnsupportedDeviceReportsItsOwnCodeAndLandsIneligible() async throws {
+        let reader = FiservCardReader()
+        reader.setPlatformSupportSource(false)
+        let (ttp, _) = try makeTTP(provider: reader)
+
+        do {
+            try await ttp.initialize()
+            XCTFail("initialize proceeded on a device the platform refuses")
+        } catch {
+            let host = TapToPayErrorTranslation.hostError(for: error)
+            XCTAssertEqual((host as? TapToPayError)?.type, .deviceHardwareUnsupported, "\(error)")
+        }
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceIneligible))
+    }
+
+    #if canImport(PayabliCardReaderCore)
+        /// The vendor's refusal of the handset is the device's own refusal: it
+        /// reports the refusal's code and lands the device ineligible.
+        func testAVendorRefusalOfTheDeviceReportsItsOwnCodeAndLandsIneligible() async throws {
+            let vendored = FiservTTPCardReaderError(
+                title: "Setup failed",
+                localizedDescription: "the vendor refused the device",
+                failureReason: #"{"responseCode":"677","responseText":"Declined"}"#
+            )
+            let (ttp, _) = try makeReaderBackedTTP(vendored: vendored)
+
+            do {
+                try await ttp.initialize()
+                XCTFail("initialize proceeded past a vendor refusal of the device")
+            } catch {
+                let host = TapToPayErrorTranslation.hostError(for: error)
+                XCTAssertEqual((host as? TapToPayError)?.type, .readerDeviceRefused, "\(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceIneligible))
+        }
+
+        /// A vendor failure that is not a refusal of the handset is the reader's
+        /// own: it reports the reader's code, and the session waits for a reader.
+        func testAVendorFailureOfTheReaderReportsItsOwnCodeAndLandsWaiting() async throws {
+            let vendored = FiservTTPCardReaderError(
+                title: "Setup failed",
+                localizedDescription: "the reader could not be started",
+                failureReason: #"{"responseCode":"999","responseText":"Unreachable"}"#
+            )
+            let (ttp, _) = try makeReaderBackedTTP(vendored: vendored)
+
+            do {
+                try await ttp.initialize()
+                XCTFail("initialize proceeded past a reader that could not be started")
+            } catch {
+                let host = TapToPayErrorTranslation.hostError(for: error)
+                XCTAssertEqual((host as? TapToPayError)?.type, .readerUnavailable, "\(error)")
+            }
+            XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
+        }
+    #endif
+
     private func makeTTP() throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService) {
         let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
         let provider = MockTapToPayProvider()
@@ -176,5 +270,110 @@ final class PayabliTTPSetupLandingTests: XCTestCase {
             session: StubURLProtocol.makeSession()
         )
         return (ttp, provider, attestation)
+    }
+
+    /// The same TTP on a chosen provider, for a reader the mock cannot stand in for.
+    private func makeTTP(provider: some TapToPayProvider) throws -> (PayabliTTP, MockDeviceAttestationService) {
+        let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
+        let attestation = MockDeviceAttestationService()
+        let ttp = PayabliTTP(
+            config: config,
+            provider: provider,
+            attestation: attestation,
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+            session: StubURLProtocol.makeSession()
+        )
+        return (ttp, attestation)
+    }
+
+    #if canImport(PayabliCardReaderCore)
+        /// A TTP on a real reader whose setup throws `vendored`, so the vendor's own
+        /// failures reach the classify path. The binding is warm and `/config` answers a
+        /// complete envelope, so the only moving part is the reader.
+        private func makeReaderBackedTTP(vendored: Error) throws -> (PayabliTTP, FiservCardReader) {
+            StubURLProtocol.handler = Self.readerConfigHandler
+            let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
+            let attestation = MockDeviceAttestationService()
+            attestation.bindings = ["e": "dev_e"]
+            let reader = FiservCardReader()
+            reader.setPlatformSupportSource(true)
+            reader.setLinkStateSource(LinkedStub())
+            reader.setReaderFactory { _ in ThrowingReaderSetup(failure: vendored) }
+            let ttp = PayabliTTP(
+                config: config,
+                provider: reader,
+                attestation: attestation,
+                retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
+                session: StubURLProtocol.makeSession()
+            )
+            return (ttp, reader)
+        }
+
+        /// Answers `/config` with a complete credentials envelope, the shape a real
+        /// reader is configured from.
+        private static let readerConfigHandler: StubURLProtocol.Handler = { request in
+            let credentials: [String: String] = [
+                "secretKey": "s",
+                "apiKey": "a",
+                "merchantId": "m",
+                "terminalId": "t",
+                "environment": "sandbox",
+                "currencyCode": "USD",
+                "appleTtpMerchantId": "apple-m",
+                "merchantName": "name",
+                "merchantCategoryCode": "code",
+                "terminalProfileId": "profile"
+            ]
+            let body: [String: Any] = [
+                "responseCode": 1,
+                "isSuccess": true,
+                "responseData": ["credentials": credentials]
+            ]
+            let data = try JSONSerialization.data(withJSONObject: body)
+            return (
+                HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!,
+                data
+            )
+        }
+    #endif
+}
+
+/// Linked throughout, so a reader path that reaches the terms question runs on
+/// without a sheet. A throwing setup never gets that far, but the facade is
+/// given a reader whose every answer is stable.
+private final class LinkedStub: AccountLinking {
+    func isAccountLinked() async throws -> Bool {
+        true
+    }
+
+    func linkAccount() async throws {}
+}
+
+/// A reader whose session never opens: it throws the vendor's own failure, the
+/// way a reader that refused the handset or could not be reached does.
+private final class ThrowingReaderSetup: ReaderSetup {
+    private let failure: Error
+
+    init(failure: Error) {
+        self.failure = failure
+    }
+
+    func requestSessionToken() async throws {
+        throw failure
+    }
+
+    func isAccountLinked() async throws -> Bool {
+        true
+    }
+
+    func linkAccount() async throws {}
+
+    func initializeSession(onReaderEvent _: @escaping @MainActor (TapToPayReaderEvent) -> Void) async throws {
+        throw failure
     }
 }

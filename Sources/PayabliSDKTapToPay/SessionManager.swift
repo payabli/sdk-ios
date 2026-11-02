@@ -223,8 +223,8 @@ final class SessionManager: ObservableObject {
         }
     }
 
-    /// A charge opens, waits for a card, then closes. While it waits, the
-    /// reader's prompts follow each other in whatever order the payer causes.
+    /// A charge opens, waits for a card, then closes, and an opening closed without a read goes straight to
+    /// closing. While it waits, the reader's prompts follow each other in whatever order the payer causes.
     ///
     /// - Parameter from: the activity the charge is in.
     /// - Parameter to: the next prompt the reader raised.
@@ -232,7 +232,7 @@ final class SessionManager: ObservableObject {
     private static func advances(_ from: TapToPayChargeActivity, _ to: TapToPayChargeActivity) -> Bool {
         switch from {
         case .opening:
-            return to == .waitingForCard
+            return to == .waitingForCard || to == .closing
         case .waitingForCard, .cardDetected, .cardRemovalRequested, .cardReadRetryRequested,
              .pinEntryRequested, .pinEntryCompleted, .readerPromptDismissed:
             return to != .opening

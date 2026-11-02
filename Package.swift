@@ -93,7 +93,8 @@ let package = Package(
                 "LLM.md"
             ],
             resources: [
-                .process("Resources/PayabliBrandAssets.xcassets")
+                .process("Resources/PayabliBrandAssets.xcassets"),
+                .copy("Resources/PrivacyInfo.xcprivacy")
             ]
         ),
         .target(
@@ -128,6 +129,11 @@ let package = Package(
             name: "PayabliSDKCrossCapabilityTests",
             dependencies: ["PayabliSDKCore", "PayabliSDKPayIn", "PayabliSDKTapToPay"],
             path: "Tests/PayabliSDKCrossCapabilityTests"
+        ),
+        .testTarget(
+            name: "PayabliSDKObjCTests",
+            dependencies: ["PayabliSDKCore"],
+            path: "Tests/PayabliSDKObjCTests"
         ),
         .testTarget(
             name: "PayabliSDKTestUtilsTests",

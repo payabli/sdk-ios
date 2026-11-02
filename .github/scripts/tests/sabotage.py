@@ -26,6 +26,7 @@ change that moved the code; deleting the row is how coverage disappears quietly.
 from __future__ import annotations
 
 import ast
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,9 @@ COPIED = (
     ".github/workflows/release.yml",
     ".github/workflows/nightly-report.yml",
     ".github/workflows/public-interface.yml",
+    ".github/workflows/source-branch.yml",
+    ".github/workflows/pr-reports.yml",
+    ".github/dependabot.yml",
     ".github/hardware-only-tests.txt",
     ".github/scripts/release-version.sh",
     ".github/scripts/release-newer.sh",
@@ -53,6 +57,8 @@ CI_YML = ".github/workflows/ci.yml"
 RELEASE_YML = ".github/workflows/release.yml"
 REPORT_YML = ".github/workflows/nightly-report.yml"
 INTERFACE_YML = ".github/workflows/public-interface.yml"
+SOURCE_YML = ".github/workflows/source-branch.yml"
+REPORTS_YML = ".github/workflows/pr-reports.yml"
 HARDWARE_LIST = ".github/hardware-only-tests.txt"
 HELPER = ".github/scripts/hardware-only-skips.sh"
 REPORT = ".github/scripts/nightly_report.py"
@@ -64,13 +70,34 @@ NEWER = ".github/scripts/release-newer.sh"
 VERSION_SOURCE = "Sources/PayabliSDKCore/PayabliSDKCore.swift"
 
 
+def pinned(path: str, action: str) -> str:
+    """Return `action@<sha> # <version>` as `path` names it today, so a row survives Dependabot moving the pin.
+
+    - Parameter path: the workflow, relative to the repository root.
+    - Parameter action: the action's `owner/name`.
+    - Returns: the pinned reference, or one that matches nothing, which the run reports as an invalid anchor.
+    """
+    found = re.search(rf"{re.escape(action)}@[0-9a-f]{{40}} # v\S+", (REPO_ROOT / path).read_text(encoding="utf-8"))
+    return found.group(0) if found else f"{action}@<not pinned in {path}>"
+
+
+NIGHTLY_CHECKOUT = pinned(NIGHTLY, "actions/checkout")
+RELEASE_CHECKOUT = pinned(RELEASE_YML, "actions/checkout")
+RELEASE_DOWNLOAD = pinned(RELEASE_YML, "actions/download-artifact")
+REPORTS_DOWNLOAD = pinned(REPORTS_YML, "actions/download-artifact")
+CI_UPLOAD = pinned(CI_YML, "actions/upload-artifact")
+
+
 class Mutation:
     def __init__(self, name: str, path: str, anchor: str, replacement: str, expect: str,
-                 half: str) -> None:
+                 half: str, occurrences: int = 1) -> None:
         self.name = name
         self.path = path
         self.anchor = anchor
         self.replacement = replacement
+        # How many times the anchor appears. More than one only where the file carries the same lines twice
+        # on purpose and a check holds the copies equal, so breaking one copy alone tests that check instead.
+        self.occurrences = occurrences
         # The check label prefix that must appear among verify.py's failures.
         self.expect = expect
         # Which half of verify.py can see it, so a mutation does not pay for the other two.
@@ -398,8 +425,8 @@ MUTATIONS = [
     Mutation(
         "the harness stops running on the workflow it makes claims about",
         SCRIPTS_YML,
-        "      - '.github/workflows/**'\n      - '.github/workflows/nightly.yml'\n",
-        "      - '.github/workflows/**'\n",
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n      - '.github/workflows/nightly.yml'\n",
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n",
         "W11", "workflows",
     ),
     Mutation(
@@ -483,10 +510,10 @@ MUTATIONS = [
     Mutation(
         "the Slack token moves back into the branch-dispatchable workflow",
         NIGHTLY,
-        "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "      - name: Checkout\n        env:\n"
         "          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}\n"
-        "        uses: actions/checkout@v4\n",
+        "        uses: " + NIGHTLY_CHECKOUT + "\n",
         "W3", "workflows",
     ),
     Mutation(
@@ -608,9 +635,9 @@ MUTATIONS = [
     ),
     Mutation(
         "the nightly starts tagging",
-        NIGHTLY, "      - name: Checkout\n        uses: actions/checkout@v4\n",
+        NIGHTLY, "      - name: Checkout\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "      - name: Checkout\n        run: git tag nightly && git push origin nightly\n"
-        "      - name: Checkout again\n        uses: actions/checkout@v4\n",
+        "      - name: Checkout again\n        uses: " + NIGHTLY_CHECKOUT + "\n",
         "W15d", "workflows",
     ),
     Mutation(
@@ -653,6 +680,196 @@ MUTATIONS = [
         '          VERSION="$(.github/scripts/release-version.sh "$GITHUB_REF")"\n', "W15l", "workflows",
     ),
     Mutation(
+        "a push run's analysis names no branch",
+        REPORTS_YML, 'echo "args=$trusted -Dsonar.branch.name=$head" >> "$GITHUB_OUTPUT"',
+        'echo "args=$trusted" >> "$GITHUB_OUTPUT"', "W20", "workflows",
+    ),
+    Mutation(
+        "a push run's branch reaches the scanner unchecked",
+        REPORTS_YML, "head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$') || head=\"\"",
+        'head="$HEAD_BRANCH"', "W20b", "workflows",
+    ),
+    Mutation(
+        "Dependabot raises one pull request per action",
+        ".github/dependabot.yml", '    groups:\n', '    ungrouped:\n', "W23", "workflows",
+    ),
+    Mutation(
+        "a dispatch off main runs the check job",
+        RELEASE_YML, '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n            exit 1\n',
+        '            echo "::error::a release is dispatched from refs/heads/main, not $GITHUB_REF"\n', "R14c", "workflows",
+    ),
+    Mutation(
+        "a later release cancels the one waiting to publish",
+        RELEASE_YML, "      group: release\n      cancel-in-progress: false\n",
+        "      group: release\n      cancel-in-progress: true\n", "R14d", "workflows",
+    ),
+    Mutation(
+        "the whole release workflow is locked again",
+        RELEASE_YML, "\njobs:\n", "\nconcurrency:\n  group: release\n  cancel-in-progress: false\n\njobs:\n",
+        "R14d", "workflows",
+    ),
+    Mutation(
+        "the Slack token is read from the repository",
+        REPORT_YML, "    environment: ci-protected\n", "", "W22", "workflows",
+    ),
+    Mutation(
+        "the analysis token is read from the repository",
+        REPORTS_YML, "    environment: ci-protected\n", "", "W22", "workflows",
+    ),
+    Mutation(
+        "a revision older than the tip is analysed",
+        REPORTS_YML, 'if [ "$tip" = "$SHA" ]; then', "if true; then", "W21b", "workflows", occurrences=2,
+    ),
+    Mutation(
+        "the scan runs whatever the freshness check found",
+        REPORTS_YML, "        if: steps.newest.outputs.newest == 'true'\n", "", "W21f", "workflows",
+    ),
+    Mutation(
+        "a later analysis cancels the one running",
+        REPORTS_YML, "      cancel-in-progress: false\n", "      cancel-in-progress: true\n", "W21f", "workflows",
+    ),
+    Mutation(
+        "the freshness job and the scan's check drift apart",
+        REPORTS_YML, "server.\n      - name: Check the revision is the newest\n        id: newest\n        env:\n"
+        "          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}\n          REPO: ${{ github.repository }}\n"
+        "          SHA: ${{ github.event.workflow_run.head_sha }}\n          PR: ${{ github.event.workflow_run.pull_requests[0].number }}\n"
+        "          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}\n        run: |\n          set -euo pipefail\n"
+        "          if [ -n \"$PR\" ]; then\n            number=$(printf '%s' \"$PR\" | grep -E '^[0-9]+$')\n"
+        "            tip=$(gh api \"repos/$REPO/pulls/$number\" --jq .head.sha)\n          else\n"
+        "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n"
+        "            tip=$(gh api \"repos/$REPO/branches/$head\" --jq .commit.sha)\n          fi\n"
+        "          if [ \"$tip\" = \"$SHA\" ]; then\n            echo \"newest=true\" >> \"$GITHUB_OUTPUT\"\n"
+        "          else\n            echo \"newest=false\" >> \"$GITHUB_OUTPUT\"\n"
+        "            echo \"not analysing $SHA: $tip is newer\"\n          fi\n\n  sonar:",
+        "server.\n      - name: Check the revision is the newest\n        id: newest\n        run: echo newest=true >> \"$GITHUB_OUTPUT\"\n\n  sonar:",
+        "W21g", "workflows",
+    ),
+    Mutation(
+        "a stale run joins the analysis's group",
+        REPORTS_YML, "      && needs.newest.outputs.newest == 'true'\n", "", "W21h", "workflows",
+    ),
+    Mutation(
+        "the analysis does not wait on the freshness job",
+        REPORTS_YML, "    needs: newest\n", "", "W21h", "workflows",
+    ),
+    Mutation(
+        "the commit's SHA check reports and carries on",
+        RELEASE_YML, "40-character commit SHA, not '$COMMIT'\"\n            exit 1\n",
+        "40-character commit SHA, not '$COMMIT'\"\n", "W15o", "workflows",
+    ),
+    Mutation(
+        "the release's token rests on the repository default",
+        RELEASE_YML, "# Granted per job, never here.\npermissions: {}\n", "", "W24", "workflows",
+    ),
+    Mutation(
+        "CI's token can write the repository",
+        CI_YML, "\npermissions:\n  contents: read\n", "\npermissions:\n  contents: write\n", "W24", "workflows",
+    ),
+    Mutation(
+        "the release's steps run without pipefail",
+        RELEASE_YML, "defaults:\n  run:\n    shell: bash\n", "", "W24b", "workflows",
+    ),
+    Mutation(
+        "CI's steps run in sh",
+        CI_YML, "defaults:\n  run:\n    shell: bash\n", "defaults:\n  run:\n    shell: sh\n", "W24b", "workflows",
+    ),
+    Mutation(
+        "the job holding the deploy key runs an action by tag",
+        RELEASE_YML, RELEASE_DOWNLOAD, "actions/download-artifact@v4", "W25", "workflows",
+    ),
+    Mutation(
+        "a pinned action loses the version it stands for",
+        CI_YML, CI_UPLOAD, CI_UPLOAD.split(" # ")[0], "W25", "workflows", occurrences=2,
+    ),
+    Mutation(
+        "the tag no longer names the run that made it",
+        RELEASE_YML, ' -m "Released by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" "$COMMIT"',
+        ' "$COMMIT"', "W15x", "workflows",
+    ),
+    Mutation(
+        "the tag names whoever dispatched the release",
+        RELEASE_YML, '/actions/runs/$GITHUB_RUN_ID" "$COMMIT"', '/actions/runs/$GITHUB_RUN_ID by $GITHUB_ACTOR" "$COMMIT"',
+        "W15x", "workflows",
+    ),
+    Mutation(
+        "the release skips the sample app's step sequences",
+        RELEASE_YML, "            -scheme PayabliDemoFlowTests \\\n", "            -scheme PayabliDemo \\\n",
+        "W15y", "workflows",
+    ),
+    Mutation(
+        "the scanner reads the analysed revision's settings",
+        REPORTS_YML, 'show "$GITHUB_SHA:sonar-project.properties"', 'show "HEAD:sonar-project.properties"',
+        "W26b", "workflows",
+    ),
+    Mutation(
+        "the settings are read honouring replace refs",
+        REPORTS_YML, "git --no-replace-objects show", "git show", "W26d", "workflows",
+    ),
+    Mutation(
+        "the coverage unpacks into the workspace again",
+        REPORTS_YML, "          name: coverage\n          path: ${{ runner.temp }}/artifacts\n",
+        "          name: coverage\n", "W26e", "workflows",
+    ),
+    Mutation(
+        "the coverage arrives before the settings are read",
+        REPORTS_YML, "      - name: Take the analysis settings from main\n",
+        "      - name: Download early\n        uses: " + REPORTS_DOWNLOAD
+        + "\n        with:\n          name: coverage\n          path: ${{ runner.temp }}/artifacts\n\n"
+        "      - name: Take the analysis settings from main\n",
+        "W26e", "workflows",
+    ),
+    Mutation(
+        "the coverage is never taken in",
+        REPORTS_YML, "      - name: Take the coverage report in\n", "      - name: Stage the coverage\n",
+        "W26f", "workflows",
+    ),
+    Mutation(
+        "the whole artifact is copied into the workspace",
+        REPORTS_YML, 'cp "$STAGED/coverage.xml" "$GITHUB_WORKSPACE/coverage.xml"',
+        'cp -R "$STAGED/." "$GITHUB_WORKSPACE/"', "W26g", "workflows",
+    ),
+    Mutation(
+        "a symbolic link in the artifact is taken in",
+        REPORTS_YML,
+        '          if [ -n "$(find "$STAGED" -type l -print -quit)" ]; then\n'
+        '            echo "::error::the artifact carries a symbolic link"\n'
+        '            exit 1\n'
+        '          fi\n', "", "W26h", "workflows",
+    ),
+    Mutation(
+        "a symbolic link in the checkout is copied through",
+        REPORTS_YML,
+        '          if [ -n "$(find "$GITHUB_WORKSPACE" -path "$GITHUB_WORKSPACE/.git" -prune -o -type l -print -quit)" ]; then\n'
+        '            echo "::error::the checkout carries a symbolic link"\n'
+        '            exit 1\n'
+        '          fi\n', "", "W26i", "workflows",
+    ),
+    Mutation(
+        "the scanner is not pointed at main's settings",
+        REPORTS_YML, 'trusted="-Dproject.settings=$SETTINGS"\n          trusted="$trusted -Dsonar.host.url',
+        'trusted="-Dsonar.host.url', "W26", "workflows",
+    ),
+    Mutation(
+        "main's settings are written inside the analysed tree",
+        REPORTS_YML, '> "$RUNNER_TEMP/sonar-project.properties"', '> "sonar-project.properties"', "W26c", "workflows",
+    ),
+    Mutation(
+        "a push run's branch reaches the API unchecked",
+        REPORTS_YML, "            head=$(printf '%s' \"$HEAD_BRANCH\" | grep -E '^[A-Za-z0-9._/-]+$')\n",
+        '            head="$HEAD_BRANCH"\n', "W21e", "workflows", occurrences=2,
+    ),
+    Mutation(
+        "the check job reads the version with the commit's own script",
+        RELEASE_YML,
+        '          git show "$GITHUB_SHA:.github/scripts/release-version.sh" > .github/scripts/release-version.sh\n',
+        "", "R12", "release",
+    ),
+    Mutation(
+        "the check job fetches the version's script from the commit, not from main",
+        RELEASE_YML, 'git show "$GITHUB_SHA:.github/scripts/release-version.sh"',
+        'git show "$COMMIT:.github/scripts/release-version.sh"', "R12", "release",
+    ),
+    Mutation(
         "the tag is pushed to whatever host answers first",
         RELEASE_YML, "-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=accept-new", "W15j", "workflows",
     ),
@@ -680,13 +897,13 @@ MUTATIONS = [
     ),
     Mutation(
         "the release leaves the push credential where the tested code can read it",
-        RELEASE_YML, "          persist-credentials: false\n\n      - name: Check the commit is on main\n",
-        "          persist-credentials: true\n\n      - name: Check the commit is on main\n",
+        RELEASE_YML, "          persist-credentials: false\n\n      # Main's copy of the script",
+        "          persist-credentials: true\n\n      # Main's copy of the script",
         "W15f", "workflows",
     ),
     Mutation(
-        "a CI run on a branch other than main counts for the release",
-        RELEASE_YML, "head_sha=$COMMIT&branch=main&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
+        "a CI run on any branch counts for the release",
+        RELEASE_YML, "head_sha=$COMMIT&branch=$BRANCH&event=push&", "head_sha=$COMMIT&", "W15h", "workflows",
     ),
     Mutation(
         "a version below the newest release passes the ordering check",
@@ -793,9 +1010,8 @@ MUTATIONS = [
         "W15o", "workflows",
     ),
     Mutation(
-        "a commit that is not on main is released",
-        RELEASE_YML, 'if [ "$(git merge-base "$COMMIT" origin/main)" != "$COMMIT" ]; then', "if false; then",
-        "W15p", "workflows",
+        "a commit that is not on its version's branch is released",
+        RELEASE_YML, 'if [ -z "$branch" ]; then', "if false; then", "R10d", "release",
     ),
     Mutation(
         "the publish job checks out the commit without the tags or history its checks read",
@@ -867,14 +1083,28 @@ MUTATIONS = [
     Mutation(
         "the release notes are bound to a literal the workflow writes",
         RELEASE_YML,
-        "      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
-        "      RELEASE_NOTES: placeholder notes\n",
+        "\n      RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "\n      RELEASE_NOTES: placeholder notes\n",
         "W15w", "workflows",
     ),
     Mutation(
+        "the check job judges a literal rather than the notes the release publishes",
+        RELEASE_YML,
+        "\n          RELEASE_NOTES: ${{ inputs.release_notes }}\n",
+        "\n          RELEASE_NOTES: placeholder notes\n",
+        "W15w", "workflows",
+    ),
+    Mutation(
+        "blank release notes are refused only after the approval",
+        RELEASE_YML,
+        "      - name: Check the release notes are written\n",
+        "      - name: Check the notes\n",
+        "R13b", "workflows",
+    ),
+    Mutation(
         "one step queries CI for main's head through its own environment",
-        RELEASE_YML, "      - name: Require a passing CI run on main for this commit\n        env:\n",
-        "      - name: Require a passing CI run on main for this commit\n        env:\n          COMMIT: ${{ github.sha }}\n",
+        RELEASE_YML, "      - name: Require a passing CI run on the branch for this commit\n        env:\n",
+        "      - name: Require a passing CI run on the branch for this commit\n        env:\n          COMMIT: ${{ github.sha }}\n",
         "W15q", "workflows",
     ),
     Mutation(
@@ -885,9 +1115,10 @@ MUTATIONS = [
         "W15q", "workflows",
     ),
     Mutation(
-        "a commit that is not on main only warns",
-        RELEASE_YML, "      - name: Check the commit is on main\n",
-        "      - name: Check the commit is on main\n        continue-on-error: true\n", "W15p", "workflows",
+        "a commit that is not on its version's branch only warns",
+        RELEASE_YML, "      - name: Check the commit is on its release or hotfix branch\n",
+        "      - name: Check the commit is on its release or hotfix branch\n        continue-on-error: true\n",
+        "W15p", "workflows",
     ),
     Mutation(
         "a command hides behind an echo and acts on main's head",
@@ -924,11 +1155,11 @@ MUTATIONS = [
         "the suite job checks out main's head",
         RELEASE_YML, "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: " + RELEASE_CHECKOUT + "\n"
         "        with:\n          ref: ${{ needs.check.outputs.commit }}\n",
         "    name: Test the release\n    needs: check\n    # The same image as the build job, so the release is tested on the Xcode it\n"
         "    # builds its XCFrameworks with.\n    runs-on: xcode-27\n    permissions:\n"
-        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: actions/checkout@v4\n"
+        "      contents: read\n\n    steps:\n      - name: Checkout\n        uses: " + RELEASE_CHECKOUT + "\n"
         "        with:\n", "W15q", "workflows",
     ),
     Mutation(
@@ -962,6 +1193,190 @@ MUTATIONS = [
         "PayabliSDKTapToPayTests/SecureStorageTests/testTheSweepStoresNothingForAKeyThatHasNoItemIfAvailable\n",
         "",
         "W12d", "workflows",
+    ),
+    # Release and hotfix branches.
+    Mutation(
+        "a commit on its hotfix branch is refused",
+        RELEASE_YML, 'for candidate in "release/$VERSION" "hotfix/$VERSION"; do',
+        'for candidate in "release/$VERSION"; do', "R10b", "release",
+    ),
+    Mutation(
+        "the release branch is named by a literal rather than the declared version",
+        RELEASE_YML, 'for candidate in "release/$VERSION" "hotfix/$VERSION"; do',
+        'for candidate in "release/0.2.0" "hotfix/$VERSION"; do', "R10f", "release",
+    ),
+    Mutation(
+        "the commit is looked for in the checkout's own history rather than on the branch",
+        RELEASE_YML, 'git merge-base --is-ancestor "$COMMIT" "refs/remotes/origin/$candidate"; then',
+        'git merge-base --is-ancestor "$COMMIT" HEAD; then', "R10", "release",
+    ),
+    Mutation(
+        "the branch step reports main whatever it found",
+        RELEASE_YML, 'echo "branch=$branch" >> "$GITHUB_OUTPUT"', 'echo "branch=main" >> "$GITHUB_OUTPUT"',
+        "R10", "release",
+    ),
+    Mutation(
+        "the CI query goes back to main",
+        RELEASE_YML, "head_sha=$COMMIT&branch=$BRANCH&event=push&", "head_sha=$COMMIT&branch=main&event=push&",
+        "W15h", "workflows",
+    ),
+    Mutation(
+        "the CI query names a branch of its own rather than the one the commit was found on",
+        RELEASE_YML, "          BRANCH: ${{ steps.branch.outputs.branch }}\n", "          BRANCH: main\n",
+        "W15h", "workflows",
+    ),
+    Mutation(
+        "an earlier release is looked for in its own tag rather than in main",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then',
+        'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "refs/tags/$tag"; then', "R11c", "release", occurrences=2,
+    ),
+    Mutation(
+        "main is named short in the merge-back check, so a tag of that name stands in for it",
+        RELEASE_YML, '"refs/tags/$tag^{commit}" refs/remotes/origin/main; then', '"refs/tags/$tag^{commit}" origin/main; then',
+        "R11h", "release", occurrences=2,
+    ),
+    Mutation(
+        "every tag counts as a release in the merge-back check",
+        RELEASE_YML, 'for tag in $(printf \'%s\\n\' "$tags" | { grep -E "$release" || true; }); do',
+        'for tag in $(printf \'%s\\n\' "$tags"); do', "R11e", "release", occurrences=2,
+    ),
+    Mutation(
+        "the merge-back check looks at later releases instead of earlier ones",
+        RELEASE_YML, '| sort -V | head -n 1)" = "$tag" ]', '| sort -V | tail -n 1)" = "$tag" ]', "R11c", "release", occurrences=2,
+    ),
+    Mutation(
+        "a resumed release is refused for its own tag",
+        RELEASE_YML, 'if [ "$tag" != "$VERSION" ] && [', "if [", "R11f", "release", occurrences=2,
+    ),
+    Mutation(
+        "a release missing from main only warns",
+        RELEASE_YML, "      - name: Check every earlier release is in main and in the commit\n",
+        "      - name: Check every earlier release is in main and in the commit\n        continue-on-error: true\n",
+        "W15p", "workflows",
+    ),
+    Mutation(
+        "a commit that lacks an earlier release is cut",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then', "if false; then",
+        "R11i", "release", occurrences=2,
+    ),
+    Mutation(
+        "the earlier release is looked for in main's head rather than in the commit cut",
+        RELEASE_YML, 'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" "$COMMIT"; then',
+        'if ! git merge-base --is-ancestor "refs/tags/$tag^{commit}" refs/remotes/origin/main; then', "R11i", "release", occurrences=2,
+    ),
+    Mutation(
+        "the job that tags stops checking every earlier release",
+        RELEASE_YML, "      - name: Check again that every earlier release is in main and in the commit\n        run: |\n",
+        "      - name: Check again that every earlier release is in main and in the commit\n        run: |\n          exit 0\n",
+        "W15x", "workflows",
+    ),
+    Mutation(
+        "a fork's pull request into main passes on its branch name",
+        SOURCE_YML, 'if [ "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]; then', "if false; then", "W19k", "workflows",
+    ),
+    Mutation(
+        "the source-branch check runs the pull request's own copy of itself",
+        SOURCE_YML, "on:\n  pull_request_target:\n", "on:\n  pull_request:\n", "W19", "workflows",
+    ),
+    Mutation(
+        "the source-branch check checks out the pull request it runs main's copy for",
+        SOURCE_YML, "    steps:\n", "    steps:\n      - uses: actions/checkout@v4\n", "W19", "workflows",
+    ),
+    Mutation(
+        "a push run the release reads can be cancelled by the next merge",
+        CI_YML, "cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "cancel-in-progress: true",
+        "W18b", "workflows",
+    ),
+    Mutation(
+        "push runs share a group, so a newer push cancels one still waiting",
+        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
+        "group: ci-${{ github.ref }}", "W18b", "workflows",
+    ),
+    Mutation(
+        "push runs are grouped by commit, so a push of the same commit to a new branch replaces one waiting",
+        CI_YML, "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}",
+        "group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}", "W18b", "workflows",
+    ),
+    Mutation(
+        "the change report checks out the merge into the base again",
+        CI_YML, "          ref: ${{ github.event.pull_request.head.sha }}\n          fetch-depth: 0\n",
+        "          fetch-depth: 0\n", "W18d", "workflows",
+    ),
+    Mutation(
+        "every CI job builds the merge, while the analysis reads the head",
+        CI_YML, "          ref: ${{ github.event.pull_request.head.sha }}\n",
+        "          ref: ${{ github.ref }}\n", "W18d", "workflows", occurrences=4,
+    ),
+    Mutation(
+        "a push to a hotfix branch runs no CI",
+        CI_YML, "  push:\n    branches: [main, 'release/**', 'hotfix/**']\n", "  push:\n    branches: [main, 'release/**']\n",
+        "W18", "workflows",
+    ),
+    Mutation(
+        "a pull request into a release branch gets no interface check",
+        INTERFACE_YML, "branches: [main, 'release/**', 'hotfix/**']", "branches: [main, 'hotfix/**']",
+        "W18c", "workflows",
+    ),
+    Mutation(
+        "the source-branch check passes every branch",
+        SOURCE_YML, "              exit 1\n", "              exit 0\n", "W19f", "workflows",
+    ),
+    Mutation(
+        "a Dependabot pull request into main is refused",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|ci/?*) ;;", "W19e", "workflows",
+    ),
+    Mutation(
+        "a bare release/ prefix passes the source-branch check",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/*|hotfix/?*|dependabot/?*|ci/?*) ;;",
+        "W19h", "workflows",
+    ),
+    Mutation(
+        "a ci pull request into main is refused",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*) ;;",
+        "W19l", "workflows",
+    ),
+    Mutation(
+        "a bare ci/ prefix passes the source-branch check",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*|ci/*) ;;",
+        "W19m", "workflows",
+    ),
+    Mutation(
+        "a ci/ prefix is matched anywhere in the branch name",
+        SOURCE_YML, "release/?*|hotfix/?*|dependabot/?*|ci/?*) ;;", "release/?*|hotfix/?*|dependabot/?*|*ci/?*) ;;",
+        "W19n", "workflows",
+    ),
+    Mutation(
+        "the head branch is interpolated into the script",
+        SOURCE_YML, 'case "$HEAD_REF" in', 'case "${{ github.head_ref }}" in', "W19b", "workflows",
+    ),
+    Mutation(
+        "a pull request retargeted to main is not checked",
+        SOURCE_YML, "types: [opened, synchronize, reopened, edited]", "types: [opened, synchronize, reopened]",
+        "W19", "workflows",
+    ),
+    Mutation(
+        "the source-branch check holds the default token",
+        SOURCE_YML, "permissions: {}\n", "", "W19", "workflows",
+    ),
+    Mutation(
+        "the harness does not run on a pull request changing the source-branch check",
+        SCRIPTS_YML,
+        "      - '.github/workflows/source-branch.yml'\n      - '.github/workflows/pr-reports.yml'\n"
+        "      - '.github/hardware-only-tests.txt'\n      # The",
+        "      - '.github/workflows/pr-reports.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
+        "W11", "workflows",
+    ),
+    Mutation(
+        "the harness does not run on a pull request changing the reporting workflow",
+        SCRIPTS_YML,
+        "      - '.github/workflows/pr-reports.yml'\n      - '.github/hardware-only-tests.txt'\n      # The",
+        "      - '.github/hardware-only-tests.txt'\n      # The", "W11", "workflows",
+    ),
+    Mutation(
+        "the harness does not run on a pull request changing the Dependabot config",
+        SCRIPTS_YML,
+        "      - '.github/workflows/**'\n      - '.github/dependabot.yml'\n",
+        "      - '.github/workflows/**'\n", "W11", "workflows",
     ),
 ]
 
@@ -1054,7 +1469,7 @@ def main() -> int:
 
             text = target.read_text(encoding="utf-8")
             occurrences = text.count(mutation.anchor)
-            if occurrences != 1:
+            if occurrences != mutation.occurrences:
                 bad.append((mutation.name, f"anchor matched {occurrences} times in {mutation.path}"))
                 print(f"  INVALID {mutation.name}")
                 continue

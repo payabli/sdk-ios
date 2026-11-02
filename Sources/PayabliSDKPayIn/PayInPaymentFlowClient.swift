@@ -298,7 +298,7 @@ final class PayInPaymentFlowClient: Sendable {
              .readerUnavailable, .readerSessionExpired, .paymentNotOpened, .cardDeclined, .activationCodeMalformed,
              .activationCodeIncorrect, .activationCodeExpired, .activationAttemptsExhausted, .activationCodeNotIssued,
              .deviceNotPending, .terminalNotReady, .tooManyOpenCharges, .paymentNotHeld, .deviceIdentityUnavailable,
-             .transactionNotFound, .retryNotSamePayment, .paymentReferenceOpen:
+             .paymentNotTaken, .transactionNotFound, .retryNotSamePayment, .paymentReferenceOpen, .contactlessDisabled:
             return false
         }
     }
@@ -314,14 +314,20 @@ final class PayInPaymentFlowClient: Sendable {
             return try decodeResult(from: response)
         } catch {
             let refusedKey = error is IdempotencyCheckRefusal
-            let failure = refusedKey ? PayabliGenericError(type: .conflict, reason: "Conflict (409)") : error
+            let failure: any Error = if refusedKey {
+                PayabliGenericError(type: .conflict, reason: "Conflict (409)")
+            } else if PayInInterruption.isCancellation(error) {
+                CancellationError()
+            } else {
+                error
+            }
             let conflict = answer?.statusCode == 409
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
             // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, conflict || Self.leavesOutcomeUnknown(failure) else { throw failure }
             let interruption = PayabliPayInError.submissionInterrupted(
-                type: conflict ? .conflict : (failure as? any PayabliError)?.type ?? .unknown,
+                type: conflict ? .conflict : PayInInterruption.type(of: failure),
                 causeType: RedactedCause(failure).originalType,
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil

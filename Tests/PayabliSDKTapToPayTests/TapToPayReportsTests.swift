@@ -358,7 +358,7 @@ private actor HeldTelemetryTransport: TelemetryTransport {
     private var heldWaiters: [CheckedContinuation<Void, Never>] = []
     private var released = false
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         sent += batch
         guard !released else { return .delivered }
         await withCheckedContinuation { continuation in

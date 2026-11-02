@@ -407,23 +407,23 @@ extension SwiftUICore::View {
   @_Concurrency::MainActor @preconcurrency public func payabliPayInStyle(_ style: PayabliSDKPayIn::PayabliPayInFormStyle) -> some SwiftUICore::View
   
 }
-public enum PayabliPayInMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
+public enum PayabliPayInMethodType : Swift::RawRepresentable, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable {
   case card
   case bankAccount
+  public init?(rawValue: Swift::String)
+  public var rawValue: Swift::String {
+    get
+  }
   public var id: Swift::String {
     get
   }
   public var displayName: Swift::String {
     get
   }
-  public init?(rawValue: Swift::String)
   public typealias AllCases = [PayabliSDKPayIn::PayabliPayInMethodType]
   public typealias ID = Swift::String
   public typealias RawValue = Swift::String
   nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInMethodType] {
-    get
-  }
-  public var rawValue: Swift::String {
     get
   }
 }
@@ -845,6 +845,11 @@ extension SwiftUICore::View {
   @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void) -> some SwiftUICore::View
   
 }
+public struct PayabliPayInStoreRequest : Swift::Sendable {
+  public let instrument: PayabliSDKPayIn::PayabliPayInMethodInput
+  public let options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions
+  public init(instrument: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions)
+}
 public enum PayabliPayInSummaryRows {
   public static func labelText(for field: PayabliSDKPayIn::PayabliPayInField, labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
   public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
@@ -910,20 +915,20 @@ public enum PayabliPayInResultKind : Swift::String, Swift::Sendable, Swift::Equa
     get
   }
 }
-public enum PayabliPayInStoredMethodType : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
+public enum PayabliPayInStoredMethodType : Swift::RawRepresentable, Swift::CaseIterable, Swift::Identifiable, Swift::Codable, Swift::Sendable {
   case card
   case bankAccount
+  public init?(rawValue: Swift::String)
+  public var rawValue: Swift::String {
+    get
+  }
   public var id: Swift::String {
     get
   }
-  public init?(rawValue: Swift::String)
   public typealias AllCases = [PayabliSDKPayIn::PayabliPayInStoredMethodType]
   public typealias ID = Swift::String
   public typealias RawValue = Swift::String
   nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInStoredMethodType] {
-    get
-  }
-  public var rawValue: Swift::String {
     get
   }
 }
@@ -981,11 +986,6 @@ public struct PayabliPayInRequest : Swift::Sendable {
     get
   }
   public init(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, options: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
-}
-public struct PayabliPayInStoreRequest : Swift::Sendable {
-  public let instrument: PayabliSDKPayIn::PayabliPayInMethodInput
-  public let options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions
-  public init(instrument: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions)
 }
 public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails
@@ -1141,7 +1141,6 @@ extension PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement : Swift::Hashable 
 extension PayabliSDKPayIn::PayabliPayInFailureMessagePlacement : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInMethodType : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInCardBrand : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInAccountType : Swift::Equatable {}
@@ -1162,4 +1161,3 @@ extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInStoredMethodType : Swift::RawRepresentable {}

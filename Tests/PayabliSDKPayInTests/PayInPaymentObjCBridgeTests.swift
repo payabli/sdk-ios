@@ -5,6 +5,11 @@ import XCTest
 /// The payment members as an Objective-C caller reaches them: a request object in, a result or an `NSError` out.
 @MainActor
 final class PayInPaymentObjCBridgeTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     private static let interrupted = Data(#"{"code":"E9999","reason":"Error","data":{"paymentTransId":"101-abc"}}"#.utf8)
 
     func testACaptureThroughObjectiveCSendsTheRequestAndReturnsTheResult() async {
@@ -54,6 +59,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let failure = try XCTUnwrap(error)
         XCTAssertEqual(failure.domain, "com.payabli.payIn")
         XCTAssertEqual(failure.code, PayabliErrorType.serverError.number)
+        XCTAssertEqual(PayabliErrorTypeCode(rawValue: failure.code), .serverError)
         XCTAssertEqual(failure.userInfo["paymentTransId"] as? String, "101-abc")
     }
 
@@ -74,10 +80,83 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(refused).userInfo["capture"] as? Int, 0)
     }
 
+    func testARetryNamingNoReferenceThroughObjectiveCIsRefusedUnsent() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let request = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        request.attempt = .retry
+
+        let (result, error) = await call { bridge.capture(request, completion: $0) }
+
+        XCTAssertNil(result)
+        let failure = try XCTUnwrap(error)
+        XCTAssertEqual(failure.localizedDescription, "A retry must name the paymentReference of the payment it repeats.")
+        XCTAssertEqual(failure.userInfo["capture"] as? Int, 0)
+        XCTAssertEqual(transport.count, 0)
+    }
+
+    func testAPaymentReferenceOpenOnCaptureSaysThePaymentMayHaveBeenTaken() async throws {
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: RecordingIdempotencyTransport(body: Self.interrupted, status: 500),
+            key: "reserved-1"
+        ))
+        let request = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        request.paymentReference = "order-42"
+
+        _ = await call { bridge.capture(request, completion: $0) }
+        let (_, error) = await call { bridge.capture(request, completion: $0) }
+
+        let refused = try XCTUnwrap(error)
+        XCTAssertEqual(refused.code, PayabliErrorType.paymentReferenceOpen.number)
+        XCTAssertEqual(refused.userInfo["capture"] as? Int, 1)
+    }
+
+    func testAPaymentReferenceOpenOnVoidSaysThePaymentMayHaveBeenTaken() async throws {
+        let held = HeldOpenTransport()
+        let first = PayInFixture.makeFlow(transport: held, key: "k1")
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: held, key: "n1"))
+
+        let sending = Task { try await first.voidTransaction("t-1") }
+        await held.firstSendArrived()
+        let (_, error) = await call { bridge.voidTransaction(transId: "t-1", completion: $0) }
+        held.release()
+        _ = try await sending.value
+
+        let refused = try XCTUnwrap(error)
+        XCTAssertEqual(refused.code, PayabliErrorType.paymentReferenceOpen.number)
+        XCTAssertEqual(refused.userInfo["capture"] as? Int, 1)
+        XCTAssertEqual(held.sentKeys, ["k1"])
+    }
+
+    func testARetryDescribingAnotherPaymentSaysThePaymentWasNotTaken() async throws {
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: RecordingIdempotencyTransport(body: Self.interrupted, status: 500),
+            key: "reserved-1"
+        ))
+        let first = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        first.paymentReference = "order-42"
+        let retry = PayabliPayInRequestObjC.cash(totalAmount: 11)
+        retry.paymentReference = "order-42"
+        retry.attempt = .retry
+
+        _ = await call { bridge.capture(first, completion: $0) }
+        let (_, error) = await call { bridge.capture(retry, completion: $0) }
+
+        let refused = try XCTUnwrap(error)
+        XCTAssertEqual(refused.code, PayabliErrorType.retryNotSamePayment.number)
+        XCTAssertEqual(refused.userInfo["capture"] as? Int, 0)
+    }
+
     func testAnErrorFromACallThatMovesNoMoneyCarriesNoCapture() {
         let error = PayabliGenericError(type: .networkError, reason: "lost").toPayabliPayInNSError()
 
         XCTAssertNil(error.userInfo["capture"])
+    }
+
+    func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {
+        let error = CancellationError().toPayabliPayInNSError(movesMoney: true)
+
+        XCTAssertEqual(error.userInfo["capture"] as? Int, 1)
     }
 
     func testAnUnknownOutcomeThroughObjectiveCCarriesTheTransactionAndThePaymentsReference() async throws {

@@ -240,7 +240,7 @@ struct PayabliPayInSheetContent: View {
     }
 
     var sheetTitle: String? {
-        if let configuredTitle = sheetConfiguration.title?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+        if let configuredTitle = PayabliPayInFormLabels.nonBlank(sheetConfiguration.title) {
             return configuredTitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
@@ -248,11 +248,11 @@ struct PayabliPayInSheetContent: View {
     }
 
     var sheetSubtitle: String? {
-        if let configuredSubtitle = sheetConfiguration.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty {
+        if let configuredSubtitle = PayabliPayInFormLabels.nonBlank(sheetConfiguration.subtitle) {
             return configuredSubtitle
         }
         guard sheetConfiguration.movesFormHeaderToSheetHeader else { return nil }
-        return labels.subtitle?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        return labels.drawnSubtitle
     }
 
     /// The labels the form inside the sheet draws: the sheet's header owns the form's heading when

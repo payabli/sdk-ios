@@ -3,16 +3,19 @@ import PayabliSDKTestUtils
 import XCTest
 
 final class TelemetryClientTests: XCTestCase {
-    private let clock = ManualTelemetryClock()
-    private let lifecycle = ManualAppLifecycle()
-    private let transport = InMemoryTelemetryTransport()
+    let clock = ManualTelemetryClock()
+    let lifecycle = ManualAppLifecycle()
+    let transport = InMemoryTelemetryTransport()
+    let overflow = "sdk.telemetryOverflow"
 
-    private func makeClient(
+    func makeClient(
         batchSize: Int = 20,
         queueCapacity: Int = 500,
         maxEventsPerRequest: Int = 100,
         deviceId: String? = nil,
-        queued: [(name: String, properties: [String: String])] = []
+        queued: [(name: String, properties: [String: String])] = [],
+        logger: PayabliLogger = PayabliLogger(category: .telemetry, sink: RecordingLogSink()),
+        predecessor: TelemetryClient? = nil
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -27,8 +30,20 @@ final class TelemetryClientTests: XCTestCase {
             sleep: clock.sleep,
             lifecycle: lifecycle,
             deviceId: { deviceId },
-            queued: queued
+            queued: queued,
+            logger: logger,
+            predecessor: predecessor
         )
+    }
+
+    /// Records an event that waits for its batch, told apart from the others by `label`.
+    func record(_ client: TelemetryClient, _ label: String) async {
+        await client.emit(TelemetryEventName.formPresented, properties: ["step": label])
+    }
+
+    /// Records an event whose outcome sends it at once, told apart from the others by `label`.
+    func recordFailure(_ client: TelemetryClient, _ label: String, outcome: String) async {
+        await client.emit(TelemetryEventName.payinCaptureCompleted, properties: ["outcome": outcome, "origin": label])
     }
 
     /// Fires the timer, failing the test rather than waiting when no timer is running.
@@ -46,13 +61,13 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["form.presented", "ttp.initialize.started"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["form.presented", "ttp.initialize.started"]])
     }
 
     func testShortOfAFullBatchNothingIsSentUntilTheTimerFires() async {
         let client = makeClient(batchSize: 5)
-        await client.emit("e1")
-        await client.emit("e2")
+        await record(client, "e1")
+        await record(client, "e2")
         await client.settled()
         let beforeTick = await transport.batches
         XCTAssertTrue(beforeTick.isEmpty)
@@ -61,42 +76,42 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["e1", "e2"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["e1", "e2"]])
     }
 
     func testTheTimerKeepsFiringAfterABatchIsRefused() async {
         let client = makeClient()
         await transport.refuse(true)
-        await client.emit("first")
+        await record(client, "first")
         await tick()
         await client.settled()
         await transport.refuse(false)
-        await client.emit("second")
+        await record(client, "second")
 
         await tick()
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["first"], ["first", "second"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["first"], ["first", "second"]])
     }
 
     func testDeliveryListensForBackgroundingOnceTheFirstEventIsRecorded() async {
         let client = makeClient()
 
-        await client.emit("a")
+        await record(client, "a")
 
         XCTAssertTrue(lifecycle.isSubscribed, "subscribed before the first emit returns, not when a task gets to run")
     }
 
     func testGoingToTheBackgroundSendsEverythingQueuedWithTimeToFinish() async {
         let client = makeClient()
-        await client.emit("a")
-        await client.emit("b")
+        await record(client, "a")
+        await record(client, "b")
 
         let closed = await lifecycle.background()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["a", "b"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["a", "b"]])
         XCTAssertTrue(closed, "the background time is handed back once the send has ended")
         XCTAssertEqual(lifecycle.closedCount, 1)
     }
@@ -111,19 +126,19 @@ final class TelemetryClientTests: XCTestCase {
             deviceId: { nil },
             queued: []
         )
-        await client.emit("a", properties: ["outcome": "failed"])
+        await recordFailure(client, "a", outcome: "failed")
         await gated.untilHeld()
 
-        await client.emit("b")
+        await record(client, "b")
         await tick()
-        await client.emit("c", properties: ["outcome": "declined"])
+        await recordFailure(client, "c", outcome: "declined")
         let backgrounded = Task { await lifecycle.background() }
         XCTAssertEqual(lifecycle.closedCount, 0, "the background time stays open while a send is held")
         await gated.open()
         let closed = await backgrounded.value
         await client.settled()
 
-        let sent = await gated.sent.flatMap { $0 }.map(\.event)
+        let sent = await gated.sent.flatMap { $0 }.map(\.label)
         let mostAtOnce = await gated.mostAtOnce
         XCTAssertEqual(sent, ["a", "b", "c"])
         XCTAssertEqual(mostAtOnce, 1)
@@ -153,7 +168,7 @@ final class TelemetryClientTests: XCTestCase {
     func testAnEventReportingSuccessWaitsForItsBatch() async {
         let client = makeClient()
         await client.emit("payin.capture.completed", properties: ["outcome": "approved"])
-        await client.emit("ttp.initialize.succeeded", properties: ["outcome": "succeeded"])
+        await client.emit("payin.void.completed", properties: ["outcome": "succeeded"])
         await client.settled()
 
         let batches = await transport.batches
@@ -181,7 +196,7 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["ttp.initialize.started", "ttp.initialize.failed"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["ttp.initialize.started", "ttp.initialize.failed"]])
     }
 
     func testTheSendAtOnceRule() {
@@ -198,63 +213,186 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertTrue(TelemetryClient.sendsAtOnce(TelemetryEventName.ttpCloseFailed, [:]))
     }
 
+    // MARK: - The catalog gate
+
+    func testAKeyTheEventDoesNotDeclareIsNotQueued() async {
+        let client = makeClient()
+        await client.emit(
+            TelemetryEventName.payinCaptureCompleted,
+            properties: ["outcome": "approved", "holder": "undeclared"]
+        )
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(queued.map(\.properties), [["outcome": "approved"]])
+    }
+
+    func testAnEventTheCatalogDoesNotNameIsNotQueued() async {
+        let client = makeClient()
+        await client.emit("payin.cardNumber.entered", properties: ["outcome": "failed"])
+        await client.settled()
+
+        let buffered = await client.bufferedCount
+        let batches = await transport.batches
+        XCTAssertEqual(buffered, 0)
+        XCTAssertTrue(batches.isEmpty, "a dropped event asks for no send")
+    }
+
+    func testWhatWasRecordedBeforeTheClientStartedPassesTheSameGate() async {
+        let client = makeClient(queued: [
+            (TelemetryEventName.sdkInitialized, ["state": "ready", "holder": "undeclared"]),
+            ("payin.cardNumber.entered", [:])
+        ])
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(queued.map(\.event), [TelemetryEventName.sdkInitialized])
+        XCTAssertEqual(queued.map(\.properties), [["state": "ready"]])
+    }
+
+    func testADeclaredValueThatCannotBeReportedDropsItsPairAndKeepsTheRest() async {
+        let client = makeClient()
+        await client.emit(TelemetryEventName.payinCaptureCompleted, properties: [
+            "outcome": "approved",
+            "code": "",
+            "origin": String(repeating: "o", count: 257),
+            "failure_type": "Caf\u{E9}Error",
+            "duration_ms": "12\n",
+            "method": String(repeating: "m", count: 256)
+        ])
+
+        let queued = await client.queuedEvents
+        XCTAssertEqual(
+            queued.map(\.properties),
+            [["outcome": "approved", "method": String(repeating: "m", count: 256)]],
+            "empty, too long and non-printable values go; a value of exactly 256 stays"
+        )
+    }
+
+    func testAnOutcomeTheEventDoesNotDeclareDoesNotSendItAtOnce() async {
+        let client = makeClient()
+        await client.emit(TelemetryEventName.ttpInitializeSucceeded, properties: ["outcome": "failed"])
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertTrue(batches.isEmpty)
+    }
+
     // MARK: - The bounded queue
 
-    func testWhatTheQueueEvictedIsCarriedByTheNextBatch() async {
-        let client = makeClient(queueCapacity: 2)
-        await client.emit("a")
-        await client.emit("b")
-        await client.emit("c")
+    func testWhatTheQueueEvictedArrivesAsOneOverflowEventLastInTheNextBatch() async {
+        let client = makeClient(queueCapacity: 2, deviceId: "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d")
+        await record(client, "a")
+        await record(client, "b")
+        await record(client, "c")
         await client.flush()
 
         let batches = await transport.batches
-        let counts = await transport.droppedCounts
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["b", "c"]])
-        XCTAssertEqual(counts, [1])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["b", "c", overflow]])
+        let event = batches.first?.last
+        XCTAssertEqual(event?.properties, ["dropped": "1"])
+        XCTAssertEqual(event?.entry, "test_entry")
+        XCTAssertEqual(event?.deviceIdHash, "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d")
     }
 
-    func testABatchThatLostNothingCarriesNoCount() async {
+    func testABatchThatLostNothingCarriesNoOverflowEvent() async {
         let client = makeClient()
-        await client.emit("a")
+        await record(client, "a")
         await client.flush()
 
-        let counts = await transport.droppedCounts
-        XCTAssertEqual(counts, [0])
+        let batches = await transport.batches
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["a"]])
     }
 
-    func testACountSurvivesTheBatchThatWasRefused() async {
-        let client = makeClient(queueCapacity: 1)
-        await client.emit("a")
-        await client.emit("b")
+    func testARefusedBatchGoesBackWithoutItsOverflowEventAndTheNextCarriesTheRunningTotal() async {
+        let client = makeClient(queueCapacity: 2)
+        await record(client, "a")
+        await record(client, "b")
+        await record(client, "c")
         await transport.refuse(true)
         await client.flush()
         await transport.refuse(false)
-        await client.emit("c")
+        await record(client, "d")
         await client.flush()
 
-        let counts = await transport.droppedCounts
-        XCTAssertEqual(counts, [1, 2])
+        let batches = await transport.batches
+        XCTAssertEqual(
+            batches.map { $0.map(\.label) },
+            [["b", "c", overflow], ["c", "d", overflow]],
+            "the refused batch went back without its overflow event, and b was evicted from it"
+        )
+        XCTAssertEqual(batches.map { $0.last?.properties["dropped"] }, ["1", "2"])
     }
 
     func testAFlushWithNothingToSendDoesNotConsumeTheCount() async {
         let client = makeClient(queueCapacity: 1)
-        await client.emit("a")
-        await client.emit("b")
+        await record(client, "a")
+        await record(client, "b")
         await transport.discard(true)
         await client.flush()
         await transport.discard(false)
         await client.flush()
-        await client.emit("c")
+        await record(client, "c")
         await client.flush()
 
-        let counts = await transport.droppedCounts
-        XCTAssertEqual(counts, [1, 1], "the discarded batch's count survives the empty flush after it")
+        let batches = await transport.batches
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["b", overflow], ["c", overflow]])
+        XCTAssertEqual(
+            batches.map { $0.last?.properties["dropped"] },
+            ["1", "1"],
+            "the discarded batch's count survives the empty flush after it"
+        )
+    }
+
+    func testWithACountWaitingAFullRequestCarries99EventsAndTheOverflowEventLast() async {
+        let client = makeClient(batchSize: 600)
+        for index in 0 ... 500 {
+            await record(client, "e\(index)")
+        }
+        await client.flush()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.first?.count, 100)
+        XCTAssertEqual(batches.first?.last?.event, overflow)
+        XCTAssertEqual(batches.first?.dropLast().map(\.label), (1 ... 99).map { "e\($0)" })
+        XCTAssertLessThanOrEqual(batches.map(\.count).max() ?? 0, 100, "no request carries more than 100")
+    }
+
+    func testOneSignalDrainsAFullQueueAndItsOverflowEvent() async {
+        let client = makeClient(batchSize: 600)
+        for index in 0 ... 500 {
+            await record(client, "e\(index)")
+        }
+        await client.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.filter { $0.event != overflow }.map(\.label), (1 ... 500).map { "e\($0)" })
+        XCTAssertEqual(events.filter { $0.event == overflow }.count, 1)
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0, "one signal sends everything that was waiting")
+    }
+
+    func testOneSignalDrainsEverythingWhenEachRequestIsDiscarded() async {
+        let client = makeClient(batchSize: 600)
+        for index in 0 ... 500 {
+            await record(client, "e\(index)")
+        }
+        await transport.discard(true)
+        await client.flush()
+
+        let batches = await transport.batches
+        XCTAssertEqual(
+            batches.map { $0.last?.event },
+            Array(repeating: overflow, count: batches.count),
+            "each discarded request gives its count back, so every request carries the event"
+        )
+        XCTAssertEqual(batches.flatMap { $0 }.filter { $0.event != overflow }.count, 500)
+        let buffered = await client.bufferedCount
+        XCTAssertEqual(buffered, 0, "one signal sends everything that was waiting")
     }
 
     func testOneRequestCarriesNoMoreThanOneRequestMay() async {
         let client = makeClient(maxEventsPerRequest: 2)
         for index in 0 ..< 5 {
-            await client.emit("e\(index)")
+            await record(client, "e\(index)")
         }
         await client.flush()
 
@@ -267,8 +405,8 @@ final class TelemetryClientTests: XCTestCase {
     func testARefusedBatchIsQueuedAgainInOrderAndTheNextFlushSendsIt() async {
         let client = makeClient()
         await transport.refuse(true)
-        await client.emit("first")
-        await client.emit("second")
+        await record(client, "first")
+        await record(client, "second")
         await client.flush()
         await transport.refuse(false)
 
@@ -277,7 +415,7 @@ final class TelemetryClientTests: XCTestCase {
 
         let batches = await transport.batches
         XCTAssertEqual(
-            batches.map { $0.map(\.event) },
+            batches.map { $0.map(\.label) },
             [["first", "second"], ["first", "second"]],
             "the refused batch goes back to the front and the next flush sends it"
         )
@@ -288,7 +426,7 @@ final class TelemetryClientTests: XCTestCase {
     func testAFailedSendMakesNoRequestUntilTheNextFlush() async {
         let client = makeClient(batchSize: 600)
         for index in 0 ..< 250 {
-            await client.emit("e\(index)")
+            await record(client, "e\(index)")
         }
         await transport.refuse(true)
         await client.flush()
@@ -307,7 +445,7 @@ final class TelemetryClientTests: XCTestCase {
     func testADiscardedBatchIsNotQueuedAgain() async {
         let client = makeClient()
         await transport.discard(true)
-        await client.emit("only")
+        await record(client, "only")
         await client.flush()
 
         let buffered = await client.bufferedCount
@@ -321,7 +459,7 @@ final class TelemetryClientTests: XCTestCase {
         XCTAssertEqual(batches.count, 1, "nothing was left for the next flush")
     }
 
-    func testAFullQueueEvictsTheOldestPutBackEventsAndCountsThem() async {
+    func testARefusedBatchEvictedOnItsWayBackKeepsEveryLossInTheCount() async {
         let gated = GatedTelemetryTransport()
         let client = TelemetryClient(
             configuration: .init(
@@ -337,12 +475,14 @@ final class TelemetryClientTests: XCTestCase {
             queued: []
         )
         await gated.reply(with: .kept)
-        await client.emit("first")
-        await client.emit("second", properties: ["outcome": "failed"])
+        await record(client, "lost")
+        await record(client, "first")
+        await record(client, "second")
+        await recordFailure(client, "third", outcome: "failed")
         await gated.untilHeld()
-        await client.emit("third")
-        await client.emit("fourth")
-        await client.emit("fifth")
+        await record(client, "fourth")
+        await record(client, "fifth")
+        await record(client, "sixth")
         await gated.open()
         await client.settled()
         await gated.reply(with: .delivered)
@@ -351,9 +491,47 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let sent = await gated.sent
-        XCTAssertEqual(sent.map { $0.map(\.event) }, [["first", "second"], ["third", "fourth", "fifth"]])
-        let counts = await gated.droppedCounts
-        XCTAssertEqual(counts, [0, 2], "the two oldest put-back events were evicted and counted")
+        XCTAssertEqual(
+            sent.map { $0.map(\.label) },
+            [["first", "second", "third", overflow], ["fourth", "fifth", "sixth", overflow]]
+        )
+        XCTAssertEqual(
+            sent.map { $0.last?.properties["dropped"] },
+            ["1", "4"],
+            "the refused batch's count, plus its three events evicted on the way back"
+        )
+    }
+
+    // MARK: - When a batch fills
+
+    func testWithSendsRefused40EventsOfferedOneAtATimeMakeTwoSendAttempts() async {
+        let client = makeClient()
+        await transport.refuse(true)
+        for index in 0 ..< 40 {
+            await record(client, "e\(index)")
+            await client.settled()
+        }
+
+        let attempts = await transport.batches
+        XCTAssertEqual(attempts.map(\.count), [20, 40], "a put-back batch does not count toward the next twenty")
+
+        await transport.refuse(false)
+        await tick()
+        await client.settled()
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.last?.map(\.label), (0 ..< 40).map { "e\($0)" })
+    }
+
+    func testTwentyNewEventsAfterASuccessfulSendStillSendAtOnce() async {
+        let client = makeClient()
+        for index in 0 ..< 40 {
+            await record(client, "e\(index)")
+            await client.settled()
+        }
+
+        let batches = await transport.batches
+        XCTAssertEqual(batches.map(\.count), [20, 20])
     }
 
     // MARK: - Best effort
@@ -382,7 +560,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testADeviceThatCannotBeIdentifiedSendsNoIdentifier() async {
         let client = makeClient(deviceId: "")
-        await client.emit("x")
+        await record(client, "x")
         await client.flush()
 
         let events = await transport.batches.flatMap { $0 }
@@ -396,7 +574,7 @@ final class TelemetryClientTests: XCTestCase {
         await client.flush()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["sdk.initialized", "ttp.initialize.started"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["sdk.initialized", "ttp.initialize.started"]])
         XCTAssertEqual(batches.first?.first?.properties, ["state": "ready"])
     }
 
@@ -407,12 +585,12 @@ final class TelemetryClientTests: XCTestCase {
         await client.settled()
 
         let batches = await transport.batches
-        XCTAssertEqual(batches.map { $0.map(\.event) }, [["sdk.initialized"]])
+        XCTAssertEqual(batches.map { $0.map(\.label) }, [["sdk.initialized"]])
     }
 
     func testEnvelopeIncludesVersion() async {
         let client = makeClient()
-        await client.emit("x")
+        await record(client, "x")
         await client.flush()
         let batches = await transport.batches
         let event = batches.first?.first
@@ -422,9 +600,8 @@ final class TelemetryClientTests: XCTestCase {
 }
 
 /// Holds every send until opened, and records how many were in flight at once.
-private actor GatedTelemetryTransport: TelemetryTransport {
+actor GatedTelemetryTransport: TelemetryTransport {
     private(set) var sent: [[TelemetryEvent]] = []
-    private(set) var droppedCounts: [Int] = []
     private(set) var mostAtOnce = 0
     private var active = 0
     private var isOpen = false
@@ -437,7 +614,7 @@ private actor GatedTelemetryTransport: TelemetryTransport {
         self.outcome = outcome
     }
 
-    func send(_ batch: [TelemetryEvent], droppedSinceLastSend: Int) async -> TelemetrySendOutcome {
+    func send(_ batch: [TelemetryEvent]) async -> TelemetrySendOutcome {
         active += 1
         mostAtOnce = max(mostAtOnce, active)
         if !isOpen {
@@ -448,7 +625,6 @@ private actor GatedTelemetryTransport: TelemetryTransport {
             }
         }
         sent.append(batch)
-        droppedCounts.append(droppedSinceLastSend)
         active -= 1
         return outcome
     }
@@ -464,5 +640,12 @@ private actor GatedTelemetryTransport: TelemetryTransport {
         isOpen = true
         gates.forEach { $0.resume() }
         gates.removeAll()
+    }
+}
+
+extension TelemetryEvent {
+    /// The label a test recorded the event under, or its name for an event recorded by name.
+    var label: String {
+        properties["step"] ?? properties["origin"] ?? event
     }
 }

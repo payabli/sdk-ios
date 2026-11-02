@@ -31,6 +31,11 @@ env:
   # facts file that never arrived.
   PLATFORM: iOS
 
+# Every step under pipefail, so a failing command piped into another fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   report:
     name: Report to Slack
@@ -43,6 +48,9 @@ jobs:
     # a Slack outage; it does not cover a failed checkout or an uncaught exception, and neither of those is a
     # test result. It cannot change the nightly's own conclusion either way, since that run has finished.
     continue-on-error: true
+    # The Slack token lives in this environment, never at the repository, where a job in a pull request's
+    # own copy of a workflow could name it. The environment deploys from main, release and hotfix branches only.
+    environment: ci-protected
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -51,7 +59,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # The default branch, which is what `workflow_run` checks out and the whole point of this file.
           # Nothing here pushes, so the token is not left in `.git/config`.
@@ -61,7 +69,7 @@ jobs:
       # token are both required.
       - name: Download the report facts
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: nightly-facts
           run-id: ${{ github.event.workflow_run.id }}

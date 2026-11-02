@@ -16,6 +16,8 @@ struct PayabliDemoQAApp: App {
 
 /// The app's tabs, built once the session has started.
 struct DemoTabs: View {
+    private let session: PayabliSession
+
     @StateObject private var paymentMethod: PayInFlowHandle
 
     @StateObject private var paymentCapture: PayInFlowHandle
@@ -44,6 +46,7 @@ struct DemoTabs: View {
     @StateObject private var demoCustomer = DemoCustomerSetting()
 
     init(session: PayabliSession, terminal: TapToPayTerminal) {
+        self.session = session
         _terminal = StateObject(wrappedValue: terminal)
         _paymentMethod = StateObject(wrappedValue: PayInSessions.storedMethod(session: session))
         _paymentCapture = StateObject(wrappedValue: PayInSessions.capture(session: session))
@@ -76,7 +79,7 @@ struct DemoTabs: View {
                     Label("TapToPay", systemImage: "wave.3.right")
                 }
 
-            ConfigurationQAView()
+            ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
                 .tabItem {
                     Label("Config", systemImage: "gearshape")
                 }
@@ -119,7 +122,7 @@ struct DemoTabs: View {
                     Label("TapToPay", systemImage: "wave.3.right")
                 }
 
-            ConfigurationQAView()
+            ConfigurationQAView(readDeviceId: { await SessionDeviceId.read(session) })
                 .tabItem {
                     Label("Config", systemImage: "gearshape")
                 }

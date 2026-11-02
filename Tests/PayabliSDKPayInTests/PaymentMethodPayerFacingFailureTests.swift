@@ -8,6 +8,11 @@ import XCTest
 /// threw: the payment's own error, the store's, or a core failure, each keeping its category.
 @MainActor
 final class PaymentMethodPayerFacingFailureTests: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     func testADeclineDrawsTheDeclinedMessage() async {
         await assertDraws(
             "The payment was declined. Try another payment method.",
