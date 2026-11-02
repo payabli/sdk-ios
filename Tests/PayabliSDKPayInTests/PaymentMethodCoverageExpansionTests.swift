@@ -539,7 +539,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 cvv: "123",
                 billingZip: "33139"
             )),
-            options: PayabliPayInTokenStorageOptions()
+            options: PayabliPayInStoreOptions()
         ))
         let achResult = try await component.storeMethod(PayabliPayInStoreRequest(
             instrument: .bankAccount(PayabliPayInBankAccountData(
@@ -548,7 +548,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 holderName: "Jane Doe",
                 routingNumber: "123456780"
             )),
-            options: PayabliPayInTokenStorageOptions()
+            options: PayabliPayInStoreOptions()
         ))
 
         XCTAssertEqual(cardResult.storedMethodId, "stored-123")

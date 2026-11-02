@@ -8,7 +8,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
     func testDescribingACardStoreRequestExposesNoneOfItsValues() {
         let request = PayabliPayInStoreRequest(
             instrument: .card(Self.enteredCard),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 customerData: Self.payer,
                 methodDescription: Self.methodDescription
             )
@@ -28,7 +28,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
     func testDescribingABankStoreRequestExposesNoneOfItsValues() {
         let request = PayabliPayInStoreRequest(
             instrument: .bankAccount(Self.enteredBankAccount),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 customerData: Self.payer,
                 methodDescription: Self.methodDescription
             )
@@ -69,7 +69,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
     func testReflectingAStoreRequestExposesNoneOfItsValues() {
         let request = PayabliPayInStoreRequest(
             instrument: .card(Self.enteredCard),
-            options: PayabliPayInTokenStorageOptions(customerData: Self.payer)
+            options: PayabliPayInStoreOptions(customerData: Self.payer)
         )
 
         let reflection = String(reflecting: request)
@@ -146,7 +146,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
         }
         for value in Self.payerValues + [Self.methodDescription] {
             XCTAssertFalse(
-                String(describing: PayabliPayInTokenStorageOptions(
+                String(describing: PayabliPayInStoreOptions(
                     customerData: Self.payer,
                     vendorData: PayabliPayInVendorData(vendorId: 4, vendorNumber: "4781"),
                     methodDescription: Self.methodDescription

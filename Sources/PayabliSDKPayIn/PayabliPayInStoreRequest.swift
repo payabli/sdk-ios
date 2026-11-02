@@ -3,7 +3,7 @@ import Foundation
 /// A payment method to store: the instrument, and the options for everything else.
 public struct PayabliPayInStoreRequest: Sendable {
     public let instrument: PayabliPayInMethodInput
-    public let options: PayabliPayInTokenStorageOptions
+    public let options: PayabliPayInStoreOptions
 
     /// Creates a store request.
     ///
@@ -11,7 +11,7 @@ public struct PayabliPayInStoreRequest: Sendable {
     /// - Parameter options: what the request carries besides the method, from the customer to the flags.
     public init(
         instrument: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions
+        options: PayabliPayInStoreOptions
     ) {
         self.instrument = instrument
         self.options = options

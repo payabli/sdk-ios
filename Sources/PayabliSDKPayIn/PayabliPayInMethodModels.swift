@@ -393,7 +393,7 @@ public struct PayabliPayInVendorData: Codable, Sendable {
 /// The options a stored-method request carries, and no idempotency key: a repeat is not recognisable on
 /// the store route, so one sent there is read by nothing and offering it implies a protection the route
 /// does not give. A store whose outcome is unknown is settled by reading the stored methods back.
-public struct PayabliPayInTokenStorageOptions: Sendable {
+public struct PayabliPayInStoreOptions: Sendable {
     /// Whether to verify a bank account before storing it. On this route the flag is the only way the check
     /// is requested.
     public var achValidation: Bool?
@@ -440,7 +440,7 @@ public struct PayabliPayInTokenStorageOptions: Sendable {
     }
 }
 
-extension PayabliPayInTokenStorageOptions {
+extension PayabliPayInStoreOptions {
     var payabliViewModelSignature: String {
         payabliFramedSignature([
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",

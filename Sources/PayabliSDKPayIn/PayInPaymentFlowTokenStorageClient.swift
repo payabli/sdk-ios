@@ -16,7 +16,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     func addMethod(
         entryPoint: String,
         paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
+        options: PayabliPayInStoreOptions = PayabliPayInStoreOptions()
     ) async throws -> PayabliPayInStoredMethod {
         let entry = entryPoint.trimmed
         guard !entry.isEmpty else {
@@ -65,7 +65,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     private func addMethodRequest(
         entryPoint: String,
         paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions
+        options: PayabliPayInStoreOptions
     ) throws -> PayabliRequest {
         return try PayabliRequest.json(
             method: .post,
@@ -156,7 +156,7 @@ private struct TokenStorageAddMethodBody: Encodable {
     let subdomain: String?
 }
 
-private extension PayabliPayInTokenStorageOptions {
+private extension PayabliPayInStoreOptions {
     var queryItems: [URLQueryItem] {
         var items: [URLQueryItem] = []
         appendBool(achValidation, name: "achValidation", to: &items)

@@ -232,7 +232,7 @@ let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
         cvv: "123",
         billingZip: "33139"
     )),
-    options: PayabliPayInTokenStorageOptions(
+    options: PayabliPayInStoreOptions(
         createAnonymous: false,
         forceCustomerCreation: true,
         source: "ios-sdk"
@@ -250,7 +250,7 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
         secCode: .web,
         holderType: .personal
     )),
-    options: PayabliPayInTokenStorageOptions()
+    options: PayabliPayInStoreOptions()
 ))
 ```
 
@@ -276,7 +276,7 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
 
-`PayabliPayInTokenStorageOptions` is what a store request carries besides the
+`PayabliPayInStoreOptions` is what a store request carries besides the
 instrument, and what a form's `.storePaymentMethod(options)` sends. The form
 configuration carries none. It carries no idempotency key: a repeat is not
 recognizable on the store route, so a key sent there is read by nothing.

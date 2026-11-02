@@ -385,7 +385,7 @@ final class PayabliPayInViewModel: ObservableObject {
             return try await component.submitConfigured(request, for: operation, origin: .form)
         }
         return try await component.submitConfigured(
-            PayabliPayInStoreRequest(instrument: methodInput(), options: mergedTokenStorageOptions()),
+            PayabliPayInStoreRequest(instrument: methodInput(), options: mergedStoreOptions()),
             for: operation,
             origin: .form
         )

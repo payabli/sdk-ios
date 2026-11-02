@@ -25,7 +25,7 @@ final class PayInPaymentFlowTests: XCTestCase {
                 cvv: "123",
                 billingZip: "12345"
             )),
-            options: PayabliPayInTokenStorageOptions()
+            options: PayabliPayInStoreOptions()
         ))
 
         XCTAssertEqual(result.storedMethodId, "stored-123")

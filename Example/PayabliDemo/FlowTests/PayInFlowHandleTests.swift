@@ -68,7 +68,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
     func testASaveFormIsHandedTheStoreOptionsItWasGiven() throws {
         let handle = try makeHandle()
-        let options = PayabliPayInTokenStorageOptions(forceCustomerCreation: true, source: "save-source")
+        let options = PayabliPayInStoreOptions(forceCustomerCreation: true, source: "save-source")
 
         guard case let .storePaymentMethod(handed) = handle.formOperation(for: .storedMethod, storeOptions: options) else {
             return XCTFail("a save form was handed a payment")

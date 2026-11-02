@@ -261,7 +261,7 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
     }
 
     func toSwift() -> PayabliPayInStoreRequest {
-        var options = PayabliPayInTokenStorageOptions()
+        var options = PayabliPayInStoreOptions()
         options.achValidation = achValidation?.boolValue
         options.createAnonymous = createAnonymous?.boolValue
         options.forceCustomerCreation = forceCustomerCreation?.boolValue

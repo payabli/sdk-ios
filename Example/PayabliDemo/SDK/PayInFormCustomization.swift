@@ -8,7 +8,7 @@ struct PayInFormCustomization: Hashable {
     /// Names this tab on every request it sends, a capture and a save alike.
     static let source = "ios-simple-capture"
     /// What a method stored from this screen is sent with.
-    static let storeOptions = PayabliPayInTokenStorageOptions(forceCustomerCreation: true, source: source)
+    static let storeOptions = PayabliPayInStoreOptions(forceCustomerCreation: true, source: source)
 
     enum Preset: String, CaseIterable, Identifiable {
         case sdkDefault = "Default"

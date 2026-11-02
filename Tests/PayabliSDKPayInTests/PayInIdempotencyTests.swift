@@ -427,7 +427,7 @@ final class PayInIdempotencyTests: XCTestCase {
                     cvv: "999",
                     billingZip: "12345"
                 )),
-                options: PayabliPayInTokenStorageOptions()
+                options: PayabliPayInStoreOptions()
             ))
         })
 

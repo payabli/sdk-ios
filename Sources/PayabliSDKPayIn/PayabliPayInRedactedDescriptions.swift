@@ -51,10 +51,10 @@ extension PayabliPayInVendorData: CustomStringConvertible {
     }
 }
 
-extension PayabliPayInTokenStorageOptions: CustomStringConvertible {
+extension PayabliPayInStoreOptions: CustomStringConvertible {
     /// The store's settings print nothing, because the customer data they may carry is the payer's.
     public var description: String {
-        "PayabliPayInTokenStorageOptions"
+        "PayabliPayInStoreOptions"
     }
 }
 

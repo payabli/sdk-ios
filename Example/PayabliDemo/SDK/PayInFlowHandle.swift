@@ -50,7 +50,7 @@ final class PayInFlowHandle: ObservableObject {
     /// - Returns: the operation to hand the form.
     func formOperation(
         for purpose: PayInOperation,
-        storeOptions: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
+        storeOptions: PayabliPayInStoreOptions = PayabliPayInStoreOptions()
     ) -> PayabliPayInOperation {
         switch purpose {
         case .storedMethod: .storePaymentMethod(storeOptions)

@@ -31,7 +31,7 @@ final class TokenStorageClientTests: XCTestCase {
                 cvv: "123",
                 billingZip: "12345"
             )),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 createAnonymous: true,
                 forceCustomerCreation: false,
                 temporary: true,
@@ -108,7 +108,7 @@ final class TokenStorageClientTests: XCTestCase {
                 secCode: .web,
                 holderType: .personal
             )),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 achValidation: true,
                 vendorData: PayabliPayInVendorData(vendorId: 7890)
             )
@@ -395,7 +395,7 @@ final class TokenStorageClientTests: XCTestCase {
                 cvv: "123",
                 billingZip: "33139"
             )),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,

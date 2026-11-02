@@ -581,7 +581,7 @@ public struct PayabliPayInVendorData : Swift::Codable, Swift::Sendable {
   public func encode(to encoder: any Swift::Encoder) throws
   public init(from decoder: any Swift::Decoder) throws
 }
-public struct PayabliPayInTokenStorageOptions : Swift::Sendable {
+public struct PayabliPayInStoreOptions : Swift::Sendable {
   public var achValidation: Swift::Bool?
   public var createAnonymous: Swift::Bool?
   public var forceCustomerCreation: Swift::Bool?
@@ -639,7 +639,7 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
 }
 public enum PayabliPayInOperation : Swift::Sendable {
-  case storePaymentMethod(_: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions())
+  case storePaymentMethod(_: PayabliSDKPayIn::PayabliPayInStoreOptions = PayabliPayInStoreOptions())
   case capture(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
   case authorize(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
 }
@@ -673,7 +673,7 @@ extension PayabliSDKPayIn::PayabliPayInVendorData : Swift::CustomStringConvertib
     get
   }
 }
-extension PayabliSDKPayIn::PayabliPayInTokenStorageOptions : Swift::CustomStringConvertible {
+extension PayabliSDKPayIn::PayabliPayInStoreOptions : Swift::CustomStringConvertible {
   public var description: Swift::String {
     get
   }
@@ -833,8 +833,8 @@ extension SwiftUICore::View {
 }
 public struct PayabliPayInStoreRequest : Swift::Sendable {
   public let instrument: PayabliSDKPayIn::PayabliPayInMethodInput
-  public let options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions
-  public init(instrument: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions)
+  public let options: PayabliSDKPayIn::PayabliPayInStoreOptions
+  public init(instrument: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInStoreOptions)
 }
 public enum PayabliPayInSummaryRows {
   public static func labelText(for field: PayabliSDKPayIn::PayabliPayInField, labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String

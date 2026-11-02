@@ -9,7 +9,7 @@ struct PayInFormSetup {
     let labels: PayabliPayInFormLabels
     let style: PayabliPayInFormStyle
     /// What a stored method is sent with; read only when the operation stores one.
-    var storeOptions = PayabliPayInTokenStorageOptions()
+    var storeOptions = PayabliPayInStoreOptions()
 }
 
 /// The two forms this app shows.
@@ -66,7 +66,7 @@ enum PayInForms {
                 fieldPlaceholders: placeholders
             ),
             style: PayInSharedConfiguration.style,
-            storeOptions: PayabliPayInTokenStorageOptions(
+            storeOptions: PayabliPayInStoreOptions(
                 // `createAnonymous` and `temporary` stay unset so the paypoint decides them:
                 // the encoder omits only nil, so `false` would opt out of both.
                 forceCustomerCreation: true,

@@ -106,7 +106,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     func testAStoringACardReturnsAToken() async throws {
         let stored = try await makeFlow().storeMethod(PayabliPayInStoreRequest(
             instrument: .card(try card()),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
@@ -241,7 +241,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     private func storedCard(on flow: PayabliPayIn) async throws -> PayabliPayInPaymentMethod {
         let stored = try await flow.storeMethod(PayabliPayInStoreRequest(
             instrument: .card(try card()),
-            options: PayabliPayInTokenStorageOptions(
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )

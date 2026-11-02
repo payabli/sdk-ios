@@ -52,7 +52,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                     cvv: "123",
                     billingZip: "33139"
                 )),
-                options: PayabliPayInTokenStorageOptions(
+                options: PayabliPayInStoreOptions(
                     createAnonymous: false,
                     temporary: true
                 )
@@ -261,7 +261,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                     cvv: "123",
                     billingZip: "33139"
                 )),
-                options: PayabliPayInTokenStorageOptions()
+                options: PayabliPayInStoreOptions()
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {

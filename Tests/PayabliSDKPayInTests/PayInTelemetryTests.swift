@@ -132,7 +132,7 @@ final class PayInTelemetryTests: XCTestCase {
 
         _ = try await flow.storeMethod(PayabliPayInStoreRequest(
             instrument: .card(Self.card),
-            options: PayabliPayInTokenStorageOptions()
+            options: PayabliPayInStoreOptions()
         ))
 
         let event = try await onlyEvent(of: flow)
@@ -210,7 +210,7 @@ final class PayInTelemetryTests: XCTestCase {
         let told = await PayInFixture.failure {
             _ = try await flow.storeMethod(PayabliPayInStoreRequest(
                 instrument: .card(Self.card),
-                options: PayabliPayInTokenStorageOptions()
+                options: PayabliPayInStoreOptions()
             ))
         }
 

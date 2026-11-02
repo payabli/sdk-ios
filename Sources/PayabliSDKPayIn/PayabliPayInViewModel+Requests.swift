@@ -70,8 +70,8 @@ extension PayabliPayInViewModel {
             ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    func mergedTokenStorageOptions() -> PayabliPayInTokenStorageOptions {
-        var options = operation.storeOptions ?? PayabliPayInTokenStorageOptions()
+    func mergedStoreOptions() -> PayabliPayInStoreOptions {
+        var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
         options.methodDescription = mergedOrderDescription()
         return options

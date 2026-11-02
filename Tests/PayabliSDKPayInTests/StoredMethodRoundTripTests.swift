@@ -57,7 +57,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(PayabliPayInTokenStorageOptions(
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayabliPayInCustomerData(customerId: 4440),
                 source: "operation-source",
