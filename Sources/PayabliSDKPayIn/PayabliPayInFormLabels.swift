@@ -62,7 +62,7 @@ public struct PayabliPayInFormLabels: Sendable {
         case .credential, .configuration, .invalidRequest, .device, .internal:
             otherMessage
         }
-        return message?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+        return Self.nonBlank(message)?.payabliCaptureTrimmed
     }
 
     /// The host's label for `field`, or the default when the host's is absent or blank.

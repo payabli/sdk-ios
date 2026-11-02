@@ -44,6 +44,17 @@ final class PaymentFormLabelTextTests: XCTestCase {
         XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: labels), "Total")
     }
 
+    func testFailureWordingBlankByTheFormsRuleFallsBackToTheSDKs() {
+        let labels = PayabliPayInFormLabels(declinedMessage: "\u{1C}\u{1F}", otherMessage: " \u{1D} ")
+
+        XCTAssertNil(labels.failureMessage(for: .declined))
+        XCTAssertNil(labels.failureMessage(for: .internal))
+        XCTAssertEqual(
+            PayabliPayInFormLabels(declinedMessage: "  Card declined  ").failureMessage(for: .declined),
+            "Card declined"
+        )
+    }
+
     func testABlankHostLabelFallsBackToTheDefault() {
         let labels = PayabliPayInFormLabels(fieldLabels: [.amount: "", .serviceFee: "   ", .surchargeFee: "Extra"])
 
