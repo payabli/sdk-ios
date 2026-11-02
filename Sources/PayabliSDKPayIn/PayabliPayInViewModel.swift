@@ -140,13 +140,14 @@ final class PayabliPayInViewModel: ObservableObject {
             configuration: configuration,
             labels: labels
         )
+        // The operation is what a submission sends, so it is taken even when nothing drawn changes.
+        self.operation = operation
         guard nextSignature != lifecycleSignature else { return }
 
         objectWillChange.send()
         // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
         let replacesFlow = component !== self.component
         self.component = component
-        self.operation = operation
         self.configuration = configuration
         self.labels = labels
         lifecycleSignature = nextSignature

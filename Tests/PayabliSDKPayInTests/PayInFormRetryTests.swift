@@ -44,6 +44,62 @@ final class PayInFormRetryTests: XCTestCase {
         XCTAssertEqual(transport.sentKeys.first, transport.sentKeys.last, "the retry did not resend the held key")
     }
 
+    func testAnUpdateToAnEmptyPaymentReferenceIsTheOperationSubmitted() async {
+        transport.script = [.approved]
+        let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        let payment = PayabliPayInPaymentDetails(totalAmount: 12.34)
+        let viewModel = PayabliPayInViewModel(
+            component: flow,
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: payment)),
+            configuration: configuration
+        )
+        viewModel.update(
+            component: flow,
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: payment, paymentReference: "")),
+            configuration: configuration,
+            labels: PayabliPayInFormLabels()
+        )
+        fillCard(viewModel)
+
+        let error = await PayInFixture.failure { _ = try await viewModel.submit() }
+
+        guard case PayabliPayInError.invalidInput = error else { return XCTFail("Wrong error: \(String(describing: error))") }
+        XCTAssertTrue(transport.sentKeys.isEmpty, "the blank reference was refused before sending")
+    }
+
+    func testATapSubmitsTheOperationTheFormHoldsNow() async throws {
+        transport.script = [.approved]
+        let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        let payment = PayabliPayInPaymentDetails(totalAmount: 12.34)
+        let viewModel = PayabliPayInViewModel(
+            component: flow,
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: payment)),
+            configuration: configuration
+        )
+        fillCard(viewModel)
+        var failures: [any PayabliError] = []
+        var completions = 0
+        let form = PayabliPayInForm(
+            viewModel: viewModel,
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: payment, paymentReference: "")),
+            onCompleted: { _ in completions += 1 },
+            onFailed: { failures.append($0) },
+            onMethodChanged: { _ in }
+        )
+
+        form.submitForOutcome()
+        let deadline = Date().addingTimeInterval(5)
+        while failures.isEmpty, completions == 0, Date() < deadline {
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
+
+        XCTAssertEqual(completions, 0)
+        guard case PayabliPayInError.invalidInput = try XCTUnwrap(failures.first) else {
+            return XCTFail("Wrong error: \(failures)")
+        }
+        XCTAssertTrue(transport.sentKeys.isEmpty, "the blank reference was refused before sending")
+    }
+
     private func fillCard(_ viewModel: PayabliPayInViewModel) {
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"

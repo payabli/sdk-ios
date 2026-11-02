@@ -80,11 +80,12 @@ public struct PayabliPayInForm: View {
         ))
     }
 
-    /// Creates the form, bound to state already built, taking the component, operation,
-    /// configuration and wording that state holds.
+    /// Creates the form, bound to state already built, taking the component, configuration and
+    /// wording that state holds.
     ///
     /// - Parameters:
     ///   - viewModel: the form's state: the values it draws and submits.
+    ///   - operation: the operation the form is handed, nil for the one the state holds.
     ///   - style: the colors, fonts and spacing the form draws with, nil to read the environment's.
     ///   - onCompleted: called once with the outcome of the submission: `.method` or `.payment`.
     ///   - onFailed: called with the failure the flow threw, unchanged, when a submission did not complete.
@@ -92,13 +93,14 @@ public struct PayabliPayInForm: View {
     @MainActor
     init(
         viewModel: PayabliPayInViewModel,
+        operation: PayabliPayInOperation? = nil,
         style: PayabliPayInFormStyle? = nil,
         onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,
         onFailed: @escaping (any PayabliError) -> Void,
         onMethodChanged: @escaping (PayabliPayInMethodType) -> Void
     ) {
         self.payIn = viewModel.component
-        self.operation = viewModel.operation
+        self.operation = operation ?? viewModel.operation
         self.configuration = viewModel.configuration
         self.labels = viewModel.labels
         self.explicitStyle = style
@@ -285,6 +287,8 @@ public struct PayabliPayInForm: View {
     /// Sends the filled form through its operation and reports the outcome to the host.
     @MainActor
     func submitForOutcome() {
+        // The tap sends the operation the form holds now, whatever the last change check concluded.
+        syncViewModel()
         Task {
             do {
                 let result = try await viewModel.submit()
