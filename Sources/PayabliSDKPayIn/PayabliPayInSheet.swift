@@ -67,7 +67,7 @@ public extension View {
         isPresented: Binding<Bool>,
         payIn: PayabliPayIn,
         operation: PayabliPayInOperation,
-        configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(),
+        configuration: PayabliPayInFormConfiguration,
         labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
         sheetConfiguration: PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(),
         style: PayabliPayInFormStyle? = nil,

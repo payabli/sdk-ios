@@ -128,7 +128,7 @@ public enum PayabliPayInFormSuccess {
   case method(PayabliSDKPayIn::PayabliPayInStoredMethod)
 }
 @_Concurrency::MainActor @preconcurrency public struct PayabliPayInForm : SwiftUICore::View {
-  @_Concurrency::MainActor public init(payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void)
+  @_Concurrency::MainActor public init(payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration, labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void)
   @_Concurrency::MainActor @preconcurrency public var body: some SwiftUICore::View {
     get
   }
@@ -301,7 +301,6 @@ public struct PayabliPayInFormLabels : Swift::Sendable {
   public let outcomeUnknownMessage: Swift::String?
   public let otherMessage: Swift::String?
   public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, submitButton: Swift::String? = nil, fieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = Self.defaultFieldLabels, fieldPlaceholders: [PayabliSDKPayIn::PayabliPayInField : Swift::String] = [:], total: Swift::String? = nil, declinedMessage: Swift::String? = nil, retryLaterMessage: Swift::String? = nil, outcomeUnknownMessage: Swift::String? = nil, otherMessage: Swift::String? = nil)
-  public func failureMessage(for category: PayabliSDKCore::PayabliErrorCategory) -> Swift::String?
   public func label(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String
   public func placeholder(for field: PayabliSDKPayIn::PayabliPayInField) -> Swift::String?
   public static let defaultFieldLabels: [PayabliSDKPayIn::PayabliPayInField : Swift::String]
@@ -842,7 +841,7 @@ public struct PayabliPayInSheetConfiguration {
   public init(title: Swift::String? = nil, subtitle: Swift::String? = nil, dismissButton: PayabliSDKPayIn::PayabliPayInSheetDismissButton = .close, dismissesOnSuccess: Swift::Bool = true, detents: Swift::Set<SwiftUI::PresentationDetent> = [.medium, .large], dragIndicatorVisibility: SwiftUICore::Visibility = .visible, contentInsets: SwiftUICore::EdgeInsets = EdgeInsets(top: 20, leading: 20, bottom: 24, trailing: 20), movesFormHeaderToSheetHeader: Swift::Bool = true, sizesToContentWhenPossible: Swift::Bool = true, expandsToLargeWhenContentDoesNotFit: Swift::Bool = true)
 }
 extension SwiftUICore::View {
-  @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(), labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void) -> some SwiftUICore::View
+  @_Concurrency::MainActor @preconcurrency public func payabliPayInSheet(isPresented: SwiftUICore::Binding<Swift::Bool>, payIn: PayabliSDKPayIn::PayabliPayIn, operation: PayabliSDKPayIn::PayabliPayInOperation, configuration: PayabliSDKPayIn::PayabliPayInFormConfiguration, labels: PayabliSDKPayIn::PayabliPayInFormLabels = PayabliPayInFormLabels(), sheetConfiguration: PayabliSDKPayIn::PayabliPayInSheetConfiguration = PayabliPayInSheetConfiguration(), style: PayabliSDKPayIn::PayabliPayInFormStyle? = nil, onCompleted: @escaping (PayabliSDKPayIn::PayabliPayInFormSuccess) -> Swift::Void, onFailed: @escaping (any PayabliSDKCore::PayabliError) -> Swift::Void, onMethodChanged: @escaping (PayabliSDKPayIn::PayabliPayInMethodType) -> Swift::Void) -> some SwiftUICore::View
   
 }
 public struct PayabliPayInStoreRequest : Swift::Sendable {

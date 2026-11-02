@@ -76,6 +76,7 @@ struct CheckoutView: View {
         PayabliPayInForm(
             payIn: payIn,
             operation: .capture,
+            configuration: PayabliPayInFormConfiguration(),
             onCompleted: { success in
                 // Store the identifiers; don't log them.
                 switch success {

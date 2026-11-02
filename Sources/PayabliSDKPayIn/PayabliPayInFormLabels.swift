@@ -51,7 +51,7 @@ public struct PayabliPayInFormLabels: Sendable {
     /// - Parameter category: the failure category the message is drawn for.
     /// - Returns: the host's message, trimmed, or nil when it is absent or blank, in which case the
     ///   SDK's own message for the category is drawn.
-    public func failureMessage(for category: PayabliErrorCategory) -> String? {
+    func failureMessage(for category: PayabliErrorCategory) -> String? {
         let message: String? = switch category {
         case .declined:
             declinedMessage

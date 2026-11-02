@@ -57,7 +57,7 @@ public struct PayabliPayInForm: View {
     public init(
         payIn: PayabliPayIn,
         operation: PayabliPayInOperation,
-        configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(),
+        configuration: PayabliPayInFormConfiguration,
         labels: PayabliPayInFormLabels = PayabliPayInFormLabels(),
         style: PayabliPayInFormStyle? = nil,
         onCompleted: @escaping (PayabliPayInFormSuccess) -> Void,

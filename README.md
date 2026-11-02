@@ -270,6 +270,7 @@ struct CheckoutView: View {
         PayabliPayInForm(
             payIn: payIn,
             operation: .capture,
+            configuration: PayabliPayInFormConfiguration(),
             onCompleted: { success in
                 if case let .payment(result) = success {
                     order.paymentTransId = result.transaction?.paymentTransId
