@@ -208,7 +208,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: storeConfiguration
         )
 
@@ -299,7 +299,7 @@ final class PayabliPayInTests: XCTestCase {
         await transport.waitForFirstRequest()
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels()
         )
@@ -347,7 +347,7 @@ final class PayabliPayInTests: XCTestCase {
         await transport.waitForFirstRequest()
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels()
         )

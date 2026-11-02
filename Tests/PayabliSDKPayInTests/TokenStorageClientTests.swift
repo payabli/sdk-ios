@@ -31,7 +31,7 @@ final class TokenStorageClientTests: XCTestCase {
                 cvv: "123",
                 billingZip: "12345"
             )),
-            options: PayabliPayInOptions(
+            options: PayabliPayInTokenStorageOptions(
                 createAnonymous: true,
                 forceCustomerCreation: false,
                 temporary: true,
@@ -108,7 +108,7 @@ final class TokenStorageClientTests: XCTestCase {
                 secCode: .web,
                 holderType: .personal
             )),
-            options: PayabliPayInOptions(
+            options: PayabliPayInTokenStorageOptions(
                 achValidation: true,
                 vendorData: PayabliPayInVendorData(vendorId: 7890)
             )
@@ -395,7 +395,7 @@ final class TokenStorageClientTests: XCTestCase {
                 cvv: "123",
                 billingZip: "33139"
             )),
-            options: PayabliPayInOptions(
+            options: PayabliPayInTokenStorageOptions(
                 createAnonymous: false,
                 forceCustomerCreation: true,
                 temporary: false,
@@ -546,7 +546,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
@@ -609,7 +609,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
@@ -663,7 +663,7 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -711,7 +711,7 @@ final class TokenStorageClientTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111111111111111"
@@ -751,7 +751,7 @@ final class TokenStorageClientTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount

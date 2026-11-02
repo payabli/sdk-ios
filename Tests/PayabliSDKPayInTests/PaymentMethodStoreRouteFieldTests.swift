@@ -11,12 +11,12 @@ final class PaymentMethodStoreRouteFieldTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration,
             onCompleted: { _ in },
             onFailed: { _ in },

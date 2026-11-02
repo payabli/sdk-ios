@@ -352,7 +352,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
                     responseBody: #"{"isSuccess":false,"responseText":"Invalid card number"}"#
                 )
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         fillCard(viewModel)

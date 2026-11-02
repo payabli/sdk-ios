@@ -85,7 +85,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let content = PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 showsBaseAmount: false
@@ -123,7 +123,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let content = PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(total: "Amount due"),
             sheetConfiguration: PayabliPayInSheetConfiguration(movesFormHeaderToSheetHeader: true),
@@ -142,7 +142,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let content = PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(
                 declinedMessage: "That card didn't work.",
@@ -304,7 +304,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
     ) -> PayabliPayInForm {
         PayabliPayInForm(
             payIn: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration,
             labels: PayabliPayInFormLabels(),
             onCompleted: { _ in },

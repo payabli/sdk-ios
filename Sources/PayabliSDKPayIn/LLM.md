@@ -113,7 +113,7 @@ cannot show it being supplied.
 
 | Value | Hosted form behavior | Direct API |
 | --- | --- | --- |
-| `.storePaymentMethod` | Collects card or bank account and calls token storage. | `storeMethod(_:)` |
+| `.storePaymentMethod(options)` | Collects card or bank account and calls token storage with `options`. `options` defaults to empty. | `storeMethod(_:)` |
 | `.capture(configuration)` | Collects card or bank account and sends a MoneyIn getpaid request built from `configuration`. | `capture(_:)` supports card, bank account, stored method, cloud, check, and cash. |
 | `.authorize(configuration)` | Collects card only and sends a MoneyIn authorize request built from `configuration`. | `authorize(_:)` accepts card, stored card, and cloud. |
 
@@ -232,7 +232,7 @@ let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
         cvv: "123",
         billingZip: "33139"
     )),
-    options: PayabliPayInOptions(
+    options: PayabliPayInTokenStorageOptions(
         createAnonymous: false,
         forceCustomerCreation: true,
         source: "ios-sdk"
@@ -250,7 +250,7 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
         secCode: .web,
         holderType: .personal
     )),
-    options: PayabliPayInOptions()
+    options: PayabliPayInTokenStorageOptions()
 ))
 ```
 
@@ -276,8 +276,9 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
 
-`PayabliPayInOptions` is a typealias for
-`PayabliPayInTokenStorageOptions`. It carries no idempotency key: a repeat is not
+`PayabliPayInTokenStorageOptions` is what a store request carries besides the
+instrument, and what a form's `.storePaymentMethod(options)` sends. The form
+configuration carries none. It carries no idempotency key: a repeat is not
 recognizable on the store route, so a key sent there is read by nothing.
 
 | Field | Meaning |

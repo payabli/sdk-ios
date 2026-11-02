@@ -205,7 +205,6 @@ public struct PayabliPayInHiddenValues : Swift::Sendable {
   public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
   public init(accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, deviceId: Swift::String? = nil, methodDescription: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil)
 }
-public typealias PayabliPayInOptions = PayabliSDKPayIn::PayabliPayInTokenStorageOptions
 public struct PayabliPayInInputSize : Swift::Sendable, Swift::Equatable {
   public let width: CoreFoundation::CGFloat?
   public let height: CoreFoundation::CGFloat
@@ -255,7 +254,6 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public let cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public let bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public let hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues
-  public let options: PayabliSDKPayIn::PayabliPayInOptions
   public let labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout
   public let showsFieldLabels: Swift::Bool
   public let hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
@@ -269,7 +267,7 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public let paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration
   public let showsBaseAmount: Swift::Bool
   public let showsFailureMessage: Swift::Bool
-  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), options: PayabliSDKPayIn::PayabliPayInOptions = PayabliPayInOptions(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true, showsFailureMessage: Swift::Bool = true)
+  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true, showsFailureMessage: Swift::Bool = true)
   public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
 }
@@ -641,7 +639,7 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
 }
 public enum PayabliPayInOperation : Swift::Sendable {
-  case storePaymentMethod
+  case storePaymentMethod(_: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions())
   case capture(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
   case authorize(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
 }

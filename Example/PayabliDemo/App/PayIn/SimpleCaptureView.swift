@@ -141,7 +141,8 @@ struct SimpleCaptureView: View {
             operation: operation,
             configuration: customization.configuration(for: operation),
             labels: customization.labels(for: operation),
-            style: customization.style
+            style: customization.style,
+            storeOptions: PayInFormCustomization.storeOptions
         )
     }
 

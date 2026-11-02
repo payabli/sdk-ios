@@ -15,7 +15,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111 1111 1111 1111"
@@ -37,7 +37,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
         )
         viewModel.accountHolder = "Jane Doe"
@@ -50,6 +50,38 @@ final class StoredMethodRoundTripTests: XCTestCase {
 
         XCTAssertEqual(paymentMethod["method"] as? String, "ach")
         XCTAssertEqual(paymentMethod["storedMethodId"] as? String, "stored-123")
+    }
+
+    func testAFormStoreSendsTheOperationsOptions() async throws {
+        let transport = RoutedTransport()
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            operation: .storePaymentMethod(PayabliPayInTokenStorageOptions(
+                forceCustomerCreation: true,
+                customerData: PayabliPayInCustomerData(customerId: 4440),
+                source: "operation-source",
+                validation: PayabliPayInValidation(requiresLuhnCheck: false)
+            )),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
+        )
+        viewModel.cardNumber = "4111 1111 1111 1112"
+        viewModel.cardExpiration = "02/25"
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardCvv = "321"
+        viewModel.cardZip = "33139"
+
+        XCTAssertNil(viewModel.cardNumberValidationMessage, "the operation turned the Luhn check off")
+        _ = try await viewModel.submit()
+
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.first)
+        XCTAssertEqual(request.path, "/api/TokenStorage/add")
+        XCTAssertEqual(request.query.first { $0.name == "forceCustomerCreation" }?.value, "true")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(request.body)) as? [String: Any])
+        XCTAssertEqual(body["source"] as? String, "operation-source")
+        let customer = try XCTUnwrap(body["customerData"] as? [String: Any])
+        XCTAssertEqual(customer["customerId"] as? Int, 4440)
     }
 
     private func chargedPaymentMethod(

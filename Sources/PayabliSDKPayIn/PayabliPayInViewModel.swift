@@ -483,7 +483,7 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     private var validation: PayabliPayInValidation {
-        operation.requestConfiguration?.validation ?? configuration.options.validation
+        operation.requestConfiguration?.validation ?? operation.storeOptions?.validation ?? .default
     }
 
     private static func availableMethods(

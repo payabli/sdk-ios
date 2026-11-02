@@ -52,7 +52,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                     cvv: "123",
                     billingZip: "33139"
                 )),
-                options: PayabliPayInOptions(
+                options: PayabliPayInTokenStorageOptions(
                     createAnonymous: false,
                     temporary: true
                 )
@@ -291,7 +291,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,

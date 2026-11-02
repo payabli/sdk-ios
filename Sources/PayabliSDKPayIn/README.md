@@ -123,7 +123,7 @@ In sandbox, use Payabli's [test cards](https://docs.payabli.com/guides/test-acco
 ### Store a payment method and charge it later
 
 `storeMethod(_:)` saves a card or bank account and returns a `PayabliPayInStoredMethod`. The form does
-the same with `.storePaymentMethod`. Its `storedMethodId` is optional, and is `nil` when the service's
+the same with `.storePaymentMethod(options)`, which sends those options with what the payer entered. Its `storedMethodId` is optional, and is `nil` when the service's
 answer names no ID. To charge a saved method, pass `.stored(.init(method: .card, storedMethodId: id))`
 as the payment method.
 
@@ -204,9 +204,9 @@ retried payment refused for a rate limit or a credential is still one that may h
 
 | Operation | What a form submission does |
 |---|---|
-| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. This is the default |
-| `.capture` | Charges the payment method |
-| `.authorize` | Authorizes a card without capturing it |
+| `.storePaymentMethod(options)` | Saves the card or bank account as a stored payment method, sent with `options` |
+| `.capture(configuration)` | Charges the payment method for the payment `configuration` describes |
+| `.authorize(configuration)` | Authorizes a card without capturing it |
 
 ### Methods
 

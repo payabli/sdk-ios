@@ -5,8 +5,9 @@ import Foundation
 /// A payment carries everything it sends except the payment method, so a form can be set up before the payer
 /// has typed anything.
 public enum PayabliPayInOperation: Sendable {
-    /// Stores the payment method, so a later payment charges it without the details again.
-    case storePaymentMethod
+    /// Stores the payment method, so a later payment charges it without the details again. The options are
+    /// everything the stored method is sent with besides the details the payer enters.
+    case storePaymentMethod(PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions())
     /// Takes the payment the configuration describes.
     case capture(PayabliPayInRequestConfiguration)
     /// Places a hold for the payment the configuration describes without taking it. Card only.
@@ -29,6 +30,14 @@ extension PayabliPayInOperation {
         }
     }
 
+    /// What a stored method is sent with, or nil when the operation sends a payment instead.
+    var storeOptions: PayabliPayInTokenStorageOptions? {
+        switch self {
+        case let .storePaymentMethod(options): options
+        case .capture, .authorize: nil
+        }
+    }
+
     /// The payment this operation sends, or nil when it stores a method instead.
     var requestConfiguration: PayabliPayInRequestConfiguration? {
         switch self {
@@ -40,7 +49,8 @@ extension PayabliPayInOperation {
     var payabliViewModelSignature: String {
         payabliFramedSignature([
             "kind:\(kind.rawValue)",
-            "request:\(requestConfiguration?.payabliViewModelSignature ?? "")"
+            "request:\(requestConfiguration?.payabliViewModelSignature ?? "")",
+            "store:\(storeOptions?.payabliViewModelSignature ?? "")"
         ])
     }
 }

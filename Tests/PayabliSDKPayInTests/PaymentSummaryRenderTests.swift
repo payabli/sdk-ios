@@ -28,7 +28,7 @@ final class PaymentSummaryRenderTests: XCTestCase {
     /// The form's height for a capture of `paymentDetails`, or for storing a method when there are none.
     private func renderedHeight(_ paymentDetails: PayabliPayInPaymentDetails?) -> CGFloat {
         let operation = paymentDetails.map { PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(paymentDetails: $0)) }
-            ?? .storePaymentMethod
+            ?? .storePaymentMethod()
         let host = PayInUIKitHostingSupport.host(PayabliPayInForm(
             payIn: flowOnSession(),
             operation: operation,

@@ -159,7 +159,7 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration,
             labels: labels,
             onCompleted: { _ in },

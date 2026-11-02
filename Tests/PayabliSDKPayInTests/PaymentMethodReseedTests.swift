@@ -25,14 +25,14 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testAnUpdateLeavesTypedValuesAlone() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         type(into: viewModel)
 
         viewModel.update(
             component: makeComponent(entryPoint: "a-different-entry"),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount
@@ -56,7 +56,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card])
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration
         )
         var publishes = 0
@@ -65,7 +65,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: configuration,
             labels: PayabliPayInFormLabels()
         )
@@ -74,7 +74,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount]),
             labels: PayabliPayInFormLabels()
         )
@@ -87,7 +87,7 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testAnUpdateReachesTheConfigurationItCarries() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .card
@@ -97,7 +97,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: makeComponent(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount
@@ -116,7 +116,7 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testConfiguredCustomerDataIsMergedRatherThanSeededIntoFields() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardSections: [Self.customerSection]
@@ -128,7 +128,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         // customer arriving mid-entry is the case that could overwrite a field.
         viewModel.update(
             component: makeComponent(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardSections: [Self.customerSection],
@@ -164,7 +164,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: true)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -176,7 +176,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: false),
             labels: PayabliPayInFormLabels()
         )
@@ -214,7 +214,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 hiddenValues: hiddenValues
@@ -231,7 +231,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         // drops typed values, not only by the initial build.
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 hiddenValues: hiddenValues
@@ -256,14 +256,14 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: true)
         )
         viewModel.billingZip = "33139"
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: false),
             labels: PayabliPayInFormLabels()
         )
@@ -271,7 +271,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: true),
             labels: PayabliPayInFormLabels()
         )
@@ -286,7 +286,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.bankConfiguration(showingOptionalFields: true)
         )
         viewModel.accountHolder = "Jane Business"
@@ -304,7 +304,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.bankConfiguration(showingOptionalFields: false),
             labels: PayabliPayInFormLabels()
         )
@@ -331,14 +331,14 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingSecCode: true)
         )
         viewModel.secCode = .ppd
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingSecCode: false),
             labels: PayabliPayInFormLabels()
         )
@@ -346,7 +346,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingSecCode: true),
             labels: PayabliPayInFormLabels()
         )
@@ -361,7 +361,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         viewModel.cardholderName = "Jane Doe"
@@ -376,7 +376,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount
@@ -396,7 +396,7 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels()
         )

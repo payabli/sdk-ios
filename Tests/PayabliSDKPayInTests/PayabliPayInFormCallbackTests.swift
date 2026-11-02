@@ -14,7 +14,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let host = PayInUIKitHostingSupport.host(
             form(
                 on: flowOnSession(),
-                operation: .storePaymentMethod,
+                operation: .storePaymentMethod(),
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount,
                 recorder: recorder
@@ -32,7 +32,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let host = PayInUIKitHostingSupport.host(
             form(
                 on: payIn,
-                operation: .storePaymentMethod,
+                operation: .storePaymentMethod(),
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount,
                 recorder: recorder
@@ -43,7 +43,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
 
         host.rootView = form(
             on: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             allowedMethods: [.card],
             defaultMethod: .bankAccount,
             recorder: recorder
@@ -59,7 +59,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let host = PayInUIKitHostingSupport.host(
             form(
                 on: payIn,
-                operation: .storePaymentMethod,
+                operation: .storePaymentMethod(),
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount,
                 recorder: recorder
@@ -70,7 +70,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
 
         host.rootView = form(
             on: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             allowedMethods: [.card],
             defaultMethod: .bankAccount,
             recorder: recorder
@@ -79,7 +79,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
 
         host.rootView = form(
             on: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             allowedMethods: [.card, .bankAccount],
             defaultMethod: .bankAccount,
             recorder: recorder
@@ -99,7 +99,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let host = PayInUIKitHostingSupport.host(
             form(
                 on: payIn,
-                operation: .storePaymentMethod,
+                operation: .storePaymentMethod(),
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount,
                 recorder: recorder
@@ -109,7 +109,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
 
         host.rootView = form(
             on: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             allowedMethods: [.card, .bankAccount],
             defaultMethod: .bankAccount,
             labels: PayabliPayInFormLabels(fieldLabels: [.accountHolder: "Bank account owner"]),
@@ -228,7 +228,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             on: storeFlow(
                 on: MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.storedMethodBody)
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             recorder: recorder
         )
 
@@ -251,7 +251,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             on: storeFlow(
                 on: MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.storeRefusalBody)
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             recorder: recorder
         )
 
@@ -275,7 +275,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             on: storeFlow(
                 on: MockPaymentCaptureTransport(statusCode: 400, responseBody: Self.storeBadRequestBody)
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             recorder: recorder
         )
 
@@ -300,7 +300,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let recorder = CallbackRecorder()
         let form = filledBankForm(
             on: storeFlow(on: RecordingIdempotencyTransport(failure: cause)),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             recorder: recorder
         )
 
@@ -369,7 +369,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: payIn,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: allowedMethods,
                 defaultMethod: .bankAccount

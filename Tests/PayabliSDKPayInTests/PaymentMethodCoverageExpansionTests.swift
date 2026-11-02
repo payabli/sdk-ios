@@ -183,7 +183,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let rootView = PaymentMethodSheetHarness(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(
                 title: "Inline title",
@@ -218,7 +218,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         let view = PayabliPayInSheetContent(
             isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(
                 title: "Inline title",
@@ -257,7 +257,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         let view = PayabliPayInSheetContent(
             isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(
                 title: "Inline card form",
@@ -332,7 +332,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: flowOnSession(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
             sheetConfiguration: PayabliPayInSheetConfiguration(
@@ -356,7 +356,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -397,7 +397,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -447,7 +447,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 cardBrandIconPlacement: .leading
@@ -484,7 +484,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInForm(
             payIn: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             onCompleted: { _ in },
             onFailed: { _ in },

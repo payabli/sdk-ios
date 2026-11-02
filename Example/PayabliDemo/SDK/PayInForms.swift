@@ -8,6 +8,8 @@ struct PayInFormSetup {
     let configuration: PayabliPayInFormConfiguration
     let labels: PayabliPayInFormLabels
     let style: PayabliPayInFormStyle
+    /// What a stored method is sent with; read only when the operation stores one.
+    var storeOptions = PayabliPayInTokenStorageOptions()
 }
 
 /// The two forms this app shows.
@@ -50,15 +52,6 @@ enum PayInForms {
                     secCode: .web,
                     methodDescription: QAIdentity.current.note("save")
                 ),
-                options: PayabliPayInOptions(
-                    // `createAnonymous` and `temporary` are left unset so the paypoint's
-                    // own settings decide them. The encoder omits only nil, so passing
-                    // `false` sends `createAnonymous=false` and `temporary=false`, which
-                    // opts the sample out of two behaviours on an integrator's behalf.
-                    // The sibling's store options set neither.
-                    forceCustomerCreation: true,
-                    source: "ios-payment-method-qa"
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
@@ -72,7 +65,13 @@ enum PayInForms {
                 submitButton: "Save payment method",
                 fieldPlaceholders: placeholders
             ),
-            style: PayInSharedConfiguration.style
+            style: PayInSharedConfiguration.style,
+            storeOptions: PayabliPayInTokenStorageOptions(
+                // `createAnonymous` and `temporary` stay unset so the paypoint decides them:
+                // the encoder omits only nil, so `false` would opt out of both.
+                forceCustomerCreation: true,
+                source: "ios-payment-method-qa"
+            )
         )
     }
 

@@ -109,7 +109,7 @@ final class PaymentMethodSwitchTests: XCTestCase {
     ) -> PayabliPayInViewModel {
         PayabliPayInViewModel(
             component: flowOnSession(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: defaultMethod,

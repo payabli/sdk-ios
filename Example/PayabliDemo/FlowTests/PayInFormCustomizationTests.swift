@@ -155,10 +155,9 @@ final class PayInFormCustomizationTests: XCTestCase {
 
     func testACaptureAndASaveNameTheSameSource() {
         let capture = PayInRequests.freshCapture(suppliesCustomer: false, source: PayInFormCustomization.source)
-        let save = PayInFormCustomization().configuration(for: .storedMethod)
 
         XCTAssertEqual(capture.source, PayInFormCustomization.source)
-        XCTAssertEqual(save.options.source, PayInFormCustomization.source)
+        XCTAssertEqual(PayInFormCustomization.storeOptions.source, PayInFormCustomization.source)
     }
 
     func testAnAuthorizationOffersTheCardAlone() {

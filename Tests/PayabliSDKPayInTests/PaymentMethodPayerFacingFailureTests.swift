@@ -395,7 +395,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
     private func filledStoreForm(on component: PayabliPayIn) -> PayabliPayInViewModel {
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"

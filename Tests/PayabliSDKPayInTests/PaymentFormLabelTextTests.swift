@@ -151,7 +151,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
         PayabliPayInSheetContent(
             isPresented: .constant(true),
             payIn: flowOnSession(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: labels,
             sheetConfiguration: sheetConfiguration,

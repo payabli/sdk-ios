@@ -34,7 +34,6 @@ extension PayabliPayInFormConfiguration {
             "cardFields:\(cardFieldOrder.map(\.rawValue).joined(separator: ","))",
             "achFields:\(bankFieldOrder.map(\.rawValue).joined(separator: ","))",
             "hidden:\(hiddenValues.payabliViewModelSignature)",
-            "options:\(options.payabliViewModelSignature)",
             "formatting:\(formatting.payabliViewModelSignature)",
             "required:\(requiredFields.map(\.rawValue).sorted().joined(separator: ","))",
             "paymentSummary:\(paymentSummary.payabliViewModelSignature)",

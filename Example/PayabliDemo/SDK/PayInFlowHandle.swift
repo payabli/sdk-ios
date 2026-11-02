@@ -46,10 +46,14 @@ final class PayInFlowHandle: ObservableObject {
     /// A reversal runs as a direct call and is never drawn as a form; its case only keeps the switch total.
     ///
     /// - Parameter purpose: what the form is for.
+    /// - Parameter storeOptions: what a stored method is sent with; read only when `purpose` stores one.
     /// - Returns: the operation to hand the form.
-    func formOperation(for purpose: PayInOperation) -> PayabliPayInOperation {
+    func formOperation(
+        for purpose: PayInOperation,
+        storeOptions: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
+    ) -> PayabliPayInOperation {
         switch purpose {
-        case .storedMethod: .storePaymentMethod
+        case .storedMethod: .storePaymentMethod(storeOptions)
         case .capture, .void: .capture(request)
         case .authorize: .authorize(request)
         }

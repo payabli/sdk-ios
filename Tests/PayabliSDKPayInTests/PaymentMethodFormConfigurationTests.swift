@@ -340,7 +340,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
     @MainActor
     func testViewModelInputLimitHelpers() {
-        let viewModel = PayabliPayInViewModel(component: component(), operation: .storePaymentMethod)
+        let viewModel = PayabliPayInViewModel(component: component(), operation: .storePaymentMethod())
 
         XCTAssertEqual(viewModel.limitCardholderName(String(repeating: "A", count: 61)).count, 60)
         XCTAssertEqual(viewModel.formatCardNumber(String(repeating: "4", count: 25)).digitsOnly.count, 19)
@@ -379,7 +379,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelFormatsTypedExpirationAndDefaultsPickerSelection() throws {
         let viewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 formatting: PayabliPayInFormatting(expirationSeparator: "-")
@@ -425,7 +425,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelReportsInvalidCardNumberAsUserTypes() {
         let viewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
 
@@ -454,7 +454,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 environment: .sandbox,
                 transport: ThrowingPaymentMethodTransport(error: PaymentMethodTestError.transportBoom)
             ),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardholderName = "Jane Doe"
@@ -477,7 +477,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelRequiresACHCustomerFieldsBeforeSubmit() async {
         let viewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -525,7 +525,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelEvaluatesRequiredPickerAndExpirationFields() {
         let cardViewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 requiredFields: [.cardExpiration]
@@ -544,7 +544,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
         let achViewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -562,7 +562,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testViewModelBuildsExpirationFromMonthYearSelection() {
         let viewModel = PayabliPayInViewModel(
             component: component(),
-            operation: .storePaymentMethod,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
 

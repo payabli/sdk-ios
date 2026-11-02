@@ -54,7 +54,7 @@ extension PayabliPayInViewModel {
 
     func mergedCustomerData() -> PayabliPayInCustomerData? {
         var customer = operation.requestConfiguration?.customerData
-            ?? configuration.options.customerData
+            ?? operation.storeOptions?.customerData
             ?? PayabliPayInCustomerData()
         customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
         customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
@@ -71,7 +71,7 @@ extension PayabliPayInViewModel {
     }
 
     func mergedTokenStorageOptions() -> PayabliPayInTokenStorageOptions {
-        var options = configuration.options
+        var options = operation.storeOptions ?? PayabliPayInTokenStorageOptions()
         options.customerData = mergedCustomerData()
         options.methodDescription = mergedOrderDescription()
         return options

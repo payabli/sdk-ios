@@ -92,8 +92,6 @@ public struct PayabliPayInHiddenValues: Sendable {
     }
 }
 
-public typealias PayabliPayInOptions = PayabliPayInTokenStorageOptions
-
 public struct PayabliPayInInputSize: Sendable, Equatable {
     public let width: CGFloat?
     public let height: CGFloat
@@ -220,7 +218,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
     public let cardFieldOrder: [PayabliPayInField]
     public let bankFieldOrder: [PayabliPayInField]
     public let hiddenValues: PayabliPayInHiddenValues
-    public let options: PayabliPayInOptions
     public let labelLayout: PayabliPayInLabelLayout
     public let showsFieldLabels: Bool
     public let hiddenFieldLabels: Set<PayabliPayInField>
@@ -245,7 +242,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         cardSections: [PayabliPayInFieldSection]? = nil,
         bankSections: [PayabliPayInFieldSection]? = nil,
         hiddenValues: PayabliPayInHiddenValues = PayabliPayInHiddenValues(),
-        options: PayabliPayInOptions = PayabliPayInOptions(),
         labelLayout: PayabliPayInLabelLayout = .external,
         showsFieldLabels: Bool? = nil,
         hiddenFieldLabels: Set<PayabliPayInField> = [],
@@ -282,7 +278,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.cardSections = normalizedCardSections
         self.bankSections = normalizedBankSections
         self.hiddenValues = hiddenValues
-        self.options = options
         self.labelLayout = labelLayout
         self.showsFieldLabels = showsFieldLabels ?? (labelLayout == .external)
         self.hiddenFieldLabels = hiddenFieldLabels
