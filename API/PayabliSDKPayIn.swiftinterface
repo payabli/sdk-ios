@@ -138,8 +138,8 @@ public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Ident
   case cardholderName
   case cardNumber
   case cardExpiration
-  case cardCvv
-  case cardZip
+  case cardSecurityCode
+  case cardPostalCode
   case accountHolder
   case routingNumber
   case accountNumber
@@ -152,7 +152,7 @@ public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Ident
   case lastName
   case customerNumber
   case billingEmail
-  case billingZip
+  case billingPostalCode
   case amount
   case serviceFee
   case surchargeFee

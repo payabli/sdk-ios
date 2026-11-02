@@ -422,7 +422,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: showingBillingZip
-                ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingZip])]
+                ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingPostalCode])]
                 : nil
         )
     }
@@ -447,7 +447,7 @@ final class PaymentMethodReseedTests: XCTestCase {
                     ),
                     PayabliPayInFieldSection(
                         title: "Customer",
-                        fields: [.methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip]
+                        fields: [.methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
                     )
                 ]
                 : [

@@ -408,12 +408,12 @@ let placeholderFields: [PayabliPayInField] = [
     .cardholderName,
     .cardNumber,
     .cardExpiration,
-    .cardCvv,
-    .cardZip,
+    .cardSecurityCode,
+    .cardPostalCode,
     .firstName,
     .lastName,
     .billingEmail,
-    .billingZip
+    .billingPostalCode
 ]
 
 let labels = PayabliPayInFormLabels(
@@ -421,8 +421,8 @@ let labels = PayabliPayInFormLabels(
     subtitle: "Enter your payment details",
     submitButton: "Submit Payment",
     fieldLabels: PayabliPayInFormLabels.defaultFieldLabels.merging([
-        .cardZip: "Postal code",
-        .billingZip: "Billing postal code"
+        .cardPostalCode: "Postal code",
+        .billingPostalCode: "Billing postal code"
     ]) { _, new in new },
     fieldPlaceholders: Dictionary(uniqueKeysWithValues: placeholderFields.map {
         ($0, PayabliPayInFormLabels.defaultFieldLabels[$0] ?? $0.rawValue)
@@ -435,7 +435,7 @@ let configuration = PayabliPayInFormConfiguration(
     cardSections: [
         PayabliPayInFieldSection(
             title: "Card Information",
-            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
             inputVerticalSpacing: 4,
             inputHorizontalSpacing: 8,
             fieldVerticalSpacings: [
@@ -445,7 +445,7 @@ let configuration = PayabliPayInFormConfiguration(
         ),
         PayabliPayInFieldSection(
             title: "Customer Information",
-            fields: [.firstName, .lastName, .billingEmail, .billingZip],
+            fields: [.firstName, .lastName, .billingEmail, .billingPostalCode],
             inputVerticalSpacing: 8
         ),
         PayabliPayInFieldSection(
@@ -464,7 +464,7 @@ let configuration = PayabliPayInFormConfiguration(
         ),
         PayabliPayInFieldSection(
             title: "Customer Information",
-            fields: [.firstName, .lastName, .billingEmail, .billingZip]
+            fields: [.firstName, .lastName, .billingEmail, .billingPostalCode]
         ),
         PayabliPayInFieldSection(
             title: "Payment Information",
@@ -493,7 +493,7 @@ let configuration = PayabliPayInFormConfiguration(
     inputSizing: PayabliPayInInputSizing(
         defaultSize: PayabliPayInInputSize(height: 52, horizontalPadding: 14),
         fieldSizes: [
-            .cardCvv: PayabliPayInInputSize(width: 120, height: 52)
+            .cardSecurityCode: PayabliPayInInputSize(width: 120, height: 52)
         ]
     ),
     cardBrandIconPlacement: .trailing,
@@ -566,8 +566,8 @@ Default field labels:
 | `.cardholderName` | Name on card |
 | `.cardNumber` | Card number |
 | `.cardExpiration` | Expiration |
-| `.cardCvv` | CVV |
-| `.cardZip` | Postal code |
+| `.cardSecurityCode` | CVV |
+| `.cardPostalCode` | Postal code |
 | `.accountHolder` | Account holder |
 | `.routingNumber` | Routing number |
 | `.accountNumber` | Account number |
@@ -580,7 +580,7 @@ Default field labels:
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
 | `.billingEmail` | Billing email |
-| `.billingZip` | Billing postal code |
+| `.billingPostalCode` | Billing postal code |
 | `.amount` | Amount |
 | `.serviceFee` | Fee |
 | `.surchargeFee` | Surcharge |

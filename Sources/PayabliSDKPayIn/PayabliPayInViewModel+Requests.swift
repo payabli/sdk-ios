@@ -142,10 +142,10 @@ extension PayabliPayInViewModel {
             cardExpirationMonth = nil
             cardExpirationYear = nil
         }
-        if dropped.contains(.cardCvv), !cardCvvStorage.isEmpty {
+        if dropped.contains(.cardSecurityCode), !cardCvvStorage.isEmpty {
             cardCvvStorage = ""
         }
-        if dropped.contains(.cardZip), !cardZipStorage.isEmpty {
+        if dropped.contains(.cardPostalCode), !cardZipStorage.isEmpty {
             cardZipStorage = ""
         }
     }
@@ -190,7 +190,7 @@ extension PayabliPayInViewModel {
         if dropped.contains(.billingEmail), !billingEmail.isEmpty {
             billingEmail = ""
         }
-        if dropped.contains(.billingZip), !billingZipStorage.isEmpty {
+        if dropped.contains(.billingPostalCode), !billingZipStorage.isEmpty {
             billingZipStorage = ""
         }
     }
@@ -225,11 +225,11 @@ extension PayabliPayInViewModel {
 
     func fieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
+        case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
+        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
         case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
@@ -247,10 +247,10 @@ extension PayabliPayInViewModel {
                 && cardNumberValidationMessage == nil
         case .cardExpiration:
             return cardExpiration.payabliCaptureDigitsOnly.count >= 4
-        case .cardCvv:
+        case .cardSecurityCode:
             return (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
                 .contains(cardCvv.payabliCaptureDigitsOnly.count)
-        case .cardZip:
+        case .cardPostalCode:
             return !cardZip.payabliCaptureTrimmed.isEmpty
         default:
             return true
@@ -294,7 +294,7 @@ extension PayabliPayInViewModel {
             return !customerNumber.payabliCaptureTrimmed.isEmpty
         case .billingEmail:
             return !billingEmail.payabliCaptureTrimmed.isEmpty
-        case .billingZip:
+        case .billingPostalCode:
             return !billingZip.payabliCaptureTrimmed.isEmpty
         default:
             return true

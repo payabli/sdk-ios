@@ -367,7 +367,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                     .lastName,
                     .customerNumber,
                     .billingEmail,
-                    .billingZip
+                    .billingPostalCode
                 ]
             ),
             onCompleted: { _ in },

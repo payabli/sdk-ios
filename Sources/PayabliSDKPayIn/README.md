@@ -247,10 +247,10 @@ Group fields with `PayabliPayInFieldSection`:
 ```swift
 PayabliPayInFieldSection(
     title: "Card Information",
-    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
     inputVerticalSpacing: 4,
     inputHorizontalSpacing: 8,
-    fieldVerticalSpacings: [.cardNumber: 2, .cardCvv: 2]
+    fieldVerticalSpacings: [.cardNumber: 2, .cardSecurityCode: 2]
 )
 ```
 

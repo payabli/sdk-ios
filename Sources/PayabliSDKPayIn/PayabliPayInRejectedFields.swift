@@ -24,8 +24,8 @@ enum PayabliPayInRejectedFields {
             (MethodKey.cardHolder.stringValue, .cardholderName),
             (MethodKey.cardnumber.stringValue, .cardNumber),
             (MethodKey.cardexp.stringValue, .cardExpiration),
-            (MethodKey.cardcvv.stringValue, .cardCvv),
-            (MethodKey.cardzip.stringValue, .cardZip),
+            (MethodKey.cardcvv.stringValue, .cardSecurityCode),
+            (MethodKey.cardzip.stringValue, .cardPostalCode),
             (MethodKey.achHolder.stringValue, .accountHolder),
             (MethodKey.achRouting.stringValue, .routingNumber),
             (MethodKey.achAccount.stringValue, .accountNumber),
@@ -37,7 +37,7 @@ enum PayabliPayInRejectedFields {
             ("lastName", .lastName),
             ("customerNumber", .customerNumber),
             ("billingEmail", .billingEmail),
-            ("billingZip", .billingZip)
+            ("billingZip", .billingPostalCode)
         ]
         return Dictionary(uniqueKeysWithValues: pairs.map { ($0.0.lowercased(), $0.1) })
     }()

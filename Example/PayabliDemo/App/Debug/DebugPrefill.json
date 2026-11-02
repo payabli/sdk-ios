@@ -1,12 +1,12 @@
 {
   "cardholderName": "Name On Card Test1",
   "cardNumber": "4111 1111 1111 1111",
-  "cardCvv": "999",
+  "cardSecurityCode": "999",
   "cardExpiration": "07/30",
   "firstName": "Name On",
   "lastName": "Card Test1",
   "accountHolder": "Name On Card Test1",
   "routingNumber": "121000248",
   "accountNumber": "1234567890",
-  "cardZip": "22039"
+  "cardPostalCode": "22039"
 }

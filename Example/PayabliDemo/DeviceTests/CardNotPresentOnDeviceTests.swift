@@ -68,8 +68,8 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
             expiration: try XCTUnwrap(values.cardExpiration),
             cardholderName: QAIdentity.current.holderName,
-            cvv: try XCTUnwrap(values.cardCvv),
-            billingZip: try XCTUnwrap(values.cardZip)
+            cvv: try XCTUnwrap(values.cardSecurityCode),
+            billingZip: try XCTUnwrap(values.cardPostalCode)
         )
     }
 

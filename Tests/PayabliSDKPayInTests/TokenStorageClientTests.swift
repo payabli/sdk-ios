@@ -566,8 +566,8 @@ final class TokenStorageClientTests: XCTestCase {
         viewModel.cardCvv = "321"
         XCTAssertFalse(viewModel.canSubmit)
         viewModel.cardZip = "33139"
-        XCTAssertTrue(viewModel.activeFields.contains(.cardCvv))
-        XCTAssertTrue(viewModel.activeFields.contains(.cardZip))
+        XCTAssertTrue(viewModel.activeFields.contains(.cardSecurityCode))
+        XCTAssertTrue(viewModel.activeFields.contains(.cardPostalCode))
         XCTAssertTrue(viewModel.canSubmit)
 
         let result = try await viewModel.submit()
@@ -612,7 +612,7 @@ final class TokenStorageClientTests: XCTestCase {
             operation: .storePaymentMethod,
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
-                cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+                cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
                 requiredFields: [.billingEmail, .methodDescription]
             )
         )

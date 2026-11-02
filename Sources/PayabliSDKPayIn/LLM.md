@@ -427,8 +427,8 @@ All `PayabliPayInField` values:
 | `.cardholderName` | Name on card | Card |
 | `.cardNumber` | Card number | Card |
 | `.cardExpiration` | Expiration | Card |
-| `.cardCvv` | CVV | Card |
-| `.cardZip` | Postal code | Card |
+| `.cardSecurityCode` | CVV | Card |
+| `.cardPostalCode` | Postal code | Card |
 | `.accountHolder` | Account holder | Bank account |
 | `.routingNumber` | Routing number | Bank account |
 | `.accountNumber` | Account number | Bank account |
@@ -441,7 +441,7 @@ All `PayabliPayInField` values:
 | `.lastName` | Last name | Customer |
 | `.customerNumber` | Customer number | Customer |
 | `.billingEmail` | Billing email | Customer |
-| `.billingZip` | Billing postal code | Customer |
+| `.billingPostalCode` | Billing postal code | Customer |
 | `.amount` | Amount | Payment summary |
 | `.serviceFee` | Fee | Payment summary |
 | `.surchargeFee` | Surcharge | Payment summary |
@@ -466,14 +466,14 @@ let configuration = PayabliPayInFormConfiguration(
     cardSections: [
         PayabliPayInFieldSection(
             title: "Card Information",
-            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
             inputVerticalSpacing: 4,
             inputHorizontalSpacing: 8,
             fieldVerticalSpacings: [.cardNumber: 2]
         ),
         PayabliPayInFieldSection(
             title: "Customer Information",
-            fields: [.firstName, .lastName, .billingEmail, .billingZip]
+            fields: [.firstName, .lastName, .billingEmail, .billingPostalCode]
         )
     ]
 )
@@ -503,8 +503,8 @@ Placeholder-only example:
 
 ```swift
 let placeholderFields: [PayabliPayInField] = [
-    .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip,
-    .firstName, .lastName, .billingEmail, .billingZip
+    .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode,
+    .firstName, .lastName, .billingEmail, .billingPostalCode
 ]
 
 let labels = PayabliPayInFormLabels(

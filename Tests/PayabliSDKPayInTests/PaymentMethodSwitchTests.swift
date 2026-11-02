@@ -42,7 +42,7 @@ final class PaymentMethodSwitchTests: XCTestCase {
 
     func testAFieldBothTabsShowIsKeptAcrossASwitch() {
         let shared: [PayabliPayInField] = [
-            .firstName, .lastName, .customerNumber, .billingEmail, .billingZip, .methodDescription
+            .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode, .methodDescription
         ]
         let viewModel = makeViewModel(
             cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder + shared,

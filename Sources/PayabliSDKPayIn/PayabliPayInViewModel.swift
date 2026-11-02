@@ -28,11 +28,11 @@ final class PayabliPayInViewModel: ObservableObject {
     @Published var cardExpirationYear: Int?
 
     @Published var cardCvvStorage = "" {
-        didSet { acceptEdit(of: .cardCvv) }
+        didSet { acceptEdit(of: .cardSecurityCode) }
     }
 
     @Published var cardZipStorage = "" {
-        didSet { acceptEdit(of: .cardZip) }
+        didSet { acceptEdit(of: .cardPostalCode) }
     }
 
     @Published var achHolderStorage = "" {
@@ -83,7 +83,7 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     @Published var billingZipStorage = "" {
-        didSet { acceptEdit(of: .billingZip) }
+        didSet { acceptEdit(of: .billingPostalCode) }
     }
 
     @Published private(set) var isSubmitting = false
@@ -292,8 +292,8 @@ final class PayabliPayInViewModel: ObservableObject {
                 && fieldHasRequiredValue(.cardNumber)
                 && cardNumberValidationMessage == nil
                 && cardExpiration.payabliCaptureDigitsOnly.count >= 4
-                && fieldHasRequiredValue(.cardCvv)
-                && fieldHasRequiredValue(.cardZip)
+                && fieldHasRequiredValue(.cardSecurityCode)
+                && fieldHasRequiredValue(.cardPostalCode)
                 && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         case .bankAccount:

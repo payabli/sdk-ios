@@ -113,8 +113,8 @@ private struct FailingForm {
         var entries: [(String, String)] = [
             ("cardholderName", holder),
             ("cardNumber", cardNumber),
-            ("cardCvv", "999"),
-            ("cardZip", "22039")
+            ("cardSecurityCode", "999"),
+            ("cardPostalCode", "22039")
         ]
         if customer {
             entries = [
@@ -229,7 +229,7 @@ private struct FailingForm {
     private func field(_ name: String) -> XCUIElement {
         let identifier = "payabli.payIn.field.\(name)"
         // The CVV is a secure field, so it is not among the text fields.
-        return name == "cardCvv" ? app.secureTextFields[identifier] : app.textFields[identifier]
+        return name == "cardSecurityCode" ? app.secureTextFields[identifier] : app.textFields[identifier]
     }
 
     private func scrollTo(_ element: XCUIElement) {

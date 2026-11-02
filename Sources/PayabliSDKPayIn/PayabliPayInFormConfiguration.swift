@@ -5,8 +5,8 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case cardholderName
     case cardNumber
     case cardExpiration
-    case cardCvv
-    case cardZip
+    case cardSecurityCode
+    case cardPostalCode
     case accountHolder
     case routingNumber
     case accountNumber
@@ -19,7 +19,7 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case lastName
     case customerNumber
     case billingEmail
-    case billingZip
+    case billingPostalCode
     case amount
     case serviceFee
     case surchargeFee
@@ -300,8 +300,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         .cardholderName,
         .cardNumber,
         .cardExpiration,
-        .cardCvv,
-        .cardZip
+        .cardSecurityCode,
+        .cardPostalCode
     ]
 
     public static let defaultBankFieldOrder: [PayabliPayInField] = [
@@ -316,8 +316,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         .cardNumber,
         .cardExpiration,
         .cardholderName,
-        .cardCvv,
-        .cardZip,
+        .cardSecurityCode,
+        .cardPostalCode,
         .amount
     ]
 
@@ -486,6 +486,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         .lastName,
         .customerNumber,
         .billingEmail,
-        .billingZip
+        .billingPostalCode
     ]
 }

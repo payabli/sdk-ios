@@ -20,8 +20,8 @@ enum PayInSharedConfiguration {
         .cardholderName,
         .cardNumber,
         .cardExpiration,
-        .cardCvv,
-        .cardZip
+        .cardSecurityCode,
+        .cardPostalCode
     ]
 
     static let bankFieldOrder: [PayabliPayInField] = [
@@ -46,7 +46,7 @@ enum PayInSharedConfiguration {
         defaultSize: PayabliPayInInputSize(height: 52),
         fieldSizes: [
             .cardExpiration: PayabliPayInInputSize(height: 48),
-            .cardCvv: PayabliPayInInputSize(height: 48)
+            .cardSecurityCode: PayabliPayInInputSize(height: 48)
         ]
     )
 
@@ -55,8 +55,8 @@ enum PayInSharedConfiguration {
         .cardholderName,
         .cardNumber,
         .cardExpiration,
-        .cardCvv,
-        .cardZip,
+        .cardSecurityCode,
+        .cardPostalCode,
         .accountHolder,
         .routingNumber,
         .accountNumber,

@@ -362,11 +362,11 @@ public struct PayabliPayInForm: View {
     @ViewBuilder
     func fieldView(_ field: PayabliPayInField) -> some View {
         switch field {
-        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
+        case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             cardFieldView(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             achFieldView(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
+        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             customerFieldView(field)
         case .amount, .serviceFee, .surchargeFee:
             EmptyView()
@@ -388,13 +388,13 @@ public struct PayabliPayInForm: View {
             cardNumberField()
         case .cardExpiration:
             expirationPickerField()
-        case .cardCvv:
+        case .cardSecurityCode:
             secureField(
                 field,
                 text: cardCvvBinding,
                 sanitize: viewModel.limitCardCvv
             )
-        case .cardZip:
+        case .cardPostalCode:
             textField(
                 field,
                 text: cardZipBinding,
@@ -460,7 +460,7 @@ public struct PayabliPayInForm: View {
             textField(field, text: $viewModel.customerNumber)
         case .billingEmail:
             textField(field, text: $viewModel.billingEmail, textContentType: .emailAddress)
-        case .billingZip:
+        case .billingPostalCode:
             textField(
                 field,
                 text: billingZipBinding,
@@ -882,8 +882,8 @@ extension PayabliPayInForm {
         guard !dynamicTypeSize.isAccessibilitySize else { return false }
 
         switch (first, second) {
-        case (.cardExpiration, .cardCvv),
-             (.cardCvv, .cardExpiration),
+        case (.cardExpiration, .cardSecurityCode),
+             (.cardSecurityCode, .cardExpiration),
              (.firstName, .lastName),
              (.lastName, .firstName):
             return true

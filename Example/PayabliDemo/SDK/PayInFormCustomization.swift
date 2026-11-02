@@ -207,7 +207,7 @@ struct PayInFormCustomization: Hashable {
     private static let brandColor = Color(red: 0.36, green: 0.18, blue: 0.62)
 
     private static let cardFields: [PayabliPayInField] = [
-        .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip
+        .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode
     ]
 
     /// A holder type supplied as a hidden value takes the place of its picker.
@@ -298,8 +298,8 @@ struct PayInFormCustomization: Hashable {
         .cardholderName: "Name on card",
         .cardNumber: "Card",
         .cardExpiration: "Expires",
-        .cardCvv: "Security code",
-        .cardZip: "Billing ZIP",
+        .cardSecurityCode: "Security code",
+        .cardPostalCode: "Billing ZIP",
         .accountHolder: "Name on account",
         .routingNumber: "Bank routing",
         .accountNumber: "Bank account",
@@ -312,8 +312,8 @@ struct PayInFormCustomization: Hashable {
     private static let hiddenLabelPlaceholders: [PayabliPayInField: String] = [
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
-        .cardCvv: "CVV",
-        .cardZip: "ZIP",
+        .cardSecurityCode: "CVV",
+        .cardPostalCode: "ZIP",
         .accountHolder: "Account holder",
         .routingNumber: "Routing number",
         .accountNumber: "Account number",

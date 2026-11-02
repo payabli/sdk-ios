@@ -145,8 +145,8 @@ Supported fields:
 | `.cardholderName` | Name on card | Card input |
 | `.cardNumber` | Card number | Card input |
 | `.cardExpiration` | Expiration | Card input |
-| `.cardCvv` | CVV | Card input |
-| `.cardZip` | Postal code | Card input |
+| `.cardSecurityCode` | CVV | Card input |
+| `.cardPostalCode` | Postal code | Card input |
 | `.accountHolder` | Account holder | bank account input |
 | `.routingNumber` | Routing number | bank account input |
 | `.accountNumber` | Account number | bank account input |
@@ -159,7 +159,7 @@ Supported fields:
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |
 | `.billingEmail` | Billing email | Customer information |
-| `.billingZip` | Billing postal code | Customer information |
+| `.billingPostalCode` | Billing postal code | Customer information |
 | `.amount` | Amount | Read-only payment summary |
 | `.serviceFee` | Fee | Read-only payment summary |
 | `.surchargeFee` | Surcharge | Read-only payment summary |
@@ -169,7 +169,7 @@ Section names are fully configurable:
 ```swift
 PayabliPayInFieldSection(
     title: "Customer Information",
-    fields: [.firstName, .lastName, .billingEmail, .billingZip]
+    fields: [.firstName, .lastName, .billingEmail, .billingPostalCode]
 )
 ```
 
@@ -202,15 +202,15 @@ let labels = PayabliPayInFormLabels(
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
-        .cardCvv: "CVV",
-        .cardZip: "Postal code"
+        .cardSecurityCode: "CVV",
+        .cardPostalCode: "Postal code"
     ]
 )
 
 let configuration = PayabliPayInFormConfiguration(
     labelLayout: .placeholder,
     showsFieldLabels: false,
-    hiddenFieldLabels: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+    hiddenFieldLabels: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
 )
 ```
 

@@ -4,7 +4,7 @@ import XCTest
 final class PaymentSummaryPlacementTests: XCTestCase {
     private let card = PayabliPayInFieldSection(
         title: "Card",
-        fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+        fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
     )
     private let customer = PayabliPayInFieldSection(title: "Customer", fields: [.firstName, .lastName])
 
@@ -61,7 +61,7 @@ final class PaymentSummaryPlacementTests: XCTestCase {
     }
 
     func testAnInputsSectionWithNoTitleDrawsNone() {
-        let untitled = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+        let untitled = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode])
         let drawn = place([untitled], details(12.34))
 
         XCTAssertEqual(drawn.map(\.isSummary), [false, true])

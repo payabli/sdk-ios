@@ -31,8 +31,8 @@ enum PayInForms {
                         .cardholderName,
                         .cardNumber,
                         .cardExpiration,
-                        .cardCvv,
-                        .cardZip
+                        .cardSecurityCode,
+                        .cardPostalCode
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
@@ -91,8 +91,8 @@ enum PayInForms {
                         .cardholderName,
                         .cardNumber,
                         .cardExpiration,
-                        .cardCvv,
-                        .cardZip
+                        .cardSecurityCode,
+                        .cardPostalCode
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)

@@ -77,6 +77,18 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [])
     }
 
+    func testTheServicesSecurityCodeAndPostalCodeNamesMarkTheFieldsOfThoseNames() {
+        let marked = ["cardcvv", "cardzip", "billingZip"].map { PayabliPayInRejectedFields.field(named: $0)?.rawValue }
+
+        XCTAssertEqual(marked, ["cardSecurityCode", "cardPostalCode", "billingPostalCode"])
+    }
+
+    func testTheSecurityCodeFieldIsFoundByItsOwnName() throws {
+        let field = try XCTUnwrap(PayabliPayInRejectedFields.field(named: "cardcvv"))
+
+        XCTAssertEqual(PayabliPayInAccessibility.fieldIdentifier(field), "payabli.payIn.field.cardSecurityCode")
+    }
+
     @MainActor
     func testEditingAMarkedFieldClearsOnlyItsOwnMark() async {
         let viewModel = filledCardForm(
@@ -86,11 +98,11 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             )
         )
         _ = try? await viewModel.submit()
-        XCTAssertEqual(viewModel.rejectedFields, [.cardholderName, .cardZip])
+        XCTAssertEqual(viewModel.rejectedFields, [.cardholderName, .cardPostalCode])
 
         viewModel.cardholderName = "Janet Doe"
 
-        XCTAssertEqual(viewModel.rejectedFields, [.cardZip])
+        XCTAssertEqual(viewModel.rejectedFields, [.cardPostalCode])
     }
 
     @MainActor
@@ -417,7 +429,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         transport: any PayabliTransport,
         customerFields: Bool = false
     ) -> PayabliPayInViewModel {
-        let customer: [PayabliPayInField] = [.firstName, .lastName, .customerNumber, .billingEmail, .billingZip]
+        let customer: [PayabliPayInField] = [.firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
         let viewModel = PayabliPayInViewModel(
             component: captureFlow(transport: transport),
             operation: .capture,

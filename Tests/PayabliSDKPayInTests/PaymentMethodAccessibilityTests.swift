@@ -79,18 +79,18 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
     }
 
     func testARefusalAnnouncesTheFieldsItNewlyMarkedInTheOrderTheFormDrawsThem() {
-        let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+        let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
         let label: (PayabliPayInField) -> String = { PayabliPayInFormLabels.defaultFieldLabels[$0] ?? $0.rawValue }
         let message = PayabliPayInAccessibility.rejectedFieldMessage
 
         XCTAssertEqual(
             PayabliPayInAccessibility.rejectedFieldsAnnouncement(
-                newlyMarked: [.cardZip, .cardholderName, .firstName],
+                newlyMarked: [.cardPostalCode, .cardholderName, .firstName],
                 drawnFields: drawn,
                 label: label,
                 message: message
             ),
-            "\(label(.cardholderName)): That was not accepted. \(label(.cardZip)): That was not accepted"
+            "\(label(.cardholderName)): That was not accepted. \(label(.cardPostalCode)): That was not accepted"
         )
         XCTAssertNil(
             PayabliPayInAccessibility.rejectedFieldsAnnouncement(
@@ -142,8 +142,8 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
         let hiddenLabelFields: [PayabliPayInField] = [
             .cardholderName,
             .cardNumber,
-            .cardCvv,
-            .cardZip
+            .cardSecurityCode,
+            .cardPostalCode
         ]
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],

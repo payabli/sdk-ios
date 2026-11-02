@@ -52,8 +52,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
     func testPaymentMethodLabelsUsePostalCodeCopy() {
         let labels = PayabliPayInFormLabels()
 
-        XCTAssertEqual(labels.label(for: .cardZip), "Postal code")
-        XCTAssertEqual(labels.label(for: .billingZip), "Billing postal code")
+        XCTAssertEqual(labels.label(for: .cardPostalCode), "Postal code")
+        XCTAssertEqual(labels.label(for: .billingPostalCode), "Billing postal code")
     }
 
     func testPaymentMethodLabelsCanConfigureFieldPlaceholders() {
@@ -68,7 +68,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(labels.label(for: .cardNumber), "Card #")
         XCTAssertEqual(labels.placeholder(for: .cardNumber), "1234 1234 1234 1234")
         XCTAssertEqual(labels.placeholder(for: .billingEmail), "customer@example.com")
-        XCTAssertNil(labels.placeholder(for: .cardCvv))
+        XCTAssertNil(labels.placeholder(for: .cardSecurityCode))
     }
 
     func testFormConfigurationCanHideExternalLabelsIndependentlyOfPlaceholders() {
@@ -82,14 +82,14 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             labelLayout: .external,
             showsFieldLabels: false,
-            hiddenFieldLabels: [.cardCvv]
+            hiddenFieldLabels: [.cardSecurityCode]
         )
         let labels = PayabliPayInFormLabels(
             fieldPlaceholders: [.cardNumber: "Enter card number"]
         )
 
         XCTAssertFalse(configuration.showsFieldLabels)
-        XCTAssertTrue(configuration.hiddenFieldLabels.contains(.cardCvv))
+        XCTAssertTrue(configuration.hiddenFieldLabels.contains(.cardSecurityCode))
         XCTAssertEqual(labels.placeholder(for: .cardNumber), "Enter card number")
     }
 
@@ -99,7 +99,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             cardSections: [
                 PayabliPayInFieldSection(
                     title: "Card Information",
-                    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+                    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
                 ),
                 PayabliPayInFieldSection(
                     title: "Customer Information",
@@ -117,8 +117,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             .cardholderName,
             .cardNumber,
             .cardExpiration,
-            .cardCvv,
-            .cardZip,
+            .cardSecurityCode,
+            .cardPostalCode,
             .firstName,
             .lastName,
             .billingEmail,
@@ -148,8 +148,8 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             .cardNumber,
             .cardExpiration,
             .cardholderName,
-            .cardCvv,
-            .cardZip
+            .cardSecurityCode,
+            .cardPostalCode
         ])
         XCTAssertEqual(configuration.cardSections[1].fields, [
             .firstName,
@@ -194,13 +194,13 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                     fields: [.accountHolder]
                 )
             ],
-            requiredFields: [.billingZip, .deviceId]
+            requiredFields: [.billingPostalCode, .deviceId]
         )
 
         XCTAssertEqual(configuration.bankSections[0].fields, [
             .firstName,
             .deviceId,
-            .billingZip
+            .billingPostalCode
         ])
         XCTAssertEqual(configuration.bankSections[1].fields, [
             .accountHolder,
@@ -225,7 +225,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                     inputHorizontalSpacing: 8,
                     fieldVerticalSpacings: [
                         .cardNumber: 2,
-                        .cardCvv: -1
+                        .cardSecurityCode: -1
                     ]
                 )
             ]
@@ -236,13 +236,13 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         XCTAssertEqual(section.inputVerticalSpacing, CGFloat(4))
         XCTAssertEqual(section.inputHorizontalSpacing, CGFloat(8))
         XCTAssertEqual(section.fieldVerticalSpacings[.cardNumber], CGFloat(2))
-        XCTAssertEqual(section.fieldVerticalSpacings[.cardCvv], CGFloat(0))
+        XCTAssertEqual(section.fieldVerticalSpacings[.cardSecurityCode], CGFloat(0))
         XCTAssertEqual(section.fields, [
             .cardNumber,
             .cardExpiration,
             .cardholderName,
-            .cardCvv,
-            .cardZip
+            .cardSecurityCode,
+            .cardPostalCode
         ])
     }
 
@@ -488,7 +488,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                     .lastName,
                     .customerNumber,
                     .billingEmail,
-                    .billingZip
+                    .billingPostalCode
                 ]
             )
         )
