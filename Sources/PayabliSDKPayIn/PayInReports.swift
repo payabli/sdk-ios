@@ -166,13 +166,16 @@ final class PayInReports {
         return simpleName(causeType) == "CancellationError"
     }
 
-    /// The simple name of the type the SDK converted, never a message or a cause chain.
+    /// The simple name of the type the SDK converted or redacted, never a message or a cause chain.
     ///
     /// - Parameter error: what the operation threw.
-    /// - Returns: the converted type's name, or the thrown type's when nothing was converted.
+    /// - Returns: the converted or redacted type's name, or the thrown type's when the SDK changed nothing.
     static func failureType(of error: any Error) -> String {
         if case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error {
             return simpleName(causeType)
+        }
+        if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
+            return simpleName(redacted.originalType)
         }
         return String(describing: type(of: error))
     }

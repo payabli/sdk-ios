@@ -47,6 +47,27 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(event.properties["failure_type"], "PayabliPayInError")
     }
 
+    func testAFailedTokenProviderReportsTheTypeItThrewRatherThanTheSDKsWrapper() async throws {
+        let config = try PayabliConfig(
+            entryPoint: "entry",
+            environment: .sandbox,
+            tokenProvider: { throw URLError(.notConnectedToInternet) }
+        )
+        let session = PayabliSession(config: config, telemetryTransport: recorder)
+        let flow = PayabliPayIn(session: session)
+
+        let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
+
+        XCTAssertEqual((told as? any PayabliError)?.type, .tokenProviderFailed)
+        let reports = try XCTUnwrap(flow.reports)
+        await reports.sent()
+        await session.telemetry.flush()
+        let captures = await recorder.events.filter { $0.event == "payin.capture.completed" }
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.properties["code"], "TOKEN_PROVIDER_FAILED")
+        XCTAssertEqual(captures.first?.properties["failure_type"], "URLError")
+    }
+
     func testAnAuthorizationReportsItsOwnEvent() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: PayInFixture.approved))
 
