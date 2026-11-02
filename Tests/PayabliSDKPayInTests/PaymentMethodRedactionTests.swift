@@ -11,17 +11,17 @@ final class PaymentMethodRedactionTests: XCTestCase {
 
     private func card() -> PayabliPayInCardData {
         PayabliPayInCardData(
-            cardNumber: SensitiveDigits.ofString(pan),
+            cardNumber: pan,
             expiry: "12/30",
             holderName: "A Payer",
-            securityCode: SensitiveDigits.ofString(securityCode),
+            securityCode: securityCode,
             postalCode: "22039"
         )
     }
 
     private func bankAccount() -> PayabliPayInBankAccountData {
         PayabliPayInBankAccountData(
-            accountNumber: SensitiveDigits.ofString(account),
+            accountNumber: account,
             accountType: .checking,
             holderName: "A Payer",
             routingNumber: "122105278"

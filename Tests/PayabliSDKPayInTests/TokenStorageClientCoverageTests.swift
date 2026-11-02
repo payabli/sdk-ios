@@ -19,10 +19,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -46,10 +46,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 )),
                 options: PayabliPayInOptions(
@@ -89,10 +89,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await arrayClient.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -110,10 +110,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await nonJSONClient.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -143,10 +143,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         let result = try await client.addMethod(
             entryPoint: "entry",
             paymentMethod: .card(PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                cardNumber: "4111111111111111",
                 expiry: "02/28",
                 holderName: "Jane Doe",
-                securityCode: SensitiveDigits.ofString("123"),
+                securityCode: "123",
                 postalCode: "33139"
             ))
         )
@@ -165,10 +165,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -199,10 +199,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await client.addMethod(
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -226,10 +226,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             _ = try await invalidEntryClient.addMethod(
                 entryPoint: "   ",
                 paymentMethod: .card(PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                    cardNumber: "4111111111111111",
                     expiry: "02/28",
                     holderName: "Jane Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "33139"
                 ))
             )
@@ -254,10 +254,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
 
         do {
             _ = try await component.addCard(PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                cardNumber: "4111111111111111",
                 expiry: "02/28",
                 holderName: "Jane Doe",
-                securityCode: SensitiveDigits.ofString("123"),
+                securityCode: "123",
                 postalCode: "33139"
             ))
             XCTFail("Expected missing token error")

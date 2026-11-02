@@ -315,10 +315,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+                    cardNumber: "4111 1111 1111 1111",
                     expiry: "02/27",
                     holderName: "John Cassian",
-                    securityCode: SensitiveDigits.ofString("999"),
+                    securityCode: "999",
                     postalCode: "12345"
                 ),
                 saveIfSuccess: true

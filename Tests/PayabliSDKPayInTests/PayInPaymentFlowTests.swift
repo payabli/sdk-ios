@@ -19,10 +19,10 @@ final class PayInPaymentFlowTests: XCTestCase {
         )
 
         let result = try await component.addCard(PayabliPayInCardData(
-            cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+            cardNumber: "4111 1111 1111 1111",
             expiry: "02/25",
             holderName: "John Doe",
-            securityCode: SensitiveDigits.ofString("123"),
+            securityCode: "123",
             postalCode: "12345"
         ))
 
@@ -47,10 +47,10 @@ final class PayInPaymentFlowTests: XCTestCase {
         let result = try await component.capture(PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
+                    cardNumber: "4111 1111 1111 1111",
                     expiry: "02/25",
                     holderName: "John Doe",
-                    securityCode: SensitiveDigits.ofString("123"),
+                    securityCode: "123",
                     postalCode: "12345"
                 )
             )),

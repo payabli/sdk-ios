@@ -74,7 +74,7 @@ final class PayInTelemetryTests: XCTestCase {
     func testABankAccountAndACheckReportTheirKind() {
         XCTAssertEqual(PayInReports.method(of: .bankAccount(PayabliPayInPaymentMethod.BankAccount(
             data: PayabliPayInBankAccountData(
-                accountNumber: SensitiveDigits.ofString("1111111111"),
+                accountNumber: "1111111111",
                 accountType: .checking,
                 holderName: "Jane",
                 routingNumber: "123456780"
@@ -451,10 +451,10 @@ final class PayInTelemetryTests: XCTestCase {
     private static func heldKeyRequest(_ attempt: PayabliAttempt, cvv: String) -> PayabliPayInRequest {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                cardNumber: "4111111111111111",
                 expiry: "12/30",
                 holderName: "Jane",
-                securityCode: SensitiveDigits.ofString(cvv),
+                securityCode: cvv,
                 postalCode: "12345"
             ))),
             options: PayabliPayInRequestConfiguration(
@@ -466,10 +466,10 @@ final class PayInTelemetryTests: XCTestCase {
     }
 
     private static let card = PayabliPayInCardData(
-        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        cardNumber: "4111111111111111",
         expiry: "12/30",
         holderName: "Jane",
-        securityCode: SensitiveDigits.ofString("123"),
+        securityCode: "123",
         postalCode: "12345"
     )
 

@@ -152,10 +152,10 @@ final class PayabliPayInTests: XCTestCase {
 
         let request = try XCTUnwrap(component.requestConfiguration?.request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString("4111111111111111"),
+                cardNumber: "4111111111111111",
                 expiry: "02/27",
                 holderName: "Jane Doe",
-                securityCode: SensitiveDigits.ofString("999"),
+                securityCode: "999",
                 postalCode: "12345"
             )))
         ))
@@ -515,10 +515,10 @@ final class PayabliPayInTests: XCTestCase {
 /// A form submission and a direct call take the same options type.
 extension PayabliPayInTests {
     private static let janeDoeCard = PayabliPayInCardData(
-        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        cardNumber: "4111111111111111",
         expiry: "02/27",
         holderName: "Jane Doe",
-        securityCode: SensitiveDigits.ofString("999"),
+        securityCode: "999",
         postalCode: "12345"
     )
 
