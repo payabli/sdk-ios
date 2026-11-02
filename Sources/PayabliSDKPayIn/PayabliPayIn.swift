@@ -449,6 +449,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 refusedLocally: refusal.wasRefused
             )
             // Converted after the report: the report names the type that failed, not the wrapper.
+            if PayInInterruption.isCancellation(error) {
+                throw CancellationError()
+            }
             throw error.payabliUnexpectedFailure ?? error
         }
     }

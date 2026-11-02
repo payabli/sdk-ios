@@ -69,6 +69,22 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         XCTAssertNil(told as? PayabliGenericError)
     }
 
+    func testAPlatformCancellationReachesTheHostAsACancellation() async {
+        let flow = makeFlow(RecordingIdempotencyTransport(failure: URLError(.cancelled)))
+
+        let told = await PayInFixture.failure { _ = try await flow.readTransaction("trans-1") }
+
+        XCTAssertTrue(told is CancellationError, "\(String(describing: told))")
+    }
+
+    func testAPlatformCancellationOfASaveReachesTheHostAsACancellation() async {
+        let flow = makeFlow(RecordingIdempotencyTransport(failure: URLError(.cancelled)))
+
+        let told = await PayInFixture.failure { _ = try await flow.addCard(Self.card) }
+
+        XCTAssertTrue(told is CancellationError, "\(String(describing: told))")
+    }
+
     func testAnErrorTheSdkAlreadyClassifiedPassesThroughUnconverted() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(
             failure: PayabliGenericError(type: .networkError, reason: "offline")
