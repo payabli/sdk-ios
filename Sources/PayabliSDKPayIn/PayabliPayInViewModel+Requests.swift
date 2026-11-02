@@ -74,6 +74,7 @@ extension PayabliPayInViewModel {
         var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
         options.methodDescription = mergedOrderDescription()
+            ?? options.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         return options
     }
 

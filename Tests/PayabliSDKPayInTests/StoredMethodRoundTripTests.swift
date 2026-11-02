@@ -84,6 +84,28 @@ final class StoredMethodRoundTripTests: XCTestCase {
         XCTAssertEqual(customer["customerId"] as? Int, 4440)
     }
 
+    func testAFormStoreSendsTheOperationsDescriptionWhenTheFormSuppliesNone() async throws {
+        let transport = RoutedTransport()
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+        let viewModel = PayabliPayInViewModel(
+            component: component,
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "  Primary card  ")),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
+        )
+        viewModel.cardNumber = "4111 1111 1111 1111"
+        viewModel.cardExpiration = "02/30"
+        viewModel.cardholderName = "Jane Doe"
+        viewModel.cardCvv = "321"
+        viewModel.cardZip = "33139"
+
+        _ = try await viewModel.submit()
+
+        let requests = await transport.requests
+        let request = try XCTUnwrap(requests.first)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(request.body)) as? [String: Any])
+        XCTAssertEqual(body["methodDescription"] as? String, "Primary card")
+    }
+
     private func chargedPaymentMethod(
         _ stored: PayabliPayInStoredMethod,
         on component: PayabliPayIn,
