@@ -1,4 +1,6 @@
-public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringConvertible, Sendable {
+public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable,
+    Sendable
+{
     let cardNumber: SensitiveDigits
     public var expiry: String
     public var holderName: String
@@ -49,13 +51,20 @@ public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringCo
     }
 
     /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
-    /// render. `dump()` and the variables view render the stored fields, which no protocol redacts.
+    /// render. A debugger's variables view reads memory directly, which no protocol redacts.
     public var debugDescription: String {
         description
     }
+
+    /// No fields, so `dump()` and a `Mirror` walk show the type name alone, as `description` does.
+    public var customMirror: Mirror {
+        Mirror(self, children: [], displayStyle: .struct)
+    }
 }
 
-public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugStringConvertible, Sendable {
+public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable,
+    Sendable
+{
     let accountNumber: SensitiveDigits
     public var accountType: PayabliPayInAccountType
     public var holderName: String
@@ -119,8 +128,13 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
     }
 
     /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
-    /// render. `dump()` and the variables view render the stored fields, which no protocol redacts.
+    /// render. A debugger's variables view reads memory directly, which no protocol redacts.
     public var debugDescription: String {
         description
+    }
+
+    /// The account type alone, so `dump()` and a `Mirror` walk show what `description` does.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["accountType": accountType], displayStyle: .struct)
     }
 }

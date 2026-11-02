@@ -293,7 +293,7 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
 }
-public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::Sendable {
+public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::CustomReflectable, Swift::Sendable {
   public var expiry: Swift::String
   public var holderName: Swift::String
   public var postalCode: Swift::String
@@ -304,8 +304,11 @@ public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::Cust
   public var debugDescription: Swift::String {
     get
   }
+  public var customMirror: Swift::Mirror {
+    get
+  }
 }
-public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::Sendable {
+public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::CustomReflectable, Swift::Sendable {
   public var accountType: PayabliSDKPayIn::PayabliPayInAccountType
   public var holderName: Swift::String
   public var routingNumber: Swift::String
@@ -317,6 +320,9 @@ public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swif
     get
   }
   public var debugDescription: Swift::String {
+    get
+  }
+  public var customMirror: Swift::Mirror {
     get
   }
 }

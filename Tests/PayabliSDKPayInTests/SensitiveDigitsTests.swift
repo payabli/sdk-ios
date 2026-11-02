@@ -82,6 +82,16 @@ final class SensitiveDigitsTests: XCTestCase {
     }
 
     func testReflectionCarriesTheLengthAndNoDigits() {
+        let value = SensitiveDigits.ofString(pan)
+        var dumped = ""
+        dump(value, to: &dumped)
+
+        XCTAssertFalse(Self.reachesBytes(value), "no reflected child is the digit storage")
+        XCTAssertTrue(dumped.contains("length: 16"), "the buffer dumps as its length")
+        XCTAssertFalse(dumped.contains("- 52"), "the first card digit is not dumped as its byte")
+    }
+
+    func testACardReflectsAsItsDescription() {
         let card = PayabliPayInCardData(
             cardNumber: pan,
             expiry: "02/30",
@@ -92,10 +102,26 @@ final class SensitiveDigitsTests: XCTestCase {
         var dumped = ""
         dump(card, to: &dumped)
 
-        XCTAssertFalse(Self.reachesBytes(card), "no reflected child is the digit storage")
-        XCTAssertTrue(dumped.contains("length: 16"), "the card number dumps as its length")
-        XCTAssertTrue(dumped.contains("length: 3"), "the security code dumps as its length")
-        XCTAssertFalse(dumped.contains("- 52"), "the first card digit is not dumped as its byte")
+        XCTAssertEqual(Mirror(reflecting: card).children.count, 0, "no field is a reflected child")
+        for field in ["Jane Doe", "02/30", "12345", "length", "- 52"] {
+            XCTAssertFalse(dumped.contains(field), "dump() carries no field value: \(field)")
+        }
+    }
+
+    func testABankAccountReflectsItsAccountTypeAlone() {
+        let account = PayabliPayInBankAccountData(
+            accountNumber: "123456789012",
+            accountType: .checking,
+            holderName: "Jane Doe",
+            routingNumber: "021000021"
+        )
+        var dumped = ""
+        dump(account, to: &dumped)
+
+        XCTAssertEqual(Mirror(reflecting: account).children.map(\.label), ["accountType"])
+        for field in ["Jane Doe", "021000021", "length", "- 49"] {
+            XCTAssertFalse(dumped.contains(field), "dump() carries no field value: \(field)")
+        }
     }
 
     func testUseDigitsRethrowsAndLeavesTheValueUntouched() {
