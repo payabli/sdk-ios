@@ -9,7 +9,9 @@ import Foundation
 /// copy of its own once a request is written, not that the digits were never a `String`.
 ///
 /// Not thread-safe. One value belongs to one call.
-final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     /// The byte `close()` writes over every digit.
     static let wipedByte: UInt8 = 0
 
@@ -68,9 +70,14 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
     }
 
     /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
-    /// render. `dump()` and the variables view render the stored bytes, which no protocol redacts.
+    /// render. A debugger's variables view reads memory directly, which no protocol redacts.
     var debugDescription: String {
         description
+    }
+
+    /// The length only, for `dump()` and anything else that walks a `Mirror`.
+    var customMirror: Mirror {
+        Mirror(self, children: ["length": length], displayStyle: .class)
     }
 
     /// The digits, for a rule that reads them. Returns a copy, which the reader is responsible for

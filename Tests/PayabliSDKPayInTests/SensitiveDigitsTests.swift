@@ -81,6 +81,23 @@ final class SensitiveDigitsTests: XCTestCase {
         XCTAssertEqual(value.description, String(reflecting: value))
     }
 
+    func testReflectionCarriesTheLengthAndNoDigits() {
+        let card = PayabliPayInCardData(
+            cardNumber: pan,
+            expiry: "02/30",
+            holderName: "Jane Doe",
+            securityCode: "999",
+            postalCode: "12345"
+        )
+        var dumped = ""
+        dump(card, to: &dumped)
+
+        XCTAssertFalse(Self.reachesBytes(card), "no reflected child is the digit storage")
+        XCTAssertTrue(dumped.contains("length: 16"), "the card number dumps as its length")
+        XCTAssertTrue(dumped.contains("length: 3"), "the security code dumps as its length")
+        XCTAssertFalse(dumped.contains("- 52"), "the first card digit is not dumped as its byte")
+    }
+
     func testUseDigitsRethrowsAndLeavesTheValueUntouched() {
         // A reader that keeps the digits it was lent keeps them alive; wiping what a reader kept is
         // the reader's work. What is asserted is the contract every reader relies on: the error is
@@ -121,5 +138,14 @@ final class SensitiveDigitsTests: XCTestCase {
         let value = SensitiveDigits.ofString("")
 
         XCTAssertEqual(0, value.length)
+    }
+
+    /// Whether any child `Mirror` reaches, to a fixed depth, is a byte array.
+    private static func reachesBytes(_ subject: Any, depth: Int = 6) -> Bool {
+        if subject is [UInt8] {
+            return true
+        }
+        guard depth > 0 else { return false }
+        return Mirror(reflecting: subject).children.contains { reachesBytes($0.value, depth: depth - 1) }
     }
 }
