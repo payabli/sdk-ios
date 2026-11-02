@@ -8,7 +8,21 @@ package struct RedactedCause: Error, CustomStringConvertible, Equatable {
     package let originalType: String
 
     package init(_ original: any Error) {
-        originalType = String(reflecting: type(of: original))
+        originalType = Self.typeName(of: original)
+    }
+
+    /// The type a caller threw. A Foundation error bridged from `NSError` reports `NSError` as its dynamic type, so
+    /// those are named by the Swift type the caller wrote.
+    ///
+    /// - Parameter original: the failure being redacted.
+    /// - Returns: its module-qualified type name.
+    private static func typeName(of original: any Error) -> String {
+        switch original {
+        case is URLError: String(reflecting: URLError.self)
+        case is CocoaError: String(reflecting: CocoaError.self)
+        case is POSIXError: String(reflecting: POSIXError.self)
+        default: String(reflecting: type(of: original))
+        }
     }
 
     package var description: String {

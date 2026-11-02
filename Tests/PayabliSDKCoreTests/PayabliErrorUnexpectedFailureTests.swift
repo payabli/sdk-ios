@@ -41,4 +41,11 @@ final class PayabliErrorUnexpectedFailureTests: XCTestCase {
         XCTAssertEqual(failure.type, .unknown)
         XCTAssertEqual(failure.reason, PayabliErrorType.unknown.message)
     }
+
+    func testABridgedFoundationErrorIsNamedByItsSwiftTypeRatherThanNSError() {
+        XCTAssertEqual(RedactedCause(URLError(.notConnectedToInternet)).originalType, "Foundation.URLError")
+        XCTAssertEqual(RedactedCause(CocoaError(.fileNoSuchFile)).originalType, "Foundation.CocoaError")
+        XCTAssertEqual(RedactedCause(POSIXError(.ENOENT)).originalType, "Foundation.POSIXError")
+        XCTAssertEqual(RedactedCause(NSError(domain: "host", code: 1)).originalType, "NSError")
+    }
 }
