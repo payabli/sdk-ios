@@ -29,7 +29,8 @@ package struct RedactedCause: Error, CustomStringConvertible, Equatable {
     }
 
     /// The type a caller threw. `URLError`, `CocoaError` and `POSIXError` report `NSError` as their dynamic type once
-    /// held as an `Error`, so those three are named by their Swift type; any other `NSError` stays `NSError`.
+    /// held as an `Error`, so an error in one of their three domains is named by that Swift type, however it was built;
+    /// an `NSError` in any other domain stays `NSError`.
     ///
     /// - Parameter original: the failure being redacted.
     /// - Returns: its module-qualified type name.
