@@ -165,7 +165,18 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let failure = try XCTUnwrap(error)
         XCTAssertEqual(failure.domain, "com.payabli.payIn")
         XCTAssertEqual(failure.code, PayabliErrorType.unknown.number)
-        XCTAssertEqual(failure.userInfo["capture"] as? Int, 0, "nothing was sent, so nothing was taken")
+        XCTAssertEqual(failure.userInfo["capture"] as? Int, 1)
+    }
+
+    func testAConvertedFailureFromACallThatMovesMoneySaysThePaymentMayHaveBeenTaken() {
+        let converted = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(URLError(.notConnectedToInternet))
+        )
+
+        XCTAssertEqual(converted.toPayabliPayInNSError(movesMoney: true).userInfo["capture"] as? Int, 1)
+        XCTAssertNil(converted.toPayabliPayInNSError().userInfo["capture"])
     }
 
     func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {
