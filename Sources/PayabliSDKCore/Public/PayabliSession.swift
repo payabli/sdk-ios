@@ -131,10 +131,13 @@ public final class PayabliSession: @unchecked Sendable {
         try await initialize(config: config, makeSession: defaultSessionBuilder)
     }
 
-    /// Same, with the builder `install` calls for a new session, so a test can make that build fail.
+    /// Installs the process's session as ``initialize(config:)`` does, building any new session with `makeSession`.
+    ///
+    /// A refusal is reported and rethrown. Any other error the SDK did not classify is reported and thrown as the
+    /// SDK's unknown failure.
     ///
     /// - Parameter config: the configuration to install; equal by entry point and environment.
-    /// - Parameter makeSession: builds the session `install` installs.
+    /// - Parameter makeSession: builds a session when none is installed for this configuration.
     /// - Returns: the process's installed session.
     static func initialize(config: PayabliConfig, makeSession: SessionBuilder) async throws -> PayabliSession {
         let startedAt = ContinuousClock.now
