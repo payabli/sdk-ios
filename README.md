@@ -254,14 +254,7 @@ import PayabliSDKCore
 import PayabliSDKPayIn
 import SwiftUI
 
-let payIn = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
-        orderId: order.id // your own reference, to find the payment if its outcome is unknown
-    )
-)
+let payIn = PayabliPayIn(session: session)
 
 struct CheckoutView: View {
     let payIn: PayabliPayIn
@@ -269,7 +262,10 @@ struct CheckoutView: View {
     var body: some View {
         PayabliPayInForm(
             payIn: payIn,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                orderId: order.id // your own reference, to find the payment if its outcome is unknown
+            )),
             configuration: PayabliPayInFormConfiguration(),
             onCompleted: { success in
                 if case let .payment(result) = success {

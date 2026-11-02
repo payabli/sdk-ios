@@ -3,13 +3,13 @@ import XCTest
 
 final class PaymentSubmitWordingTests: XCTestCase {
     func testEachOperationNamesItsAction() {
-        let expected: [PayabliPayInOperation: (idle: String, busy: String)] = [
+        let expected: [PayabliPayInOperation.Kind: (idle: String, busy: String)] = [
             .capture: ("Pay", "Paying…"),
             .authorize: ("Authorize", "Authorizing…"),
             .storePaymentMethod: ("Save", "Saving…")
         ]
 
-        for operation in PayabliPayInOperation.allCases {
+        for operation in PayabliPayInOperation.Kind.allCases {
             let wording = PayInSubmitWording(operation)
             XCTAssertEqual(wording.idle, expected[operation]?.idle, operation.rawValue)
             XCTAssertEqual(wording.busy, expected[operation]?.busy, operation.rawValue)
@@ -17,7 +17,7 @@ final class PaymentSubmitWordingTests: XCTestCase {
     }
 
     func testWithNoHostWordingTheButtonReadsTheOperation() {
-        for operation in PayabliPayInOperation.allCases {
+        for operation in PayabliPayInOperation.Kind.allCases {
             let wording = PayInSubmitWording(operation)
             XCTAssertEqual(
                 PayInSubmitWording.text(showing: operation, submitting: nil, hostWording: nil),

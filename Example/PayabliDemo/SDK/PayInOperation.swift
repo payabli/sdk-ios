@@ -17,23 +17,9 @@ enum PayInOperation {
     /// Reverse a payment already taken. The SDK mints the key and never shows it.
     case void
 
-    /// The SDK's operation the form submits for this purpose.
-    ///
-    /// A reversal runs as a direct call on a flow the app already holds, so it is never drawn
-    /// as a form; its entry here only keeps the switch total.
-    var formOperation: PayabliPayInOperation {
-        switch self {
-        case .storedMethod: .storePaymentMethod
-        case .capture, .void: .capture
-        case .authorize: .authorize
-        }
-    }
-
     /// Whether the same key can reach the service twice, which is what makes a conflict a repeat.
     ///
-    /// Only a form-driven capture or authorization can: its key rides on the request configuration and
-    /// stays put until a new attempt is drawn, so submitting again sends the one the service already
-    /// holds. A reversal takes no key and the SDK mints a fresh one per call, so it can never send a repeat.
+    /// A form's capture or authorization can: it keeps its payment until a new attempt is drawn. A reversal can't.
     var canRepeatUnderOneKey: Bool {
         switch self {
         case .storedMethod, .void:

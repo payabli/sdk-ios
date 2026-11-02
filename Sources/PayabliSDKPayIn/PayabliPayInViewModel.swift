@@ -88,11 +88,11 @@ final class PayabliPayInViewModel: ObservableObject {
 
     @Published private(set) var isSubmitting = false
     /// The operation the submission in flight is sending, or nil when none is.
-    @Published private(set) var submittingOperation: PayabliPayInOperation?
+    @Published private(set) var submittingOperation: PayabliPayInOperation.Kind?
     @Published private(set) var failureMessage: String?
     /// The failure whose message is drawn, by the category and operation that picked its wording, so
     /// a change to the wording redraws the message already drawn. Cleared with the message.
-    private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation)?
+    private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind)?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
@@ -225,7 +225,7 @@ final class PayabliPayInViewModel: ObservableObject {
             configuration.bankFieldOrder
         }
 
-        guard operation == .storePaymentMethod else { return fields }
+        guard case .storePaymentMethod = operation else { return fields }
         return fields.filter { field in
             field != .amount && field != .serviceFee && field != .surchargeFee
         }
@@ -294,13 +294,11 @@ final class PayabliPayInViewModel: ObservableObject {
                 && cardExpiration.payabliCaptureDigitsOnly.count >= 4
                 && fieldHasRequiredValue(.cardSecurityCode)
                 && fieldHasRequiredValue(.cardPostalCode)
-                && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         case .bankAccount:
             return fieldHasRequiredValue(.accountHolder)
                 && fieldHasRequiredValue(.routingNumber)
                 && fieldHasRequiredValue(.accountNumber)
-                && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         }
     }
@@ -311,14 +309,14 @@ final class PayabliPayInViewModel: ObservableObject {
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.submissionInProgress
-            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation)
-            drawFailureMessage(for: error, operation: operation)
+            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
         isSubmitting = true
         // The operation sent, which picks the message even if the form is given another while it runs.
         let operation = self.operation
-        submittingOperation = operation
+        submittingOperation = operation.kind
         defer {
             isSubmitting = false
             submittingOperation = nil
@@ -329,14 +327,14 @@ final class PayabliPayInViewModel: ObservableObject {
         do {
             try validateRequiredFields()
         } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation)
-            drawFailureMessage(for: error, operation: operation)
+            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
 
         let sendMark = PayabliSendMark()
         do {
-            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow() }
+            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow(operation) }
             clearSensitiveFields()
             return result
         } catch {
@@ -352,7 +350,7 @@ final class PayabliPayInViewModel: ObservableObject {
             }
             // A marked field is the whole answer; a failure that marks none on screen shows its
             // message, which the opt-out hides while the marks stay.
-            drawFailureMessage(for: error, operation: operation)
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
     }
@@ -360,7 +358,7 @@ final class PayabliPayInViewModel: ObservableObject {
     /// Draws the failure's message where the form shows one, or takes it away, remembering the
     /// category and operation that picked the wording so a change to the wording redraws the
     /// message already drawn.
-    private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation) {
+    private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
         guard rejectedFields.isEmpty, configuration.showsFailureMessage else {
             failureMessage = nil
             drawnFailure = nil
@@ -373,13 +371,14 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
     ///
+    /// - Parameter operation: the operation the submission sends.
     /// - Returns: what the flow returned.
-    private func submitToFlow() async throws -> PayabliPayInResult {
+    private func submitToFlow(_ operation: PayabliPayInOperation) async throws -> PayabliPayInResult {
         let request: PayabliPayInRequest?
         do {
-            request = try configuredRequest()
+            request = try configuredRequest(for: operation)
         } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation)
+            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
             throw error
         }
         if let request {
@@ -394,12 +393,10 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
+    /// - Parameter operation: the operation whose configuration the request is built from.
     /// - Returns: the request built from the configuration and the fields.
-    private func configuredRequest() throws -> PayabliPayInRequest? {
-        guard operation != .storePaymentMethod else { return nil }
-        guard let requestConfiguration = component.requestConfiguration else {
-            throw PayabliPayInError.invalidInput("Payment request configuration is required.")
-        }
+    private func configuredRequest(for operation: PayabliPayInOperation) throws -> PayabliPayInRequest? {
+        guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
             paymentMethod: paymentMethod(),
             customerData: mergedCustomerData(),
@@ -486,7 +483,7 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     private var validation: PayabliPayInValidation {
-        component.requestConfiguration?.validation ?? configuration.options.validation
+        operation.requestConfiguration?.validation ?? configuration.options.validation
     }
 
     private static func availableMethods(
@@ -494,7 +491,7 @@ final class PayabliPayInViewModel: ObservableObject {
         configuredMethods: [PayabliPayInMethodType]
     ) -> [PayabliPayInMethodType] {
         let methods = configuredMethods.filter { method in
-            switch operation {
+            switch operation.kind {
             case .storePaymentMethod, .capture:
                 return true
             case .authorize:
@@ -512,8 +509,7 @@ final class PayabliPayInViewModel: ObservableObject {
     ) -> String {
         payabliFramedSignature([
             "component:\(ObjectIdentifier(component))",
-            "operation:\(operation.rawValue)",
-            "request:\(component.requestConfiguration?.payabliViewModelSignature ?? "")",
+            "operation:\(operation.payabliViewModelSignature)",
             "configuration:\(configuration.payabliViewModelSignature)",
             "labels:\(labels.payabliViewModelSignature)"
         ])

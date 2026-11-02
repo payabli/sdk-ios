@@ -122,13 +122,11 @@ final class PaymentFormRefusalTests: XCTestCase {
             component: PayabliPayIn(
                 entryPoint: "entry",
                 environment: .sandbox,
-                transport: transport,
-                operation: .capture,
-                requestConfiguration: PayabliPayInRequestConfiguration(
-                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
-                )
+                transport: transport
             ),
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         fillCard(viewModel)
@@ -179,11 +177,9 @@ final class PaymentFormRefusalTests: XCTestCase {
             component: PayabliPayIn(
                 entryPoint: entryPoint,
                 environment: .sandbox,
-                transport: transport,
-                operation: .capture,
-                requestConfiguration: PayabliPayInRequestConfiguration(paymentDetails: paymentDetails, attempt: attempt)
+                transport: transport
             ),
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: paymentDetails, attempt: attempt)),
             configuration: configuration
         )
     }

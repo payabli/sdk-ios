@@ -160,8 +160,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
@@ -207,8 +206,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
         let hiddenValues = PayabliPayInHiddenValues(
             methodDescription: "Host description",

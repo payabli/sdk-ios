@@ -131,7 +131,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
                     responseBody: Self.refusal(naming: ["paymentMethod.cardnumber", "customerData.firstName"])
                 )
             ),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder + [.firstName],
@@ -159,7 +159,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         let withFirstName = PayabliPayInFormConfiguration.defaultCardFieldOrder + [.firstName]
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], cardFieldOrder: withFirstName)
         )
         fillCard(viewModel)
@@ -169,7 +169,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: withFirstName
@@ -181,7 +181,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: viewModel.labels
         )
@@ -201,7 +201,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
 
         viewModel.update(
             component: captureFlow(transport: UnreachableTransport()),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: viewModel.configuration,
             labels: viewModel.labels
         )
@@ -218,7 +218,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
 
         viewModel.update(
             component: captureFlow(transport: UnreachableTransport()),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: viewModel.configuration,
             labels: viewModel.labels
         )
@@ -236,7 +236,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         let component = captureFlow(transport: transport)
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.firstName]
@@ -249,7 +249,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder + [.firstName],
@@ -328,11 +328,9 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             component: PayabliPayIn(
                 entryPoint: "entry",
                 environment: .sandbox,
-                transport: UnreachableTransport(),
-                operation: .capture,
-                requestConfiguration: Self.requestConfiguration
+                transport: UnreachableTransport()
             ),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         fillCard(viewModel)
@@ -382,7 +380,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         let achTransport = MockPaymentCaptureTransport(responseBody: Self.approval)
         let achForm = PayabliPayInViewModel(
             component: captureFlow(transport: achTransport),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -418,9 +416,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: Self.requestConfiguration
+            transport: transport
         )
     }
 
@@ -432,7 +428,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         let customer: [PayabliPayInField] = [.firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
         let viewModel = PayabliPayInViewModel(
             component: captureFlow(transport: transport),
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder

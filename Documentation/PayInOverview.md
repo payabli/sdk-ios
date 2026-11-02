@@ -60,13 +60,12 @@ The component supports four PayIn workflows:
 | Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | The hosted form collects a card only. The direct API accepts a card, a stored card, or a cloud device. |
 | Capture prior authorization | Direct async API | `/api/v2/MoneyIn/capture/{transId}` | Uses a prior authorization transaction ID. |
 
-`PayabliPayInOperation` selects the hosted form behavior:
+`PayabliPayInOperation` selects the hosted form behavior. The form takes it as `operation:`, and a payment carries
+the `PayabliPayInRequestConfiguration` it sends:
 
 - `.storePaymentMethod`
-- `.capture`
-- `.authorize`
-
-The default is `.storePaymentMethod`.
+- `.capture(configuration)`
+- `.authorize(configuration)`
 
 ## Authentication Model
 

@@ -19,7 +19,7 @@ struct PaymentFormHost: View {
     var body: some View {
         PayabliPayInForm(
             payIn: flow.flow,
-            operation: form.operation.formOperation,
+            operation: flow.formOperation(for: form.operation),
             configuration: form.configuration,
             labels: form.labels,
             onCompleted: { onCompleted(PayInOutcome($0)) },
@@ -43,7 +43,7 @@ extension View {
         payabliPayInSheet(
             isPresented: isPresented,
             payIn: flow.flow,
-            operation: form.operation.formOperation,
+            operation: flow.formOperation(for: form.operation),
             configuration: form.configuration,
             labels: form.labels,
             sheetConfiguration: PayabliPayInSheetConfiguration(

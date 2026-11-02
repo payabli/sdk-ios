@@ -14,8 +14,7 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
 
         let result = try await component.storeMethod(PayabliPayInStoreRequest(
@@ -43,8 +42,7 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture
+            transport: transport
         )
 
         let result = try await component.capture(PayabliPayInRequest(

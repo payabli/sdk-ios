@@ -118,7 +118,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
         XCTAssertNil(PayabliPayInFieldSection(title: "  ", fields: [.firstName]).heading)
         XCTAssertEqual(PayabliPayInFieldSection(title: "  ", fields: [.amount], style: .summary).heading, "Payment")
         XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: blank), "Total")
-        for operation in [PayabliPayInOperation.capture, .authorize, .storePaymentMethod] {
+        for operation in [PayabliPayInOperation.Kind.capture, .authorize, .storePaymentMethod] {
             XCTAssertEqual(
                 PayInSubmitWording.text(showing: operation, submitting: nil, hostWording: blank.hostSubmitButton),
                 PayInSubmitWording(operation).idle

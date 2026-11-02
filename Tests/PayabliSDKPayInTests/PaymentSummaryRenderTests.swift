@@ -20,21 +20,17 @@ final class PaymentSummaryRenderTests: XCTestCase {
 
     func testAStoredMethodDrawsNoSummary() {
         let capture = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"))
-        let store = renderedHeight(nil, operation: .storePaymentMethod)
+        let store = renderedHeight(nil)
 
         XCTAssertGreaterThan(capture, store, "a capture draws its Total, a stored method draws no summary")
     }
 
-    private func renderedHeight(
-        _ paymentDetails: PayabliPayInPaymentDetails?,
-        operation: PayabliPayInOperation = .capture
-    ) -> CGFloat {
-        let component = flowOnSession(
-            operation: operation,
-            requestConfiguration: paymentDetails.map { PayabliPayInRequestConfiguration(paymentDetails: $0) }
-        )
+    /// The form's height for a capture of `paymentDetails`, or for storing a method when there are none.
+    private func renderedHeight(_ paymentDetails: PayabliPayInPaymentDetails?) -> CGFloat {
+        let operation = paymentDetails.map { PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(paymentDetails: $0)) }
+            ?? .storePaymentMethod
         let host = PayInUIKitHostingSupport.host(PayabliPayInForm(
-            payIn: component,
+            payIn: flowOnSession(),
             operation: operation,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             onCompleted: { _ in },

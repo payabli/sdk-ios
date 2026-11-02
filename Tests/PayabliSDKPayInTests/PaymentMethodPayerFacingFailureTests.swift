@@ -176,7 +176,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
 
         viewModel.update(
             component: flow,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 defaultMethod: .card,
@@ -199,7 +199,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
 
         viewModel.update(
             component: flow,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels(declinedMessage: "That card didn't work.")
         )
@@ -214,7 +214,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         _ = try? await viewModel.submit()
         viewModel.update(
             component: flow,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels(declinedMessage: "That card didn't work.")
         )
@@ -222,7 +222,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
 
         viewModel.update(
             component: flow,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels(declinedMessage: "   ")
         )
@@ -240,7 +240,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
 
         viewModel.update(
             component: flow,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
             labels: PayabliPayInFormLabels(retryLaterMessage: "It's busy right now. Try once more.")
         )
@@ -379,7 +379,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
     ) -> PayabliPayInViewModel {
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(Self.requestConfiguration),
             configuration: configuration,
             labels: labels
         )
@@ -411,8 +411,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
     }
 
@@ -424,9 +423,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: Self.requestConfiguration
+            transport: transport
         )
     }
 
@@ -437,9 +434,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
             tokenProvider: { throw URLError(.userAuthenticationRequired) }
         )
         return PayabliPayIn(
-            session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport()),
-            operation: .capture,
-            requestConfiguration: Self.requestConfiguration
+            session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport())
         )
     }
 

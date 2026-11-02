@@ -163,7 +163,7 @@ public struct PayabliPayInForm: View {
                 labels: change.labels
             )
         }
-        .onChange(of: operation) { _ in
+        .onChange(of: operation.payabliViewModelSignature) { _ in
             syncViewModel()
         }
         .onChange(of: viewModel.availableMethods) { _ in
@@ -171,9 +171,6 @@ public struct PayabliPayInForm: View {
         }
         .onChange(of: viewModel.selectedMethod) { method in
             onMethodChanged(method)
-        }
-        .onReceive(payIn.$requestConfiguration) { _ in
-            syncViewModel()
         }
         .onChange(of: viewModel.failureMessage) { message in
             announceFailureMessage(message)
@@ -242,10 +239,9 @@ public struct PayabliPayInForm: View {
         case .bankAccount:
             configuration.bankSections
         }
-        let charges = viewModel.operation != .storePaymentMethod
         return PayInSummaryPlacement.place(
             sections,
-            paymentDetails: charges ? payIn.requestConfiguration?.paymentDetails : nil,
+            paymentDetails: viewModel.operation.requestConfiguration?.paymentDetails,
             showsBaseAmount: configuration.showsBaseAmount
         )
     }
@@ -473,7 +469,7 @@ public struct PayabliPayInForm: View {
 
     func summarySection(_ drawn: PayInDrawnSection) -> some View {
         let summary = configuration.paymentSummary
-        let currency = payIn.requestConfiguration?.paymentDetails.currency
+        let currency = viewModel.operation.requestConfiguration?.paymentDetails.currency
 
         return VStack(alignment: .leading, spacing: drawn.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
             if let title = drawn.title {
@@ -1004,7 +1000,7 @@ extension PayabliPayInForm {
 
     var submitButtonText: String {
         PayInSubmitWording.text(
-            showing: viewModel.operation,
+            showing: viewModel.operation.kind,
             submitting: viewModel.submittingOperation,
             hostWording: labels.hostSubmitButton
         )

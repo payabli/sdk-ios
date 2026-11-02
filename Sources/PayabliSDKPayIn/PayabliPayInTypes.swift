@@ -1,16 +1,6 @@
 import Foundation
 import PayabliSDKCore
 
-public enum PayabliPayInOperation: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case storePaymentMethod
-    case capture
-    case authorize
-
-    public var id: String {
-        rawValue
-    }
-}
-
 public enum PayabliPayInAuthorizationMethod: String, CaseIterable, Identifiable, Sendable, Equatable {
     case card
 

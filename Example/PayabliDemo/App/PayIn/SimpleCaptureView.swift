@@ -317,8 +317,8 @@ private struct OwnerFrame<Content: View>: View {
 #Preview {
     WithDemoSession { session, _ in
         SimpleCaptureView(
-            captureFlow: PayInSessions.preview(session: session, operation: .capture),
-            authorizeFlow: PayInSessions.preview(session: session, operation: .authorize),
+            captureFlow: PayInSessions.preview(session: session),
+            authorizeFlow: PayInSessions.preview(session: session),
             saveFlow: PayInSessions.preview(session: session)
         )
         .environmentObject(DemoCustomerSetting())

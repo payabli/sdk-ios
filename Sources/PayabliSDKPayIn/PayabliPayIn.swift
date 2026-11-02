@@ -45,9 +45,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reads the clock a held key ages against. One that keeps counting while the device sleeps.
     var now: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
 
-    @Published public private(set) var operation: PayabliPayInOperation
-    @Published public private(set) var requestConfiguration: PayabliPayInRequestConfiguration?
-
     private(set) var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
     private var client: PayInPaymentFlowClient
@@ -63,19 +60,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// The entry point and the environment come from the session's configuration, so a flow and the
     /// session it runs on cannot disagree about which merchant or which host they are for.
     ///
-    /// - Parameters:
-    ///   - session: The session the flow sends on.
-    ///   - operation: What a submission does.
-    ///   - requestConfiguration: The request the flow starts with, if any.
-    public init(
-        session: PayabliSession,
-        operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
-    ) {
+    /// - Parameter session: The session the flow sends on.
+    public init(session: PayabliSession) {
         self.entryPoint = session.config.entryPoint
         self.environment = session.config.environment
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
         self.session = session
         injectedTransport = nil
         client = PayInPaymentFlowClient(transport: session.transport)
@@ -92,21 +80,15 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter entryPoint: the paypoint's entry point, as the requests carry it.
     /// - Parameter environment: the environment the requests go to, whose base URL builds the routes.
     /// - Parameter transport: the transport that sends every request, used whole.
-    /// - Parameter operation: what a submission without an operation of its own does, `.storePaymentMethod` when nothing is given.
-    /// - Parameter requestConfiguration: the transaction configuration a request is built from.
     /// - Parameter telemetry: where the flow reports its operations, nil to report nothing.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
         transport: any PayabliTransport,
-        operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil,
         telemetry: TelemetryClient? = nil
     ) {
         self.entryPoint = entryPoint
         self.environment = environment
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
         session = nil
         injectedTransport = transport
         client = PayInPaymentFlowClient(transport: transport)
@@ -149,37 +131,6 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         configure(config: config)
     }
 
-    public func configure(
-        operation: PayabliPayInOperation,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
-    ) {
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
-    }
-
-    public func configure(
-        requestConfiguration: PayabliPayInRequestConfiguration
-    ) {
-        self.requestConfiguration = requestConfiguration
-    }
-
-    public func submitConfigured(
-        _ request: PayabliPayInRequest
-    ) async throws -> PayabliPayInResult {
-        try await submitConfigured(request, for: operation, origin: .direct)
-    }
-
-    public func submitConfigured(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInResult {
-        try await submitConfigured(
-            PayabliPayInStoreRequest(instrument: paymentMethod, options: options),
-            for: operation,
-            origin: .direct
-        )
-    }
-
     /// Runs an operation on a payment, reported as started by `origin`.
     ///
     /// - Parameter request: the payment and its settings.
@@ -214,9 +165,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         for operation: PayabliPayInOperation,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        guard operation == .storePaymentMethod else {
+        guard case .storePaymentMethod = operation else {
             return try await reported(
-                operation == .capture ? .capture : .authorize,
+                PayInReports.operation(of: operation.kind),
                 origin: origin,
                 method: PayInReports.method(of: request.instrument.method)
             ) {
@@ -236,14 +187,15 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     func reportFormRefusal(
         _ error: any Error,
         method: PayabliPayInMethodType,
-        operation: PayabliPayInOperation
+        operation: PayabliPayInOperation.Kind
     ) {
-        let reported: PayInReports.Operation = switch operation {
-        case .storePaymentMethod: .storeMethod
-        case .capture: .capture
-        case .authorize: .authorize
-        }
-        reports?.completed(reported, origin: .form, method: PayInReports.method(of: method), after: nil, error: error)
+        reports?.completed(
+            PayInReports.operation(of: operation),
+            origin: .form,
+            method: PayInReports.method(of: method),
+            after: nil,
+            error: error
+        )
     }
 
     /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.

@@ -10,7 +10,7 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
     }
 
     func testEachCategoryDrawsItsMessageForAPaymentOrAnAuthorization() {
-        for operation in [PayabliPayInOperation.capture, .authorize] {
+        for operation in [PayabliPayInOperation.Kind.capture, .authorize] {
             for category in PayabliErrorCategory.allCases {
                 let expected = switch category {
                 case .declined: "The payment was declined. Try another payment method."
@@ -88,7 +88,7 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
             reason: PayabliErrorType.unknown.message,
             underlying: RedactedCause(failure)
         )
-        for operation in PayabliPayInOperation.allCases {
+        for operation in PayabliPayInOperation.Kind.allCases {
             XCTAssertEqual(
                 PayabliPayInFailureMessage.text(for: failure, operation: operation),
                 PayabliPayInFailureMessage.text(for: reported, operation: operation),

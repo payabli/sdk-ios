@@ -46,24 +46,18 @@ let session = try await PayabliSession.initialize(config: PayabliConfig(
     environment: .sandbox,
     tokenProvider: { try await fetchPayabliAccessToken() }
 ))
-let payIn = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
-        orderId: order.id // your own reference, to find the payment if its outcome is unknown
-    )
-)
+let payIn = PayabliPayIn(session: session)
 ```
 
-A form that captures or authorizes needs this `PayabliPayInRequestConfiguration`. A direct call takes a
-`PayabliPayInRequest` instead.
+One `PayabliPayIn` serves every form and call on the session.
 
 ## Take a payment
 
 ### Use the SDK's form
 
-`PayabliPayInForm` renders a card and bank account form and submits it with the operation you chose:
+`PayabliPayInForm` renders a card and bank account form and submits it with the operation you chose. A capture
+or an authorization carries the payment it sends, as a `PayabliPayInRequestConfiguration`; a direct call takes a
+`PayabliPayInRequest` instead.
 
 ```swift
 import SwiftUI
@@ -75,7 +69,10 @@ struct CheckoutView: View {
     var body: some View {
         PayabliPayInForm(
             payIn: payIn,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                orderId: order.id // your own reference, to find the payment if its outcome is unknown
+            )),
             configuration: PayabliPayInFormConfiguration(),
             onCompleted: { success in
                 // Store the identifiers; don't log them.
@@ -145,7 +142,8 @@ The reference stays on the device. Calling again is a new payment unless you say
 When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
 again, set `attempt: .retry` and that `paymentReference` on the options: the SDK sends that payment's key, so the
-service refuses a repeat while it still recognises the key. When it refuses one, the charge ends in
+service refuses a repeat while it still recognises the key. On the form, pass a new operation carrying the same
+configuration with `attempt: .retry`. When it refuses one, the charge ends in
 `submissionInterrupted` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.

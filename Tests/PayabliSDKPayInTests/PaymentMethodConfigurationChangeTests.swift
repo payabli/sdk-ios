@@ -36,7 +36,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let component = captureComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: Self.capture,
             configuration: configuration(),
             labels: labels(amountLabel: "Order total")
         )
@@ -44,7 +44,7 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: Self.capture,
             configuration: configuration(),
             labels: labels(amountLabel: "Due today")
         )
@@ -254,14 +254,14 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         let component = captureComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: Self.capture,
             configuration: configuration(),
             labels: PayabliPayInFormLabels(declinedMessage: "No|retryLater:Wait", retryLaterMessage: "Soon")
         )
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: Self.capture,
             configuration: configuration(),
             labels: PayabliPayInFormLabels(declinedMessage: "No", retryLaterMessage: "Wait|retryLater:Soon")
         )
@@ -291,13 +291,12 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
     }
 
     private func captureComponent() -> PayabliPayIn {
-        flowOnSession(
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 15)
-            )
-        )
+        flowOnSession()
     }
+
+    private static let capture = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 15)
+    ))
 
     private func form(
         payIn: PayabliPayIn,

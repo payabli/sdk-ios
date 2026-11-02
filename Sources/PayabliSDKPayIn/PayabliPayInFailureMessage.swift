@@ -16,7 +16,7 @@ enum PayabliPayInFailureMessage {
     ///   the SDK's own message for the category ``messageCategory(for:)`` names.
     static func text(
         for error: any Error,
-        operation: PayabliPayInOperation,
+        operation: PayabliPayInOperation.Kind,
         labels: PayabliPayInFormLabels
     ) -> String {
         text(for: messageCategory(for: error), operation: operation, labels: labels)
@@ -33,7 +33,7 @@ enum PayabliPayInFailureMessage {
     ///     the SDK's own message for the category.
     static func text(
         for category: PayabliErrorCategory,
-        operation: PayabliPayInOperation,
+        operation: PayabliPayInOperation.Kind,
         labels: PayabliPayInFormLabels
     ) -> String {
         labels.failureMessage(for: category) ?? text(for: category, operation: operation)
@@ -59,7 +59,7 @@ enum PayabliPayInFailureMessage {
     ///   - operation: What the form submitted.
     /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; otherwise the
     ///   message for the error's category, with a failure outside the catalog read as outcome-unknown.
-    static func text(for error: any Error, operation: PayabliPayInOperation) -> String {
+    static func text(for error: any Error, operation: PayabliPayInOperation.Kind) -> String {
         text(for: messageCategory(for: error), operation: operation)
     }
 
@@ -71,7 +71,7 @@ enum PayabliPayInFailureMessage {
     ///   - category: Which of the catalog's categories the failure is, which picks the message.
     ///   - operation: What the form submitted.
     /// - Returns: The message the payer sees.
-    static func text(for category: PayabliErrorCategory, operation: PayabliPayInOperation) -> String {
+    static func text(for category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind) -> String {
         switch (operation, category) {
         case (.capture, .declined), (.authorize, .declined):
             "The payment was declined. Try another payment method."

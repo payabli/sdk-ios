@@ -4,7 +4,7 @@ import XCTest
 final class PaymentMethodStoreRouteFieldTests: XCTestCase {
     @MainActor
     func testTheStoreRouteDropsEveryMoneyRow() {
-        let component = flowOnSession(operation: .storePaymentMethod)
+        let component = flowOnSession()
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardFieldOrder: [.surchargeFee] + PayabliPayInFormConfiguration.defaultCardFieldOrder

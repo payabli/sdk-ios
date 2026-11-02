@@ -52,7 +52,7 @@ Use hosted UI when the app must avoid clear PAN access:
 ```swift
 PayabliPayInForm(
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: configuration,
     style: style,
     onCompleted: { success in
@@ -203,32 +203,29 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 
 ## 5. Capture A Transaction
 
-Create a component in capture mode with request configuration:
+Describe the payment the form sends:
 
 ```swift
-let paymentFlow = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(
-            totalAmount: 1.00,
-            serviceFee: 0.10,
-            currency: "USD"
-        ),
-        orderDescription: "iOS checkout",
-        source: "ios-sdk",
-        achValidation: true,
-        forceCustomerCreation: true
-    )
+let paymentFlow = PayabliPayIn(session: session)
+let payment = PayabliPayInRequestConfiguration(
+    paymentDetails: PayabliPayInPaymentDetails(
+        totalAmount: 1.00,
+        serviceFee: 0.10,
+        currency: "USD"
+    ),
+    orderDescription: "iOS checkout",
+    source: "ios-sdk",
+    achValidation: true,
+    forceCustomerCreation: true
 )
 ```
 
-Render the hosted form:
+Render the hosted form with the payment as its operation:
 
 ```swift
 PayabliPayInForm(
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: captureConfiguration,
     style: payabliStyle,
     onCompleted: { success in
@@ -241,8 +238,8 @@ PayabliPayInForm(
 ```
 
 The hosted capture form can collect card or bank account. The read-only payment summary
-is displayed before the submit button and is derived from
-`requestConfiguration.paymentDetails`.
+is displayed before the submit button and is derived from the operation's
+`paymentDetails`.
 
 Direct capture with card:
 
@@ -299,22 +296,19 @@ Direct capture also supports `.bankAccount`, `.cloudDevice`, `.check`, and `.cas
 
 ## 6. Authorize A Transaction
 
-Create a component in authorize mode:
+Describe the hold and hand it to the form as `.authorize`:
 
 ```swift
-let paymentFlow = PayabliPayIn(
-    session: session,
-    operation: .authorize,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(
-            totalAmount: 1.00,
-            serviceFee: 0.10,
-            currency: "USD"
-        ),
-        orderDescription: "iOS authorization",
-        source: "ios-sdk"
-    )
+let hold = PayabliPayInRequestConfiguration(
+    paymentDetails: PayabliPayInPaymentDetails(
+        totalAmount: 1.00,
+        serviceFee: 0.10,
+        currency: "USD"
+    ),
+    orderDescription: "iOS authorization",
+    source: "ios-sdk"
 )
+// PayabliPayInForm(payIn: paymentFlow, operation: .authorize(hold), ...)
 ```
 
 The direct `authorize(_:)` API accepts a card, a stored card, or a cloud device,
@@ -702,7 +696,7 @@ Apply style inline:
 ```swift
 PayabliPayInForm(
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: configuration,
     style: payabliStyle,
     onCompleted: { _ in },
@@ -716,7 +710,7 @@ Apply style through environment:
 ```swift
 PayabliPayInForm(
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: configuration,
     onCompleted: { _ in },
     onFailed: { _ in },

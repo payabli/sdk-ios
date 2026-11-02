@@ -109,13 +109,13 @@ cannot show it being supplied.
 
 ## Operations
 
-`PayabliPayInOperation`:
+`PayabliPayInOperation`, which the form takes as `operation:`:
 
 | Value | Hosted form behavior | Direct API |
 | --- | --- | --- |
 | `.storePaymentMethod` | Collects card or bank account and calls token storage. | `storeMethod(_:)` |
-| `.capture` | Collects card or bank account and sends a MoneyIn getpaid request using `requestConfiguration`. | `capture(_:)` supports card, bank account, stored method, cloud, check, and cash. |
-| `.authorize` | Collects card only and sends a MoneyIn authorize request using `requestConfiguration`. | `authorize(_:)` accepts card, stored card, and cloud. |
+| `.capture(configuration)` | Collects card or bank account and sends a MoneyIn getpaid request built from `configuration`. | `capture(_:)` supports card, bank account, stored method, cloud, check, and cash. |
+| `.authorize(configuration)` | Collects card only and sends a MoneyIn authorize request built from `configuration`. | `authorize(_:)` accepts card, stored card, and cloud. |
 
 `captureAuthorizedTransaction(_:)` is a separate direct API for a prior
 authorization. It does not render as a hosted form mode.
@@ -140,11 +140,7 @@ Authorize guidance:
 The public initializer:
 
 ```swift
-PayabliPayIn(
-    session: PayabliSession,
-    operation: PayabliPayInOperation = .storePaymentMethod,
-    requestConfiguration: PayabliPayInRequestConfiguration? = nil
-)
+PayabliPayIn(session: PayabliSession)
 ```
 
 Public state:
@@ -154,17 +150,12 @@ Public state:
   published here: `voidTransaction(_:)` returns its result to its caller and
   leaves this as the last submission left it.
 - `lastStoredPaymentMethod`: convenience accessor for stored-method results.
-- `operation`: current operation.
-- `requestConfiguration`: transaction configuration used by hosted capture and
-  authorize forms.
 
 Configuration methods:
 
 - `configure(config:)`: keeps the installed session when `config` matches it. A different
   configuration is not applied, and later submissions fail with `invalidConfiguration`.
 - `configure(config:theme:)`; theme is accepted for component uniformity.
-- `configure(operation:requestConfiguration:)`
-- `configure(requestConfiguration:)`
 
 ## Hosted SwiftUI View
 
@@ -173,7 +164,7 @@ Inline form:
 ```swift
 PayabliPayInForm(
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: configuration,
     labels: labels,
     style: style,
@@ -205,7 +196,7 @@ Sheet:
 .payabliPayInSheet(
     isPresented: $isPresented,
     payIn: paymentFlow,
-    operation: .capture,
+    operation: .capture(payment),
     configuration: configuration,
     labels: labels,
     sheetConfiguration: PayabliPayInSheetConfiguration(

@@ -224,14 +224,13 @@ final class PayInTelemetryTests: XCTestCase {
     func testAFormCaptureCancelledAfterTheHandOffHandsTheHostAnOpenOutcomeTypedUserCancelled() async throws {
         let transport = ScriptedTransport()
         transport.script = [.cancelled(afterHandOff: true), .approved]
-        let flow = makeFlow(transport, operation: .capture)
-        flow.configure(requestConfiguration: PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
-            paymentReference: "p1"
-        ))
+        let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                paymentReference: "p1"
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -317,21 +316,26 @@ final class PayInTelemetryTests: XCTestCase {
 
     func testAFormRefusalTheFlowNeverSeesIsReportedByTheForm() async throws {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
-        let flow = makeFlow(transport, operation: .capture)
+        let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
-            operation: .capture,
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+            )),
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                requiredFields: [.cardholderName]
+            )
         )
         viewModel.cardNumber = "4111111111111111"
         viewModel.cardExpiration = "12/30"
         viewModel.cardCvv = "123"
-        viewModel.cardholderName = "Jane"
         viewModel.cardZip = "12345"
 
         _ = await PayInFixture.failure { _ = try await viewModel.submit() }
 
-        XCTAssertEqual(transport.count, 0, "no request configuration, so nothing was sent")
+        XCTAssertEqual(transport.count, 0, "a required field was empty, so nothing was sent")
         let event = try await onlyEvent(of: flow)
         XCTAssertEqual(event.event, "payin.capture.completed")
         XCTAssertEqual(event.properties["origin"], "form")
@@ -340,13 +344,12 @@ final class PayInTelemetryTests: XCTestCase {
 
     func testAFormAmountRefusalIsReportedOnceByTheFlow() async throws {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
-        let flow = makeFlow(transport, operation: .capture)
-        flow.configure(requestConfiguration: PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: "USD")
-        ))
+        let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
             component: flow,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: "USD")
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -428,10 +431,7 @@ final class PayInTelemetryTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeFlow(
-        _ transport: any PayabliTransport,
-        operation: PayabliPayInOperation = .storePaymentMethod
-    ) -> PayabliPayIn {
+    private func makeFlow(_ transport: any PayabliTransport) -> PayabliPayIn {
         let telemetry = TelemetryClient(
             configuration: .init(entry: "entry", environment: "sandbox"),
             transport: recorder,
@@ -445,7 +445,6 @@ final class PayInTelemetryTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport,
-            operation: operation,
             telemetry: telemetry
         )
     }

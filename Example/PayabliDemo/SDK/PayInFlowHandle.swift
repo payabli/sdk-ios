@@ -11,10 +11,17 @@ import PayabliSDKPayIn
 final class PayInFlowHandle: ObservableObject {
     let flow: PayabliPayIn
 
+    /// The payment a form on this flow sends next. A flow that only stores methods never sends it.
+    @Published private(set) var request: PayabliPayInRequestConfiguration
+
     private var forwarding: AnyCancellable?
 
-    init(_ flow: PayabliPayIn) {
+    init(
+        _ flow: PayabliPayIn,
+        request: PayabliPayInRequestConfiguration = PayInRequests.freshCapture(suppliesCustomer: true)
+    ) {
         self.flow = flow
+        self.request = request
         // Screens observe this object, so the flow's publishes have to arrive here
         // or a submission redraws nothing.
         forwarding = flow.objectWillChange.sink { [weak self] _ in
@@ -34,6 +41,20 @@ final class PayInFlowHandle: ObservableObject {
         flow.lastResult != nil
     }
 
+    /// What a form on this flow submits for `purpose`, carrying the payment it sends next.
+    ///
+    /// A reversal runs as a direct call and is never drawn as a form; its case only keeps the switch total.
+    ///
+    /// - Parameter purpose: what the form is for.
+    /// - Returns: the operation to hand the form.
+    func formOperation(for purpose: PayInOperation) -> PayabliPayInOperation {
+        switch purpose {
+        case .storedMethod: .storePaymentMethod
+        case .capture, .void: .capture(request)
+        case .authorize: .authorize(request)
+        }
+    }
+
     /// Draws a new attempt: a fresh amount, a new payment, and whatever the customer switch says now.
     ///
     /// Not while a submission is in flight; the screen keeps offering this then, so the refusal lives here.
@@ -45,13 +66,7 @@ final class PayInFlowHandle: ObservableObject {
         source: String = "ios-payment-capture-qa"
     ) -> Bool {
         guard !flow.isSubmitting else { return false }
-        flow.configure(
-            requestConfiguration: PayInRequests.freshCapture(
-                suppliesCustomer: suppliesCustomer,
-                amount: amount,
-                source: source
-            )
-        )
+        request = PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer, amount: amount, source: source)
         return true
     }
 
@@ -70,35 +85,23 @@ final class PayInFlowHandle: ObservableObject {
     /// Puts the customer the switch now names onto the attempt already on screen,
     /// leaving the amount, the order identifier and any declared retry as they were.
     ///
-    /// Not while a submission is in flight, whose configuration it would replace.
+    /// Not while a submission is in flight, whose payment it would change on screen.
     func applyCustomerChange(suppliesCustomer: Bool) {
         guard !flow.isSubmitting else { return }
-        guard let current = flow.requestConfiguration else {
-            flow.configure(requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: suppliesCustomer))
-            return
-        }
-        flow.configure(
-            requestConfiguration: PayInRequests.sameAttempt(
-                as: current,
-                customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
-                attempt: current.attempt
-            )
+        request = PayInRequests.sameAttempt(
+            as: request,
+            customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
+            attempt: request.attempt
         )
     }
 
-    /// After a charge whose outcome is unknown, declares the next submit a retry of it, so the SDK sends the key it
-    /// holds for that payment's reference and the service refuses a repeat rather than charging twice.
+    /// After a charge whose outcome is unknown, makes the next submit a retry of it: the same payment, so the SDK
+    /// sends the key it holds for that payment's reference and the service refuses a repeat rather than charging twice.
     ///
     /// - Parameter failure: how the charge ended.
     func chargeFailed(_ failure: PayInFailure) {
-        guard failure.outcomeIsUnresolved, !flow.isSubmitting, let current = flow.requestConfiguration else { return }
-        flow.configure(
-            requestConfiguration: PayInRequests.sameAttempt(
-                as: current,
-                customerData: current.customerData,
-                attempt: .retry
-            )
-        )
+        guard failure.outcomeIsUnresolved, !flow.isSubmitting else { return }
+        request = PayInRequests.sameAttempt(as: request, customerData: request.customerData, attempt: .retry)
     }
 }
 

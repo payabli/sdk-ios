@@ -71,25 +71,9 @@ import _SwiftConcurrencyShims
   @_Concurrency::MainActor final public var environment: PayabliSDKCore::PayabliEnvironment {
     get
   }
-  @Combine::Published<PayabliSDKPayIn::PayabliPayInOperation> @_projectedValueProperty($operation) @_Concurrency::MainActor final public var operation: PayabliSDKPayIn::PayabliPayInOperation {
-    get
-  }
-  @_Concurrency::MainActor final public var $operation: Combine::Published<PayabliSDKPayIn::PayabliPayInOperation>.Combine::Publisher {
-    get
-  }
-  @Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?> @_projectedValueProperty($requestConfiguration) @_Concurrency::MainActor final public var requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? {
-    get
-  }
-  @_Concurrency::MainActor final public var $requestConfiguration: Combine::Published<PayabliSDKPayIn::PayabliPayInRequestConfiguration?>.Combine::Publisher {
-    get
-  }
-  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession, operation: PayabliSDKPayIn::PayabliPayInOperation = .storePaymentMethod, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
+  @_Concurrency::MainActor public init(session: PayabliSDKCore::PayabliSession)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig)
   @_Concurrency::MainActor final public func configure(config: PayabliSDKCore::PayabliConfig, theme _: PayabliSDKCore::PayabliTheme)
-  @_Concurrency::MainActor final public func configure(operation: PayabliSDKPayIn::PayabliPayInOperation, requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration? = nil)
-  @_Concurrency::MainActor final public func configure(requestConfiguration: PayabliSDKPayIn::PayabliPayInRequestConfiguration)
-  @_Concurrency::MainActor final public func submitConfigured(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
-  @_Concurrency::MainActor final public func submitConfigured(_ paymentMethod: PayabliSDKPayIn::PayabliPayInMethodInput, options: PayabliSDKPayIn::PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func storeMethod(_ request: PayabliSDKPayIn::PayabliPayInStoreRequest) async throws -> PayabliSDKPayIn::PayabliPayInStoredMethod
   @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
   @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequest) async throws -> PayabliSDKPayIn::PayabliPayInResult
@@ -656,6 +640,11 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
 extension PayabliSDKPayIn::PayabliPayInMethodInput {
   public func validate(_ validation: PayabliSDKPayIn::PayabliPayInValidation = .default) throws
 }
+public enum PayabliPayInOperation : Swift::Sendable {
+  case storePaymentMethod
+  case capture(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
+  case authorize(PayabliSDKPayIn::PayabliPayInRequestConfiguration)
+}
 extension PayabliSDKPayIn::PayabliPayInCardData : Swift::CustomStringConvertible {
   public var description: Swift::String {
     get
@@ -868,24 +857,6 @@ public enum PayabliPayInTransactionStatus : Swift::Sendable, Swift::Hashable {
   public static func == (a: PayabliSDKPayIn::PayabliPayInTransactionStatus, b: PayabliSDKPayIn::PayabliPayInTransactionStatus) -> Swift::Bool
   public func hash(into hasher: inout Swift::Hasher)
   public var hashValue: Swift::Int {
-    get
-  }
-}
-public enum PayabliPayInOperation : Swift::String, Swift::CaseIterable, Swift::Identifiable, Swift::Sendable, Swift::Equatable {
-  case storePaymentMethod
-  case capture
-  case authorize
-  public var id: Swift::String {
-    get
-  }
-  public init?(rawValue: Swift::String)
-  public typealias AllCases = [PayabliSDKPayIn::PayabliPayInOperation]
-  public typealias ID = Swift::String
-  public typealias RawValue = Swift::String
-  nonisolated public static var allCases: [PayabliSDKPayIn::PayabliPayInOperation] {
-    get
-  }
-  public var rawValue: Swift::String {
     get
   }
 }
@@ -1152,8 +1123,6 @@ extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::Equatable {}
 extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInSecCode : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInSheetDismissButton : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInOperation : Swift::Hashable {}
-extension PayabliSDKPayIn::PayabliPayInOperation : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInAuthorizationMethod : Swift::Hashable {}
 extension PayabliSDKPayIn::PayabliPayInAuthorizationMethod : Swift::RawRepresentable {}
 extension PayabliSDKPayIn::PayabliPayInResultKind : Swift::Hashable {}

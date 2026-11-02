@@ -53,7 +53,7 @@ extension PayabliPayInViewModel {
     }
 
     func mergedCustomerData() -> PayabliPayInCustomerData? {
-        var customer = component.requestConfiguration?.customerData
+        var customer = operation.requestConfiguration?.customerData
             ?? configuration.options.customerData
             ?? PayabliPayInCustomerData()
         customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
@@ -199,18 +199,6 @@ extension PayabliPayInViewModel {
         activeRequiredFields.allSatisfy(fieldHasRequiredValue)
     }
 
-    var operationConfigurationIsValid: Bool {
-        if operation == .storePaymentMethod {
-            return true
-        }
-        return paymentDetailsArePresent
-    }
-
-    private var paymentDetailsArePresent: Bool {
-        // Present, not valid: an amount the request cannot send is refused at submission with its own message.
-        component.requestConfiguration?.paymentDetails != nil
-    }
-
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
@@ -304,7 +292,8 @@ extension PayabliPayInViewModel {
     private func paymentFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
         case .amount, .serviceFee, .surchargeFee:
-            return paymentDetailsArePresent
+            // Present, not valid: an amount the request cannot send is refused at submission with its own message.
+            return operation.requestConfiguration != nil
         default:
             return true
         }

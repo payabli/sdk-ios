@@ -70,13 +70,9 @@ final class PaymentMethodSurchargeRowTests: XCTestCase {
 
     @MainActor
     private func captureForm(paymentDetails: PayabliPayInPaymentDetails) -> PayabliPayInForm {
-        let payIn = flowOnSession(
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(paymentDetails: paymentDetails)
-        )
-        return PayabliPayInForm(
-            payIn: payIn,
-            operation: .capture,
+        PayabliPayInForm(
+            payIn: flowOnSession(),
+            operation: .capture(PayabliPayInRequestConfiguration(paymentDetails: paymentDetails)),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             onCompleted: { _ in },
             onFailed: { _ in },

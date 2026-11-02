@@ -177,7 +177,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         let recorder = CallbackRecorder()
         let form = filledBankForm(
             on: captureFlow(on: MockPaymentCaptureTransport(responseBody: Self.approvedCaptureBody)),
-            operation: .capture,
+            operation: Self.capture,
             recorder: recorder
         )
 
@@ -203,7 +203,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             on: captureFlow(
                 on: MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)
             ),
-            operation: .capture,
+            operation: Self.capture,
             recorder: recorder
         )
 
@@ -412,27 +412,19 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
         return form
     }
 
-    /// A capture flow on a transport the cases answer from, carrying the request the form submits.
+    /// The payment a capture form submits.
+    private static let capture = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
+    ))
+
+    /// A flow on a transport the cases answer from.
     private func captureFlow(on transport: any PayabliTransport) -> PayabliPayIn {
-        PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
-            )
-        )
+        PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
     }
 
-    /// A store flow on a transport the cases answer from.
+    /// A flow on a transport the cases answer from.
     private func storeFlow(on transport: any PayabliTransport) -> PayabliPayIn {
-        PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
-        )
+        PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
     }
 
     /// Runs the main actor, bounded, until the condition holds or the timeout does, so a case can

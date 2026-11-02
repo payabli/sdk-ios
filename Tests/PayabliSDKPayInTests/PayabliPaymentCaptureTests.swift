@@ -121,7 +121,7 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(body["entryPoint"] as? String, "new-entry")
     }
 
-    func testConfiguredSubmitUsesAuthorizeOperation() async throws {
+    func testAnAuthorizationSendsItsOptionsToTheAuthorizeRoute() async throws {
         let transport = FacadeTransport(responseBody: """
         {
           "code": "A0002",
@@ -139,18 +139,16 @@ final class PayabliPayInTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .authorize,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 22, currency: "USD"),
-                source: "ios-sdk-test",
-                achValidation: true,
-                forceCustomerCreation: true
-            )
+            transport: transport
         )
         component.newIdempotencyKey = { "idem-auth" }
 
-        let request = try XCTUnwrap(component.requestConfiguration?.request(
+        let request = PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 22, currency: "USD"),
+            source: "ios-sdk-test",
+            achValidation: true,
+            forceCustomerCreation: true
+        ).request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
                 expiration: "02/27",
@@ -158,8 +156,8 @@ final class PayabliPayInTests: XCTestCase {
                 cvv: "999",
                 billingZip: "12345"
             )))
-        ))
-        _ = try await component.submitConfigured(request)
+        )
+        _ = try await component.authorize(request)
 
         let submittedRequest = try await firstFacadeRequest(from: transport)
         XCTAssertEqual(submittedRequest.path, "/api/v2/MoneyIn/authorize")
@@ -177,11 +175,7 @@ final class PayabliPayInTests: XCTestCase {
         let component = flowOnSession(
             token: "access-token",
             entryPoint: "entry",
-            environment: .sandbox,
-            operation: .authorize,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
-            )
+            environment: .sandbox
         )
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.bankAccount],
@@ -190,7 +184,9 @@ final class PayabliPayInTests: XCTestCase {
 
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .authorize,
+            operation: .authorize(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+            )),
             configuration: configuration
         )
 
@@ -204,8 +200,7 @@ final class PayabliPayInTests: XCTestCase {
         let component = flowOnSession(
             token: "access-token",
             entryPoint: "entry",
-            environment: .sandbox,
-            operation: .storePaymentMethod
+            environment: .sandbox
         )
         let storeConfiguration = PayabliPayInFormConfiguration(
             allowedMethods: [.bankAccount],
@@ -228,7 +223,9 @@ final class PayabliPayInTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10)
+            )),
             configuration: captureConfiguration,
             labels: PayabliPayInFormLabels()
         )
@@ -279,15 +276,13 @@ final class PayabliPayInTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
-            )
+            transport: transport
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -312,7 +307,7 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(viewModel.submittingOperation, .capture)
         XCTAssertEqual(
             PayInSubmitWording.text(
-                showing: viewModel.operation,
+                showing: viewModel.operation.kind,
                 submitting: viewModel.submittingOperation,
                 hostWording: nil
             ),
@@ -331,15 +326,13 @@ final class PayabliPayInTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
-            )
+            transport: transport
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -373,14 +366,7 @@ final class PayabliPayInTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
-                source: "ios-form-test",
-                achValidation: true,
-                forceCustomerCreation: false
-            )
+            transport: transport
         )
         component.newIdempotencyKey = { "idem-form" }
         let configuration = PayabliPayInFormConfiguration(
@@ -390,7 +376,12 @@ final class PayabliPayInTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+                source: "ios-form-test",
+                achValidation: true,
+                forceCustomerCreation: false
+            )),
             configuration: configuration
         )
         viewModel.cardholderName = "Jane Doe"
@@ -430,20 +421,55 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
     }
 
+    func testOneFlowDrawsACaptureFormAndAnAuthorizeFormAndEachSendsItsOwnPayment() async throws {
+        let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+        let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        let captureForm = PayabliPayInViewModel(
+            component: component,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+            )),
+            configuration: configuration
+        )
+        let authorizeForm = PayabliPayInViewModel(
+            component: component,
+            operation: .authorize(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 56.78, currency: "USD")
+            )),
+            configuration: configuration
+        )
+
+        for form in [captureForm, authorizeForm] {
+            form.cardholderName = "Jane Doe"
+            form.cardNumber = "4111111111111111"
+            form.cardExpiration = "02/27"
+            form.cardCvv = "999"
+            form.cardZip = "12345"
+            _ = try await form.submit()
+        }
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.map(\.path), ["/api/v2/MoneyIn/getpaid", "/api/v2/MoneyIn/authorize"])
+        let amounts = try requests.map { request in
+            let details = try XCTUnwrap(parseFacadeBody(request)["paymentDetails"] as? [String: Any])
+            return details["totalAmount"] as? Double
+        }
+        XCTAssertEqual(amounts, [12.34, 56.78])
+    }
+
     func testAnAmountRefusalDrawsTheDefaultMessageAndSendsNothing() async throws {
         let transport = FacadeTransport(responseBody: Self.formCaptureResponse)
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture,
-            requestConfiguration: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: "USD")
-            )
+            transport: transport
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .capture,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: "USD")
+            )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -554,14 +580,12 @@ extension PayabliPayInTests {
         let formComponent = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: formTransport,
-            operation: .capture,
-            requestConfiguration: options
+            transport: formTransport
         )
         formComponent.newIdempotencyKey = { "idem-options" }
         let viewModel = PayabliPayInViewModel(
             component: formComponent,
-            operation: .capture,
+            operation: .capture(options),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -575,8 +599,7 @@ extension PayabliPayInTests {
         let directComponent = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: directTransport,
-            operation: .capture
+            transport: directTransport
         )
         directComponent.newIdempotencyKey = { "idem-options" }
         _ = try await directComponent.capture(PayabliPayInRequest(
