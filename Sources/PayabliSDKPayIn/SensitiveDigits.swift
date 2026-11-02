@@ -1,14 +1,8 @@
 import Foundation
 
-/// A card number, security code or bank account number, held so it can be overwritten.
-///
-/// A `String` cannot be erased: it is immutable, the runtime may move it, and nothing can say when the
-/// last copy is gone. This holds the digits as bytes instead, and `close()` overwrites them.
-///
-/// The host hands the SDK a `String`, which this cannot unmake: the guarantee is that the SDK keeps no
-/// copy of its own once a request is written, not that the digits were never a `String`.
-///
-/// Not thread-safe. One value belongs to one call.
+/// A card number, security code or account number as bytes `close()` overwrites, since a `String` can't be.
+/// The host's own `String` stays as it is; the SDK keeps no copy of its own once a request is written.
+/// Not thread-safe: one value belongs to one call.
 final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible,
     CustomReflectable
 {
