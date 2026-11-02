@@ -70,26 +70,26 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         )
     }
 
-    func testAConvertedFailureDrawsTheDefaultWhateverTheOperation() {
+    func testAConvertedFailureDrawsItsCategorysMessage() {
         let converted = PayabliGenericError(
             type: .unknown,
             reason: PayabliErrorType.unknown.message,
             underlying: RedactedCause(URLError(.notConnectedToInternet))
         )
         for operation in [PayabliPayInOperation.capture, .authorize, .storePaymentMethod] {
-            let expected = switch operation {
-            case .storePaymentMethod: "The payment method couldn't be saved."
-            default: "The payment couldn't be completed."
-            }
             XCTAssertEqual(
                 PayabliPayInFailureMessage.text(for: converted, operation: operation),
-                expected,
+                PayabliPayInFailureMessage.text(for: .outcomeUnknown, operation: operation),
                 "\(operation)"
             )
         }
+        XCTAssertEqual(
+            PayabliPayInFailureMessage.text(for: converted, operation: .capture),
+            "This payment may have gone through. Check before paying again."
+        )
     }
 
-    func testAnUnrecognizedStatusStillWarnsItsOutcomeIsUnknown() {
+    func testAnUnrecognizedStatusWarnsItsOutcomeIsUnknown() {
         for operation in [PayabliPayInOperation.capture, .authorize] {
             XCTAssertEqual(
                 PayabliPayInFailureMessage.text(
