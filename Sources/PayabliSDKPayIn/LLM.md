@@ -221,10 +221,10 @@ Sheet:
 ```swift
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
-        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        cardNumber: "4111111111111111",
         expiry: "02/28",
         holderName: "Jane Doe",
-        securityCode: SensitiveDigits.ofString("123"),
+        securityCode: "123",
         postalCode: "33139"
     ),
     options: PayabliPayInOptions(
@@ -238,7 +238,7 @@ let storedCard = try await paymentFlow.addCard(
 ```swift
 let storedBankAccount = try await paymentFlow.addBankAccount(
     PayabliPayInBankAccountData(
-        accountNumber: SensitiveDigits.ofString("111111111111"),
+        accountNumber: "111111111111",
         accountType: .checking,
         holderName: "Jane Doe",
         routingNumber: "123456780",
@@ -252,17 +252,17 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 
 | Field | Notes |
 | --- | --- |
-| `cardNumber` | Full PAN, as `SensitiveDigits`. Direct API only; PCI-sensitive. Digits are normalized before request. |
+| `cardNumber` | Full PAN. Direct API only; PCI-sensitive. Digits are normalized before request. |
 | `expiry` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
 | `holderName` | Required. |
-| `securityCode` | Required, as `SensitiveDigits`. Direct API only; PCI-sensitive. |
+| `securityCode` | Required. Direct API only; PCI-sensitive. |
 | `postalCode` | Postal code for card billing. Default label is `Postal code`. |
 
 `PayabliPayInBankAccountData` fields:
 
 | Field | Notes |
 | --- | --- |
-| `accountNumber` | Required, as `SensitiveDigits`. Direct API only; sensitive. |
+| `accountNumber` | Required. Direct API only; sensitive. |
 | `accountType` | `.checking` or `.savings`; raw values are `Checking` and `Savings`. |
 | `holderName` | Required account holder name. |
 | `routingNumber` | Required routing number; checksum validation enabled by default. |
@@ -270,7 +270,7 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
 
-`cardNumber`, `securityCode` and `accountNumber` are `SensitiveDigits`, a buffer whose `close()` overwrites the digits once the app no longer needs them. Build one with `SensitiveDigits.ofString(_:)`.
+`cardNumber`, `securityCode` and `accountNumber` are passed as `String` and copied into buffers the SDK overwrites once each request is written. They can be set, and never read back from the value.
 
 `PayabliPayInOptions` is a typealias for
 `PayabliPayInTokenStorageOptions`. It carries no idempotency key: a repeat is not

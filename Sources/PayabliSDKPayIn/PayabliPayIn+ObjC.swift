@@ -131,10 +131,10 @@ public final class PayabliPayInObjC: NSObject {
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
         let card = PayabliPayInCardData(
-            cardNumber: SensitiveDigits.ofString(cardNumber),
+            cardNumber: cardNumber,
             expiry: expiry,
             holderName: holderName,
-            securityCode: SensitiveDigits.ofString(securityCode),
+            securityCode: securityCode,
             postalCode: postalCode
         )
         let options = PayabliPayInOptions(
@@ -187,7 +187,7 @@ public final class PayabliPayInObjC: NSObject {
         }
 
         let ach = PayabliPayInBankAccountData(
-            accountNumber: SensitiveDigits.ofString(accountNumber),
+            accountNumber: accountNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
             routingNumber: routingNumber,

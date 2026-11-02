@@ -1,11 +1,35 @@
 public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringConvertible, Sendable {
-    public var cardNumber: SensitiveDigits
+    let cardNumber: SensitiveDigits
     public var expiry: String
     public var holderName: String
-    public var securityCode: SensitiveDigits
+    let securityCode: SensitiveDigits
     public var postalCode: String
 
+    /// Card data for a payment or a stored method. The card number and the security code are copied into
+    /// buffers the SDK overwrites, and can't be read back from the value.
+    ///
+    /// - Parameter cardNumber: the card number.
+    /// - Parameter expiry: the expiry, as `MM/YY` or `MMYY`.
+    /// - Parameter holderName: the cardholder's name.
+    /// - Parameter securityCode: the security code.
+    /// - Parameter postalCode: the billing postal code.
     public init(
+        cardNumber: String,
+        expiry: String,
+        holderName: String,
+        securityCode: String,
+        postalCode: String
+    ) {
+        self.init(
+            cardNumber: SensitiveDigits.ofString(cardNumber),
+            expiry: expiry,
+            holderName: holderName,
+            securityCode: SensitiveDigits.ofString(securityCode),
+            postalCode: postalCode
+        )
+    }
+
+    init(
         cardNumber: SensitiveDigits,
         expiry: String,
         holderName: String,
@@ -32,7 +56,7 @@ public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringCo
 }
 
 public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugStringConvertible, Sendable {
-    public var accountNumber: SensitiveDigits
+    let accountNumber: SensitiveDigits
     public var accountType: PayabliPayInAccountType
     public var holderName: String
     public var routingNumber: String
@@ -40,7 +64,37 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
     public var holderType: PayabliPayInAccountHolderType?
     public var device: String?
 
+    /// Bank account data for a payment or a stored method. The account number is copied into a buffer
+    /// the SDK overwrites, and can't be read back from the value.
+    ///
+    /// - Parameter accountNumber: the account number.
+    /// - Parameter accountType: checking or savings.
+    /// - Parameter holderName: the account holder's name.
+    /// - Parameter routingNumber: the routing number.
+    /// - Parameter secCode: the ACH entry class; `.web` unless set.
+    /// - Parameter holderType: personal or business, when known.
+    /// - Parameter device: the device identifier, when one is sent.
     public init(
+        accountNumber: String,
+        accountType: PayabliPayInAccountType,
+        holderName: String,
+        routingNumber: String,
+        secCode: PayabliPayInSecCode? = .web,
+        holderType: PayabliPayInAccountHolderType? = nil,
+        device: String? = nil
+    ) {
+        self.init(
+            accountNumber: SensitiveDigits.ofString(accountNumber),
+            accountType: accountType,
+            holderName: holderName,
+            routingNumber: routingNumber,
+            secCode: secCode,
+            holderType: holderType,
+            device: device
+        )
+    }
+
+    init(
         accountNumber: SensitiveDigits,
         accountType: PayabliPayInAccountType,
         holderName: String,

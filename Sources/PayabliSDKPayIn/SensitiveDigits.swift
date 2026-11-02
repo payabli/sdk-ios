@@ -5,11 +5,11 @@ import Foundation
 /// A `String` cannot be erased: it is immutable, the runtime may move it, and nothing can say when the
 /// last copy is gone. This holds the digits as bytes instead, and `close()` overwrites them.
 ///
-/// Whoever supplies the digits decides what they were held in before this, and a text field holds its
-/// value as a `String`: this cannot unmake that, and only takes over from here.
+/// The host hands the SDK a `String`, which this cannot unmake: the guarantee is that the SDK keeps no
+/// copy of its own once a request is written, not that the digits were never a `String`.
 ///
 /// Not thread-safe. One value belongs to one call.
-public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible {
+final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, CustomDebugStringConvertible {
     /// The byte `close()` writes over every digit.
     static let wipedByte: UInt8 = 0
 
@@ -20,11 +20,16 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
         self.digits = digits
     }
 
+    /// The last holder going away overwrites the digits, so a value nobody closed doesn't leave them behind.
+    deinit {
+        close()
+    }
+
     /// Holds a copy of the supplied digits, which the caller still owns and should overwrite in turn.
     ///
     /// - Parameter digits: the digits to hold a copy of.
     /// - Returns: the value holding a copy of `digits`.
-    public static func of(_ digits: [UInt8]) -> SensitiveDigits {
+    static func of(_ digits: [UInt8]) -> SensitiveDigits {
         SensitiveDigits(digits)
     }
 
@@ -33,12 +38,12 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
     ///
     /// - Parameter source: the digits as a `String`, which this cannot unmake.
     /// - Returns: the value holding the digits.
-    public static func ofString(_ source: String) -> SensitiveDigits {
+    static func ofString(_ source: String) -> SensitiveDigits {
         SensitiveDigits(Array(source.utf8))
     }
 
     /// How many characters were supplied. Reads 0 after `close()`.
-    public var length: Int {
+    var length: Int {
         wiped ? 0 : digits.count
     }
 
@@ -49,7 +54,7 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
     /// After this the value behaves as empty rather than throwing: a request built from a closed value
     /// fails validation as a missing field, which is a better failure than an exception from inside a
     /// body writer.
-    public func close() {
+    func close() {
         guard !wiped else { return }
         for index in digits.indices {
             digits[index] = Self.wipedByte
@@ -58,13 +63,13 @@ public final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible
     }
 
     /// The length only. The digits are what this type exists to keep out of a message.
-    public var description: String {
+    var description: String {
         "SensitiveDigits(length=\(length))"
     }
 
     /// The same redacted text on the debug route, which `String(reflecting:)` and a debugger's `po`
     /// render. `dump()` and the variables view render the stored bytes, which no protocol redacts.
-    public var debugDescription: String {
+    var debugDescription: String {
         description
     }
 

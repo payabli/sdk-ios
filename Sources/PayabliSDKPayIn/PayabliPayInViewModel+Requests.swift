@@ -6,15 +6,15 @@ extension PayabliPayInViewModel {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
-                cardNumber: SensitiveDigits.ofString(cardNumber),
+                cardNumber: cardNumber,
                 expiry: cardExpiration,
                 holderName: cardholderName,
-                securityCode: SensitiveDigits.ofString(cardCvv),
+                securityCode: cardCvv,
                 postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: SensitiveDigits.ofString(accountNumber),
+                accountNumber: accountNumber,
                 accountType: accountType,
                 holderName: accountHolder,
                 routingNumber: routingNumber,
@@ -30,17 +30,17 @@ extension PayabliPayInViewModel {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: SensitiveDigits.ofString(cardNumber),
+                    cardNumber: cardNumber,
                     expiry: cardExpiration,
                     holderName: cardholderName,
-                    securityCode: SensitiveDigits.ofString(cardCvv),
+                    securityCode: cardCvv,
                     postalCode: cardZip
                 )
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: SensitiveDigits.ofString(accountNumber),
+                    accountNumber: accountNumber,
                     accountType: accountType,
                     holderName: accountHolder,
                     routingNumber: routingNumber,

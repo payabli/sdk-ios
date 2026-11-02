@@ -71,10 +71,10 @@ public final class PayabliPayInRequestObjC: NSObject {
         totalAmount: Double
     ) -> PayabliPayInRequestObjC {
         let data = PayabliPayInCardData(
-            cardNumber: SensitiveDigits.ofString(cardNumber),
+            cardNumber: cardNumber,
             expiry: expiry,
             holderName: holderName,
-            securityCode: SensitiveDigits.ofString(securityCode),
+            securityCode: securityCode,
             postalCode: postalCode
         )
         let card = PayabliPayInPaymentMethod.Card(data: data, saveIfSuccess: saveIfSuccess)
@@ -112,7 +112,7 @@ public final class PayabliPayInRequestObjC: NSObject {
             holder = named
         }
         let data = PayabliPayInBankAccountData(
-            accountNumber: SensitiveDigits.ofString(accountNumber),
+            accountNumber: accountNumber,
             accountType: type,
             holderName: holderName,
             routingNumber: routingNumber,

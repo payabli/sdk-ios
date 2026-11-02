@@ -70,17 +70,17 @@ data:
 
 ```swift
 let stored = try await paymentFlow.addCard(PayabliPayInCardData(
-    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+    cardNumber: "4111111111111111",
     expiry: "02/28",
     holderName: "Jane Doe",
-    securityCode: SensitiveDigits.ofString("123"),
+    securityCode: "123",
     postalCode: "33139"
 ))
 ```
 
 Direct card/bank account calls are PCI-sensitive because the host app supplies the data.
 
-Card numbers, security codes and bank account numbers are held as `SensitiveDigits`, a buffer whose `close()` overwrites the digits once the app no longer needs them.
+The SDK copies the card number, security code and bank account number into buffers it overwrites once each request is written. They can be set, and never read back from the value.
 
 ## 4. Store A Payment Method
 
@@ -148,10 +148,10 @@ Direct stored card:
 ```swift
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
-        cardNumber: SensitiveDigits.ofString("4111111111111111"),
+        cardNumber: "4111111111111111",
         expiry: "02/28",
         holderName: "Jane Doe",
-        securityCode: SensitiveDigits.ofString("123"),
+        securityCode: "123",
         postalCode: "33139"
     ),
     options: PayabliPayInOptions(
@@ -172,7 +172,7 @@ Direct stored bank account:
 ```swift
 let storedBankAccount = try await paymentFlow.addBankAccount(
     PayabliPayInBankAccountData(
-        accountNumber: SensitiveDigits.ofString("111111111111"),
+        accountNumber: "111111111111",
         accountType: .checking,
         holderName: "Jane Doe",
         routingNumber: "123456780",
@@ -229,10 +229,10 @@ Direct capture with card:
 
 ```swift
 let cardData = PayabliPayInCardData(
-    cardNumber: SensitiveDigits.ofString("4111111111111111"),
+    cardNumber: "4111111111111111",
     expiry: "02/28",
     holderName: "Jane Doe",
-    securityCode: SensitiveDigits.ofString("123"),
+    securityCode: "123",
     postalCode: "33139"
 )
 

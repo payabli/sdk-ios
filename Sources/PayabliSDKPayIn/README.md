@@ -98,10 +98,10 @@ It renders the same form and takes the same configuration and style.
 let result = try await payIn.capture(
     PayabliPayInRequest(
         paymentMethod: .card(.init(data: PayabliPayInCardData(
-            cardNumber: SensitiveDigits.ofString("4012000098765439"),
+            cardNumber: "4012000098765439",
             expiry: "12/30",
             holderName: "Jane Doe",
-            securityCode: SensitiveDigits.ofString("999"),
+            securityCode: "999",
             postalCode: "12345"
         ))),
         options: PayabliPayInRequestConfiguration(
