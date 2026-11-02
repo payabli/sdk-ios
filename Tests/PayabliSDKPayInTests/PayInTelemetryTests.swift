@@ -115,6 +115,12 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(PayInReports.failureType(of: interrupted), "Wrap<Inner>")
     }
 
+    func testAPlatformErrorNothingConvertedIsNamedByItsSwiftType() {
+        XCTAssertEqual(PayInReports.failureType(of: URLError(.badServerResponse)), "URLError")
+        XCTAssertEqual(PayInReports.failureType(of: CocoaError(.fileNoSuchFile)), "CocoaError")
+        XCTAssertEqual(PayInReports.failureType(of: POSIXError(.ENOENT)), "POSIXError")
+    }
+
     func testCapturingAnAuthorizationIsReportedAsACaptureWithNoMethod() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: PayInFixture.approved))
 

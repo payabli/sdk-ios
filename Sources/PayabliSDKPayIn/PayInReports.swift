@@ -169,7 +169,8 @@ final class PayInReports {
     /// The simple name of the type the SDK converted or redacted, never a message or a cause chain.
     ///
     /// - Parameter error: what the operation threw.
-    /// - Returns: the converted or redacted type's name, or the thrown type's otherwise.
+    /// - Returns: the converted or redacted type's name, or the thrown type's otherwise, a platform error by its Swift
+    ///   type.
     static func failureType(of error: any Error) -> String {
         if case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error {
             return RedactedCause.simpleName(causeType)
@@ -177,7 +178,7 @@ final class PayInReports {
         if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
             return redacted.simpleTypeName
         }
-        return String(describing: type(of: error))
+        return RedactedCause(error).simpleTypeName
     }
 
     private func enqueue(_ report: @escaping @Sendable (TelemetryClient) async -> Void) {
