@@ -63,7 +63,7 @@ The component supports four PayIn workflows:
 `PayabliPayInOperation` selects the hosted form behavior. The form takes it as `operation:`, and a payment carries
 the `PayabliPayInRequestConfiguration` it sends:
 
-- `.storePaymentMethod`
+- `.storePaymentMethod(options)`, carrying the `PayabliPayInStoreOptions` the stored method is sent with
 - `.capture(configuration)`
 - `.authorize(configuration)`
 

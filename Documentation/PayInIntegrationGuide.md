@@ -84,7 +84,7 @@ let stored = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
         cvv: "123",
         billingZip: "33139"
     )),
-    options: PayabliPayInOptions()
+    options: PayabliPayInStoreOptions()
 ))
 ```
 
@@ -92,7 +92,7 @@ Direct card/bank account calls are PCI-sensitive because the host app supplies t
 
 ## 4. Store A Payment Method
 
-Create a component for stored-method mode:
+Create a component; the form names the operation:
 
 ```swift
 @MainActor
@@ -103,12 +103,18 @@ final class StorePaymentMethodViewModel: ObservableObject {
 
     // The caller passes the session `initialize` returned, which is where a refused configuration is handled.
     init(session: PayabliSession) {
-        paymentFlow = PayabliPayIn(
-            session: session,
-            operation: .storePaymentMethod
-        )
+        paymentFlow = PayabliPayIn(session: session)
     }
 }
+```
+
+The operation carries what the stored method is sent with besides the payer's details:
+
+```swift
+let storeOptions = PayabliPayInStoreOptions(
+    forceCustomerCreation: true,
+    source: "ios-sdk"
+)
 ```
 
 Render inline:
@@ -116,7 +122,7 @@ Render inline:
 ```swift
 PayabliPayInForm(
     payIn: viewModel.paymentFlow,
-    operation: .storePaymentMethod,
+    operation: .storePaymentMethod(storeOptions),
     configuration: storeConfiguration,
     style: payabliStyle,
     onCompleted: { success in
@@ -139,7 +145,7 @@ Button("Add Payment Method") {
 .payabliPayInSheet(
     isPresented: $viewModel.isPresented,
     payIn: viewModel.paymentFlow,
-    operation: .storePaymentMethod,
+    operation: .storePaymentMethod(storeOptions),
     configuration: storeConfiguration,
     sheetConfiguration: PayabliPayInSheetConfiguration(
         title: "Add Payment Method",
@@ -169,7 +175,7 @@ let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
         cvv: "123",
         billingZip: "33139"
     )),
-    options: PayabliPayInOptions(
+    options: PayabliPayInStoreOptions(
         createAnonymous: false,
         forceCustomerCreation: true,
         customerData: PayabliPayInCustomerData(
@@ -194,7 +200,7 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
         secCode: .web,
         holderType: .personal
     )),
-    options: PayabliPayInOptions(
+    options: PayabliPayInStoreOptions(
         achValidation: true,
         source: "ios-sdk"
     )
@@ -275,7 +281,7 @@ Direct capture with a stored method, charged as the method and identifier the st
 ```swift
 let stored = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
     instrument: .card(cardData),
-    options: PayabliPayInOptions()
+    options: PayabliPayInStoreOptions()
 ))
 guard let storedMethodId = stored.storedMethodId else { return }
 
@@ -471,11 +477,6 @@ let configuration = PayabliPayInFormConfiguration(
         secCode: .web,
         methodDescription: "iOS payment flow"
     ),
-    options: PayabliPayInOptions(
-        createAnonymous: false,
-        forceCustomerCreation: true,
-        source: "ios-sdk"
-    ),
     labelLayout: .placeholder,
     showsFieldLabels: false,
     hiddenFieldLabels: Set(placeholderFields),
@@ -513,7 +514,6 @@ The wording is not part of the configuration: pass `labels` to `PayabliPayInForm
 | `cardSections` | nil | Custom card sections. Required and payment summary fields are appended if missing. |
 | `bankSections` | nil | Custom bank account sections. `secCode` is not rendered. Required and payment summary fields are appended if missing. |
 | `hiddenValues` | default hidden values | Non-editable values submitted with the hosted form. |
-| `options` | empty options | Token-storage options for hosted `.storePaymentMethod`. |
 | `labelLayout` | `.external` | `.external` for visible labels, `.placeholder` for placeholder-first UI. |
 | `showsFieldLabels` | nil | Optional global visible-label override. Nil follows `labelLayout`. |
 | `hiddenFieldLabels` | `[]` | Hide visible labels for specific fields. Accessibility labels remain. |
