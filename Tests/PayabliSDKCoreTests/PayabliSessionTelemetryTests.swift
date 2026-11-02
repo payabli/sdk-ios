@@ -108,6 +108,20 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         XCTAssertNotNil(Int(failed["duration_ms"] ?? ""))
     }
 
+    func testAFailedBuildReportsABridgedFoundationErrorByItsSwiftType() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
+        live.machine.finish()
+
+        _ = try? await PayabliSession.initialize(config: makeConfig()) { _, _, _, _ in
+            throw URLError(.notConnectedToInternet)
+        }
+        await live.telemetry.settled()
+
+        let failed = await transport.batches.flatMap { $0 }.last { $0.event == "sdk.initialize.failed" }
+        XCTAssertEqual(failed?.properties["failure_type"], "URLError")
+    }
+
     func testARepeatCallThatChangesNothingReportsNothing() async throws {
         let transport = InMemoryTelemetryTransport()
         let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)

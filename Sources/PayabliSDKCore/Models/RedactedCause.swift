@@ -11,8 +11,25 @@ package struct RedactedCause: Error, CustomStringConvertible, Equatable {
         originalType = Self.typeName(of: original)
     }
 
-    /// The type a caller threw. A Foundation error bridged from `NSError` reports `NSError` as its dynamic type, so
-    /// those are named by the Swift type the caller wrote.
+    /// The redacted failure's type without its module or enclosing types, as telemetry reports it.
+    package var simpleTypeName: String {
+        Self.simpleName(originalType)
+    }
+
+    /// Drops every module, enclosing-type and local-context qualifier, generic arguments included.
+    ///
+    /// - Parameter qualified: a type name as `String(reflecting:)` spells it.
+    /// - Returns: the type's own name.
+    package static func simpleName(_ qualified: String) -> String {
+        qualified.replacingOccurrences(
+            of: #"(\(unknown context at \$[0-9a-f]+\)|[A-Za-z_][A-Za-z0-9_]*)\."#,
+            with: "",
+            options: .regularExpression
+        )
+    }
+
+    /// The type a caller threw. `URLError`, `CocoaError` and `POSIXError` report `NSError` as their dynamic type once
+    /// held as an `Error`, so those three are named by their Swift type; any other `NSError` stays `NSError`.
     ///
     /// - Parameter original: the failure being redacted.
     /// - Returns: its module-qualified type name.

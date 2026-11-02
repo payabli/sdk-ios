@@ -187,7 +187,7 @@ public final class PayabliSession: @unchecked Sendable {
                 TelemetryProperty.errorNumber.rawValue: String(failure.code),
                 TelemetryProperty.reason.rawValue: failure.reason,
                 TelemetryProperty.durationMs.rawValue: String(milliseconds),
-                TelemetryProperty.failureType.rawValue: String(describing: type(of: original))
+                TelemetryProperty.failureType.rawValue: RedactedCause(original).simpleTypeName
             ])
         ])
     }
