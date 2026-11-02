@@ -10,6 +10,11 @@ final class PayInUnexpectedFailureTests: XCTestCase {
     private let recorder = InMemoryTelemetryTransport()
     private var telemetry: TelemetryClient?
 
+    override func setUp() {
+        super.setUp()
+        PayInKeyStore.process.forgetHeld()
+    }
+
     // MARK: - Every entry point
 
     func testACaptureConvertsAnErrorItDoesNotKnow() async throws {
