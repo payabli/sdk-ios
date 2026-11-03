@@ -300,7 +300,11 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
     onCompleted: { result in
       finish(["status": "charged", "paymentTransId": result.transaction?.paymentTransId])
     },
-    onError: { error in finish(cardOutcome(for: error)) }
+    onError: { error in
+      // A second tap while the first submission runs; that submission still reports.
+      if case PayabliPayInError.submissionInProgress = error { return }
+      finish(cardOutcome(for: error))
+    }
   ))
   sheet = host
   presenter.present(host, animated: true)
