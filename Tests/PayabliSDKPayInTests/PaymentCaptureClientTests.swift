@@ -316,10 +316,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiration: "02/27",
-                    cardholderName: "John Cassian",
-                    cvv: "999",
-                    billingZip: "12345"
+                    expiry: "02/27",
+                    holderName: "John Cassian",
+                    securityCode: "999",
+                    postalCode: "12345"
                 ),
                 saveIfSuccess: true
             )),

@@ -452,10 +452,10 @@ final class PayInTelemetryTests: XCTestCase {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "12/30",
-                cardholderName: "Jane",
-                cvv: cvv,
-                billingZip: "12345"
+                expiry: "12/30",
+                holderName: "Jane",
+                securityCode: cvv,
+                postalCode: "12345"
             ))),
             options: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
@@ -467,10 +467,10 @@ final class PayInTelemetryTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "12/30",
-        cardholderName: "Jane",
-        cvv: "123",
-        billingZip: "12345"
+        expiry: "12/30",
+        holderName: "Jane",
+        securityCode: "123",
+        postalCode: "12345"
     )
 
     private static let stored = Data("""

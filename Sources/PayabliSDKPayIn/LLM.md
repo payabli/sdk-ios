@@ -222,10 +222,10 @@ Sheet:
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "02/28",
-        cardholderName: "Jane Doe",
-        cvv: "123",
-        billingZip: "33139"
+        expiry: "02/28",
+        holderName: "Jane Doe",
+        securityCode: "123",
+        postalCode: "33139"
     ),
     options: PayabliPayInOptions(
         createAnonymous: false,
@@ -253,10 +253,10 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | Field | Notes |
 | --- | --- |
 | `cardNumber` | Full PAN. Direct API only; PCI-sensitive. Digits are normalized before request. |
-| `expiration` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
-| `cardholderName` | Required. |
-| `cvv` | Required. Direct API only; PCI-sensitive. |
-| `billingZip` | Postal code for card billing. Default label is `Postal code`. |
+| `expiry` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
+| `holderName` | Required. |
+| `securityCode` | Required. Direct API only; PCI-sensitive. |
+| `postalCode` | Postal code for card billing. Default label is `Postal code`. |
 
 `PayabliPayInBankAccountData` fields:
 
@@ -269,6 +269,8 @@ let storedBankAccount = try await paymentFlow.addBankAccount(
 | `secCode` | Optional; defaults to `.web`. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
+
+`cardNumber`, `securityCode` and `accountNumber` are passed as `String` and copied into buffers the SDK overwrites once each request is written. They can be set, and never read back from the value.
 
 `PayabliPayInOptions` is a typealias for
 `PayabliPayInTokenStorageOptions`. It carries no idempotency key: a repeat is not

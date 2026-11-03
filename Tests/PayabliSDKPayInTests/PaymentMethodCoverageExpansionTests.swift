@@ -24,10 +24,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     func testPaymentMethodInputReportsMethod() {
         let card = PayabliPayInMethodInput.card(PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiration: "02/28",
-            cardholderName: "Jane Doe",
-            cvv: "123",
-            billingZip: "33139"
+            expiry: "02/28",
+            holderName: "Jane Doe",
+            securityCode: "123",
+            postalCode: "33139"
         ))
         let ach = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
@@ -58,10 +58,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         XCTAssertThrowsError(try PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiration: "13/28",
-            cardholderName: "Jane Doe",
-            cvv: "123",
-            billingZip: "33139"
+            expiry: "13/28",
+            holderName: "Jane Doe",
+            securityCode: "123",
+            postalCode: "33139"
         ).validate(PayabliPayInValidation(requiresLuhnCheck: false)))
 
         try PayabliPayInBankAccountData(
@@ -461,10 +461,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         let cardResult = try await component.addCard(PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiration: "02/28",
-            cardholderName: "Jane Doe",
-            cvv: "123",
-            billingZip: "33139"
+            expiry: "02/28",
+            holderName: "Jane Doe",
+            securityCode: "123",
+            postalCode: "33139"
         ))
         let achResult = try await component.addBankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",

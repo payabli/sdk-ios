@@ -71,14 +71,16 @@ data:
 ```swift
 let stored = try await paymentFlow.addCard(PayabliPayInCardData(
     cardNumber: "4111111111111111",
-    expiration: "02/28",
-    cardholderName: "Jane Doe",
-    cvv: "123",
-    billingZip: "33139"
+    expiry: "02/28",
+    holderName: "Jane Doe",
+    securityCode: "123",
+    postalCode: "33139"
 ))
 ```
 
 Direct card/bank account calls are PCI-sensitive because the host app supplies the data.
+
+The SDK copies the card number, security code and bank account number into buffers it overwrites once each request is written. They can be set, and never read back from the value.
 
 ## 4. Store A Payment Method
 
@@ -147,10 +149,10 @@ Direct stored card:
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "02/28",
-        cardholderName: "Jane Doe",
-        cvv: "123",
-        billingZip: "33139"
+        expiry: "02/28",
+        holderName: "Jane Doe",
+        securityCode: "123",
+        postalCode: "33139"
     ),
     options: PayabliPayInOptions(
         createAnonymous: false,
@@ -228,10 +230,10 @@ Direct capture with card:
 ```swift
 let cardData = PayabliPayInCardData(
     cardNumber: "4111111111111111",
-    expiration: "02/28",
-    cardholderName: "Jane Doe",
-    cvv: "123",
-    billingZip: "33139"
+    expiry: "02/28",
+    holderName: "Jane Doe",
+    securityCode: "123",
+    postalCode: "33139"
 )
 
 let result = try await paymentFlow.capture(PayabliPayInRequest(

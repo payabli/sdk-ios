@@ -153,10 +153,10 @@ final class PayabliPayInTests: XCTestCase {
         let request = try XCTUnwrap(component.requestConfiguration?.request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/27",
-                cardholderName: "Jane Doe",
-                cvv: "999",
-                billingZip: "12345"
+                expiry: "02/27",
+                holderName: "Jane Doe",
+                securityCode: "999",
+                postalCode: "12345"
             )))
         ))
         _ = try await component.submitConfigured(request)
@@ -516,10 +516,10 @@ final class PayabliPayInTests: XCTestCase {
 extension PayabliPayInTests {
     private static let janeDoeCard = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "02/27",
-        cardholderName: "Jane Doe",
-        cvv: "999",
-        billingZip: "12345"
+        expiry: "02/27",
+        holderName: "Jane Doe",
+        securityCode: "999",
+        postalCode: "12345"
     )
 
     func testAFormThePayerAddsNothingToSendsWhatADirectCaptureWithTheSameOptionsSends() async throws {

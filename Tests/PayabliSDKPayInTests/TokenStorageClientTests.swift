@@ -26,10 +26,10 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111 1111 1111 1111",
-                expiration: "02/25",
-                cardholderName: "John Doe",
-                cvv: "123",
-                billingZip: "12345"
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "123",
+                postalCode: "12345"
             )),
             options: PayabliPayInOptions(
                 createAnonymous: true,
@@ -68,10 +68,10 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/25",
-                cardholderName: "John Doe",
-                cvv: "123",
-                billingZip: "12345"
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "123",
+                postalCode: "12345"
             ))
         )
 
@@ -176,10 +176,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111112",
-                    expiration: "02/25",
-                    cardholderName: "John Doe",
-                    cvv: "123",
-                    billingZip: "12345"
+                    expiry: "02/25",
+                    holderName: "John Doe",
+                    securityCode: "123",
+                    postalCode: "12345"
                 ))
             )
             XCTFail("Expected validation error")
@@ -202,10 +202,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiration: "02/25",
-                    cardholderName: "John Doe",
-                    cvv: "123",
-                    billingZip: ""
+                    expiry: "02/25",
+                    holderName: "John Doe",
+                    securityCode: "123",
+                    postalCode: ""
                 ))
             )
             XCTFail("Expected validation error")
@@ -229,10 +229,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiration: "02/25",
-                    cardholderName: "John Doe",
-                    cvv: "",
-                    billingZip: "12345"
+                    expiry: "02/25",
+                    holderName: "John Doe",
+                    securityCode: "",
+                    postalCode: "12345"
                 ))
             )
             XCTFail("Expected validation error")
@@ -249,31 +249,31 @@ final class TokenStorageClientTests: XCTestCase {
         let scenarios: [(PayabliPayInCardData, String)] = [
             (PayabliPayInCardData(
                 cardNumber: String(repeating: "4", count: 20),
-                expiration: "02/25",
-                cardholderName: "John Doe",
-                cvv: "123",
-                billingZip: "12345"
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "123",
+                postalCode: "12345"
             ), "Card number must be 12 to 19 digits."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/25",
-                cardholderName: String(repeating: "A", count: 61),
-                cvv: "123",
-                billingZip: "12345"
+                expiry: "02/25",
+                holderName: String(repeating: "A", count: 61),
+                securityCode: "123",
+                postalCode: "12345"
             ), "Cardholder name must be 60 characters or fewer."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/25",
-                cardholderName: "John Doe",
-                cvv: "12345",
-                billingZip: "12345"
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "12345",
+                postalCode: "12345"
             ), "CVV must be 3 or 4 digits."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/25",
-                cardholderName: "John Doe",
-                cvv: "123",
-                billingZip: String(repeating: "A", count: 13)
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "123",
+                postalCode: String(repeating: "A", count: 13)
             ), "Card Postal Code must be 12 characters or fewer.")
         ]
 
@@ -310,10 +310,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiration: "022028",
-                    cardholderName: "John Doe",
-                    cvv: "123",
-                    billingZip: "12345"
+                    expiry: "022028",
+                    holderName: "John Doe",
+                    securityCode: "123",
+                    postalCode: "12345"
                 ))
             )
             XCTFail("Expected validation error")
@@ -390,10 +390,10 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "02/25",
-                cardholderName: "Jane Doe",
-                cvv: "123",
-                billingZip: "33139"
+                expiry: "02/25",
+                holderName: "Jane Doe",
+                securityCode: "123",
+                postalCode: "33139"
             )),
             options: PayabliPayInOptions(
                 createAnonymous: false,
@@ -478,10 +478,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: "123",
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected payment method failure")
@@ -509,10 +509,10 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiration: "02/28",
-                    cardholderName: "Jane Doe",
-                    cvv: "123",
-                    billingZip: "33139"
+                    expiry: "02/28",
+                    holderName: "Jane Doe",
+                    securityCode: "123",
+                    postalCode: "33139"
                 ))
             )
             XCTFail("Expected payment method failure")

@@ -7,10 +7,10 @@ extension PayabliPayInViewModel {
         case .card:
             return .card(PayabliPayInCardData(
                 cardNumber: cardNumber,
-                expiration: cardExpiration,
-                cardholderName: cardholderName,
-                cvv: cardCvv,
-                billingZip: cardZip
+                expiry: cardExpiration,
+                holderName: cardholderName,
+                securityCode: cardCvv,
+                postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
@@ -31,10 +31,10 @@ extension PayabliPayInViewModel {
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: cardNumber,
-                    expiration: cardExpiration,
-                    cardholderName: cardholderName,
-                    cvv: cardCvv,
-                    billingZip: cardZip
+                    expiry: cardExpiration,
+                    holderName: cardholderName,
+                    securityCode: cardCvv,
+                    postalCode: cardZip
                 )
             ))
         case .bankAccount:
