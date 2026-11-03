@@ -108,8 +108,8 @@ enum TapToPayErrorTranslation {
         var link: Error? = error
         for _ in 0 ..< maximumChainLength {
             guard let current = link else { break }
-            if case let .paymentNotOpened(_, httpStatus?, rawCode) = current as? PayabliTTPError {
-                return (httpStatus, rawCode)
+            if let refusal = current as? PayabliTTPError, let httpStatus = refusal.answer.httpStatus {
+                return (httpStatus, refusal.answer.rawCode)
             }
             if let answered = current as? any PayabliError, let httpStatus = answered.httpStatus {
                 return (httpStatus, answered.rawCode)
@@ -206,7 +206,7 @@ enum TapToPayErrorTranslation {
     /// - Parameter error: the failure whose wait is read.
     /// - Returns: the wait the close was given, or `nil` where the case carries none.
     private static func retryAfter(of error: PayabliTTPError) -> TimeInterval? {
-        guard case let .updateFailed(_, _, _, retryAfter) = error else { return nil }
+        guard case let .updateFailed(_, _, _, retryAfter, _, _) = error else { return nil }
         return retryAfter
     }
 
@@ -224,12 +224,12 @@ enum TapToPayErrorTranslation {
     /// - Returns: the words, or `nil` where the case carries none.
     private static func serviceText(of error: PayabliTTPError) -> String? {
         let text: String? = switch error {
-        case let .attestationRevoked(reason),
-             let .attestationFailed(reason),
-             let .deviceSetupRequired(reason),
-             let .deviceSetupRefused(reason),
-             let .entryPointRefused(reason),
-             let .configFailed(reason),
+        case let .attestationRevoked(reason, _),
+             let .attestationFailed(reason, _),
+             let .deviceSetupRequired(reason, _),
+             let .deviceSetupRefused(reason, _),
+             let .entryPointRefused(reason, _),
+             let .configFailed(reason, _),
              let .paymentNotOpened(reason, _, _),
              let .activationFailed(reason),
              let .networkError(reason),
@@ -238,7 +238,7 @@ enum TapToPayErrorTranslation {
              let .readerDeviceRefused(reason, _, _),
              let .guardFailed(reason, _),
              let .nfcFailed(reason, _),
-             let .updateFailed(reason, _, _, _):
+             let .updateFailed(reason, _, _, _, _, _):
             reason
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .tokenExpired,
              .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,

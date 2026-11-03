@@ -38,3 +38,23 @@ struct PinnedTokenRefusal: PayabliError {
         nil
     }
 }
+
+/// Puts the refusing answer's status on a device or activation refusal. Its code stays nil: the envelope's result code
+/// is the status itself.
+enum DeviceRefusalStatus {
+    /// - Parameter status: the status the refusing answer came with.
+    /// - Parameter refusal: the refusal a route's classifier built from the answer's words.
+    /// - Returns: the same refusal carrying `status`, or `refusal` unchanged where it is not one read from an answer.
+    static func carrying(_ status: Int, on refusal: any Error) -> any Error {
+        switch refusal {
+        case let failure as PayabliTTPError:
+            failure.carrying(httpStatus: status)
+        case let activation as ActivationRefusal:
+            ActivationRefusal(hostError: activation.hostError.carrying(httpStatus: status), movesSession: activation.movesSession)
+        case let host as TapToPayError:
+            host.carrying(httpStatus: status)
+        default:
+            refusal
+        }
+    }
+}

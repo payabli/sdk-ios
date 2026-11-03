@@ -42,6 +42,22 @@ final class TapToPayErrorStatusTests: XCTestCase {
         XCTAssertEqual(host.rawCode, "E5001")
     }
 
+    func testAPaypointNotEnabledOnTheOpeningCarriesTheStatusAndTheBodysCode() async throws {
+        let host = try await initiateFailure(status: 404, body: #"{"code":"E0404"}"#)
+
+        XCTAssertEqual(host.type, .cardPresentNotEnabled)
+        XCTAssertEqual(host.httpStatus, 404)
+        XCTAssertEqual(host.rawCode, "E0404")
+    }
+
+    func testAnOpeningAnswerThatCannotBeReadCarriesItsStatus() async throws {
+        let host = try await initiateFailure(status: 200, body: "not json")
+
+        XCTAssertEqual(host.type, .decodingError)
+        XCTAssertEqual(host.httpStatus, 200)
+        XCTAssertNil(host.rawCode)
+    }
+
     func testAPinnedTokenRefusalCarriesItsStatus() throws {
         let host = try XCTUnwrap(TapToPayErrorTranslation.hostError(for: PinnedTokenRefusal()) as? TapToPayError)
 

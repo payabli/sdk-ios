@@ -238,7 +238,7 @@ package func mapPayabliHTTPError(
     let decoder = JSONDecoder()
     let status = response.statusCode
     // One read of the body's `code` for every arm, so a body the typed shape cannot read costs only that shape.
-    let rawCode = (try? decoder.decode(ErrorCodeBody.self, from: response.body))?.code
+    let rawCode = serviceCode(of: response)
 
     switch status {
     case 400:
@@ -303,6 +303,14 @@ package func mapPayabliHTTPError(
             rawCode: rawCode
         )
     }
+}
+
+/// The code the service named in a response's body, read as ``mapPayabliHTTPError(response:override:)`` reads it.
+///
+/// - Parameter response: the answer whose body is read.
+/// - Returns: the body's `code`, else the older envelope's `responseCode` as text, or nil when it names neither.
+package func serviceCode(of response: PayabliResponse) -> String? {
+    (try? JSONDecoder().decode(ErrorCodeBody.self, from: response.body))?.code
 }
 
 /// The service's code, read apart from the typed shapes: the body's `code`, else the older envelope's integer
