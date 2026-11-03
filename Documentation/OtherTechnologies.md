@@ -174,15 +174,18 @@ export function Checkout({ orderId, amount }: { orderId: string; amount: number 
 
   async function pay(way: 'card' | 'tap') {
     setBusy(true);
+    let canPayAgain = true;
     try {
       const request = { amount, orderId };
       const outcome = way === 'card' ? await Payabli.payWithCard(request) : await Payabli.tapToPay(request);
+      canPayAgain = outcome.status === 'notCharged' || outcome.status === 'unsupported';
       setMessage(describe(outcome));
     } catch (e) {
       const error = e as { code?: string; message: string };
       setMessage(`Couldn't take the payment (${error.code ?? 'ERROR'})`);
     } finally {
-      setBusy(false);
+      // A charged order isn't paid again, and an unknown one stays blocked until checkWithBackend settles it.
+      if (canPayAgain) setBusy(false);
     }
   }
 
@@ -211,8 +214,8 @@ function describe(outcome: PaymentOutcome): string {
 }
 ```
 
-A native error arrives as a JavaScript `Error` with `code` and `message`. Branch on `code`; the message is for logs
-and support.
+A native error arrives as a JavaScript `Error` with `code` and `message`. Branch on `code`, and log only the code: an
+SDK error's message can quote what the customer entered.
 
 ### 5. Show Tap to Pay readiness
 
@@ -251,7 +254,7 @@ Each call is one SDK call underneath:
 | `initialize` | `PayabliSession.initialize(config:)` |
 | `payWithCard` | present `PayabliPayInView` for a `PayabliPayIn` with `operation: .capture` |
 | `tapToPay` | `PayabliTTP.create()`, `initialize()`, then `charge(paymentDetails:)` |
-| `presentTerms` | `presentTerms()`, then `areTermsAccepted()` |
+| `presentTerms` | `presentTerms()`, `areTermsAccepted()`, then `initialize()` when they accepted |
 | `activateDevice` | `activateDevice(activationCode:)`, then `initialize()` |
 | `sessionState` | `PayabliTTP`'s `$sessionState` |
 
@@ -276,25 +279,30 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
       orderId: request.orderId
     )
   )
-  var sheet: UIViewController?
+  weak var sheet: UIViewController?
+  var settled = false
   let finish = { (outcome: [String: Any?]) in
+    guard !settled else { return }
+    settled = true
     sheet?.dismiss(animated: true)
     promise.resolve(outcome)
   }
-  sheet = UIHostingController(rootView: PayabliPayInView(
+  let host = UIHostingController(rootView: PayabliPayInView(
     component: payIn,
     onCompleted: { result in
       finish(["status": "charged", "paymentTransId": result.transaction?.paymentTransId])
     },
     onError: { error in finish(cardOutcome(for: error)) }
   ))
-  presenter.present(sheet!, animated: true)
+  sheet = host
+  presenter.present(host, animated: true)
 }.runOnQueue(.main)
 ```
 
 `PaymentRequestRecord` is an Expo `Record` with `amount` and `orderId` fields, matching the TypeScript
-`PaymentRequest`. When the customer closes the sheet without paying, resolve `notCharged` from its dismissal if the
-promise hasn't resolved yet, so it doesn't wait forever.
+`PaymentRequest`. When the customer closes the sheet before the SDK reports, call `finish` with `unknown` from its
+dismissal: a submission may already be in flight, so your app checks the payment before charging again. `settled`
+makes the dismissal and the SDK's callbacks resolve the promise once between them.
 
 Map the SDK's errors to the outcome as [Handle the outcome](../README.md#handle-the-outcome) does:
 
@@ -495,26 +503,30 @@ A failure that isn't a payment outcome reaches Dart as a `PlatformException` wit
 ```dart
 Future<void> _pay({required bool tap}) async {
   setState(() => _busy = true);
+  var canPayAgain = true;
   try {
     final outcome = tap
         ? await widget.payabli.tapToPay(12.34, 'A-1001')
         : await widget.payabli.payWithCard(12.34, 'A-1001');
-    if (!mounted) return;
-    setState(() {
-      _message = switch (outcome) {
-        Charged(:final paymentTransId) => _saved(paymentTransId), // store it; don't log it
-        NotCharged() => 'Not charged. Try again.',
-        OutcomeUnknown(:final paymentTransId) => _check(paymentTransId), // look it up first
-        Unsupported() => "Tap to Pay isn't available on this phone.",
-      };
-    });
+    final message = switch (outcome) {
+      Charged(:final paymentTransId) => _saved(paymentTransId), // store it; don't log it
+      NotCharged() => 'Not charged. Try again.',
+      OutcomeUnknown(:final paymentTransId) => _check(paymentTransId), // look it up first
+      Unsupported() => "Tap to Pay isn't available on this phone.",
+    };
+    canPayAgain = outcome is NotCharged || outcome is Unsupported;
+    if (mounted) setState(() => _message = message);
   } on PlatformException catch (e) {
     if (mounted) setState(() => _message = "Couldn't take the payment (${e.code})");
   } finally {
-    if (mounted) setState(() => _busy = false);
+    // A charged order isn't paid again, and an unknown one stays blocked until _check settles it.
+    if (canPayAgain && mounted) setState(() => _busy = false);
   }
 }
 ```
+
+`_saved` and `_check` run before the `mounted` check, so the outcome is recorded even when the screen has gone. In
+your app, put them in a service that outlives the widget.
 
 Because `PaymentOutcome` is `sealed`, the `switch` must cover every case, and the analyzer flags a missing one. Show
 the Tap to Pay button only where it works, for example `if (Platform.isIOS)`.
@@ -546,8 +558,8 @@ cancels.
 ### 5. The Swift half
 
 Implement the generated `PayabliHostApi` in Swift with the calls in [The Swift half](#6-the-swift-half) of the React
-Native section, and map errors with the same `cardOutcome` and `tapOutcome`. Throw `PigeonError` for a failure that
-isn't a payment outcome; Dart receives it as a `PlatformException`.
+Native section, and map errors with the same `cardOutcome` and `tapOutcome`. Complete the call with
+`.failure(PigeonError(...))` for a failure that isn't a payment outcome; Dart receives it as a `PlatformException`.
 
 Register it in `AppDelegate`'s `didInitializeImplicitFlutterEngine`. Flutter 3.41 and later use the `UIScene`
 lifecycle by default, so registering in `application(_:didFinishLaunchingWithOptions:)` doesn't work:
