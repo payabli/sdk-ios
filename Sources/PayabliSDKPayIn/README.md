@@ -135,18 +135,18 @@ A charge always sends an idempotency key, which the SDK makes and keeps; your ap
 payment with `paymentReference` on the request's options, or leave it unset on a new payment and the SDK names it.
 The reference stays on the device. Calling again is a new payment unless you say otherwise.
 
-When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
+When a charge ends in `PayabliPayInError.Unsettled`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
 again, set `attempt: .retry` and that `paymentReference` on the options: the SDK sends that payment's key, so the
 service refuses a repeat while it still recognises the key. When it refuses one, the charge ends in
-`submissionInterrupted` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
+`Unsettled` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.
 
 Cancelling the task that runs a charge ends the call with a `CancellationError`, whether or not the request was
 sent, so treat its outcome as unknown. If your app cancels charges, name each payment with `paymentReference` and
-retry under it with `attempt: .retry`. The form reports a cancelled charge that may have been sent to its failure
-handler as `submissionInterrupted` with type `.userCancelled`.
+retry under it with `attempt: .retry`. The form reports a cancelled charge to its failure handler
+as `PayabliPayInError.Interrupted`, or as `Unsettled` with type `.userCancelled` when it may have been sent.
 
 A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
 payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
@@ -166,7 +166,7 @@ point, read the transaction back instead.
 
 A returned result means what the call did, which depends on the call:
 
-| Call | A result means | `transactionFailed` means |
+| Call | A result means | `PayabliPayInError.Refused` means |
 |---|---|---|
 | `capture(_:)` | The payment was charged | Not charged |
 | `authorize(_:)` | An amount is held. Nothing is charged until you capture it | No hold was placed |
@@ -180,17 +180,21 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | Result | Outcome | What to do |
 |---|---|---|
 | The call returns a `PayabliPayInResult` | Charged, or saved | Store the transaction ID or the stored method ID |
-| `PayabliPayInError.transactionFailed`, for example a decline | Not charged | You can retry |
-| `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
+| `PayabliPayInError.Refused`, for example a decline | Not charged | You can retry |
+| `PayabliPayInError.ServiceError` | The service failed the call without declining it | Branch on its `type` |
+| `PayabliPayInError.InvalidInput`, `.AlreadySubmitting` | Not charged; refused before anything was sent | Fix the value its `field` names, or wait for the running submission |
 | A core `PayabliError` whose `type` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
-| `PayabliPayInError.submissionInterrupted` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
+| `PayabliPayInError.Unsettled` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
-| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service refusing it, typed `.paymentDeclined`. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
+| `PayabliPayInError.InvalidInput` or `.Refused` from `addCard`, `addBankAccount` or `addPaymentMethod` | The method wasn't saved | `InvalidInput` was refused before sending; `Refused` is the service refusing it. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
 | A core `PayabliError` from `addCard`, `addBankAccount` or `addPaymentMethod` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
+
+Catch the family with `catch let error as PayabliPayInError`, or one failure by its type, for example
+`catch let error as PayabliPayInError.Unsettled`.
 
 Don't show `error.localizedDescription` to the payer or log it: it names what the service rejected and can
 quote what was submitted. Show the payer a message for the error's `category`, and log
-`(error as? any PayabliError)?.code`. Check for `submissionInterrupted` first: it keeps its cause's category, so a
+`(error as? any PayabliError)?.code`. Check for `Unsettled` first: it keeps its cause's category, so a
 retried payment refused for a rate limit or a credential is still one that may have gone through, and its message says so.
 
 ## Reference

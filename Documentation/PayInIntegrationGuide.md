@@ -369,7 +369,7 @@ mirrors no rule of its own. A refused request arrives as
 `PayabliPaymentError.validation`, whose `errors` names each parameter it refused,
 as it does for a capture or an authorization; the service's own text and code are
 on its `detail` and `rawCode`. A reversal that is declined arrives as
-`PayabliPayInError.transactionFailed`, which carries the service's own
+`PayabliPayInError.Refused`, which carries the service's own
 code and reason. A reversal answers `A0003` and calls itself canceled, where a capture
 answers `A0000`, so read the code rather than comparing against one literal.
 
