@@ -314,7 +314,7 @@ package func serviceCode(of response: PayabliResponse) -> String? {
 }
 
 /// The service's code, read apart from the typed shapes: the body's `code`, else the older envelope's integer
-/// `responseCode` as text. Each is read on its own, so one malformed field doesn't lose the other.
+/// `responseCode`, quoted or not, as text. Each is read on its own, so one malformed field doesn't lose the other.
 private struct ErrorCodeBody: Decodable {
     let code: String?
 
@@ -326,7 +326,8 @@ private struct ErrorCodeBody: Decodable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let named = (try? container.decodeIfPresent(String.self, forKey: .code)) ?? nil
-        let legacy = (try? container.decodeIfPresent(Int.self, forKey: .responseCode)) ?? nil
+        let legacy = (try? container.decodeIfPresent(Int.self, forKey: .responseCode))
+            ?? (try? container.decodeIfPresent(String.self, forKey: .responseCode)).flatMap { Int($0) }
         code = named ?? legacy.map(String.init)
     }
 }

@@ -506,7 +506,7 @@ public struct PayabliValidationError: PayabliError, Decodable {
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
         instance = try container.decodeIfPresent(String.self, forKey: .instance)
-        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         token = try container.decodeIfPresent(String.self, forKey: .token)
         errors = try? container.decodeIfPresent([String: [PayabliFieldError]].self, forKey: .errors)
         httpStatus = nil
@@ -606,7 +606,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
         instance = try container.decodeIfPresent(String.self, forKey: .instance)
         httpStatus = nil
-        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         retryAfter = nil
     }
 
@@ -694,7 +694,7 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     /// - Parameter decoder: the declined-payment body, whose missing `code` or `reason` degrades that field alone.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         reason = try container.decodeIfPresent(String.self, forKey: .reason) ?? Self.defaultReason
         explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
         action = try container.decodeIfPresent(String.self, forKey: .action)
