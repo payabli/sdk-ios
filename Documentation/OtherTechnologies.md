@@ -225,6 +225,10 @@ function describe(outcome: PaymentOutcome): string {
 A native error arrives as a JavaScript `Error` with `code` and `message`. Branch on `code`, and log only the code: an
 SDK error's message can quote what the customer entered.
 
+The guard and the outcome live in memory, so they end with the app. Before starting a payment, save the order as
+pending somewhere that survives a restart, and when the app starts, check each pending order with your backend
+before charging it again.
+
 ### 5. Show Tap to Pay readiness
 
 ```tsx
@@ -540,6 +544,10 @@ Future<void> _pay({required bool tap}) async {
 
 `_saved` and `_check` run before the `mounted` check, so the outcome is recorded even when the screen has gone. In
 your app, put them in a service that outlives the widget.
+
+The guard and the outcome live in memory, so they end with the app. Before starting a payment, save the order as
+pending somewhere that survives a restart, and when the app starts, check each pending order with your backend
+before charging it again.
 
 Because `PaymentOutcome` is `sealed`, the `switch` must cover every case, and the analyzer flags a missing one. Show
 the Tap to Pay button only where it works, for example `if (Platform.isIOS)`.
