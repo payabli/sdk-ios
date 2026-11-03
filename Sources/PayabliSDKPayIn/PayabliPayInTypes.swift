@@ -275,7 +275,6 @@ public struct PayabliPayInRequestConfiguration: Sendable {
         customerData formCustomerData: PayabliPayInCustomerData? = nil,
         orderDescription formOrderDescription: String? = nil
     ) -> PayabliPayInRequest {
-        // A copy rather than a rebuild, so a setting added later reaches the request without being listed here.
         var options = self
         options.customerData = mergedCustomerData(formCustomerData)
         options.orderDescription = formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
@@ -586,70 +585,6 @@ public struct PayabliPayInResponseData: Codable, Sendable, Equatable {
     }
 }
 
-extension PayabliPayInPaymentMethod: Encodable {
-    enum CodingKeys: String, CodingKey {
-        case method
-        case cardcvv
-        case cardexp
-        case cardHolder
-        case cardnumber
-        case cardzip
-        case achAccount
-        case achAccountType
-        case achCode
-        case achHolder
-        case achHolderType
-        case achRouting
-        case device
-        case initiator
-        case saveIfSuccess
-        case storedMethodId
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case let .card(method):
-            try c.encode("card", forKey: .method)
-            try c.encode(method.data.normalizedCaptureExpiration(), forKey: .cardexp)
-            try c.encode(method.data.holderName.payabliCaptureTrimmed, forKey: .cardHolder)
-            try c.encode(method.data.cardNumber.digitsOnly, forKey: .cardnumber)
-            try c.encode(method.data.securityCode.digitsOnly, forKey: .cardcvv)
-            try c.encode(method.data.postalCode.payabliCaptureTrimmed, forKey: .cardzip)
-            try c.encodeIfPresent(method.initiator?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, forKey: .initiator)
-            try c.encodeIfPresent(method.saveIfSuccess, forKey: .saveIfSuccess)
-
-        case let .bankAccount(method):
-            try c.encode("ach", forKey: .method)
-            try c.encode(method.data.accountNumber.digitsOnly, forKey: .achAccount)
-            try c.encode(method.data.accountType.rawValue, forKey: .achAccountType)
-            try c.encode(method.data.holderName.payabliCaptureTrimmed, forKey: .achHolder)
-            try c.encode(method.data.routingNumber.payabliCaptureDigitsOnly, forKey: .achRouting)
-            try c.encode((method.data.secCode ?? .web).rawValue, forKey: .achCode)
-            try c.encodeIfPresent(method.data.holderType?.rawValue, forKey: .achHolderType)
-            try c.encodeIfPresent(method.data.device?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty, forKey: .device)
-
-        case let .stored(method):
-            try c.encode(method.method.rawValue, forKey: .method)
-            try c.encode(method.storedMethodId.payabliCaptureTrimmed, forKey: .storedMethodId)
-            // Always sent: the payer is present on every charge this surface makes.
-            try c.encode("payor", forKey: .initiator)
-
-        case let .cloudDevice(method):
-            try c.encode("cloud", forKey: .method)
-            try c.encode(method.device.payabliCaptureTrimmed, forKey: .device)
-            try c.encodeIfPresent(method.saveIfSuccess, forKey: .saveIfSuccess)
-
-        case let .check(method):
-            try c.encode("check", forKey: .method)
-            try c.encode(method.holderName.payabliCaptureTrimmed, forKey: .achHolder)
-
-        case .cash:
-            try c.encode("cash", forKey: .method)
-        }
-    }
-}
-
 extension PayabliPayInPaymentMethod {
     func validate(_ validation: PayabliPayInValidation) throws {
         switch self {
@@ -678,8 +613,8 @@ extension PayabliPayInPaymentMethod {
 extension PayabliPayInPaymentDetails {
     /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
     ///
-    /// A negative surcharge, or a service fee and surcharge that together reach the total, describe a payment that
-    /// cannot be charged, so it is refused here for the form and a direct call alike instead of being sent.
+    /// A negative surcharge, or a service fee and surcharge that together reach the total, cannot be charged,
+    /// so it is refused before sending, from the form and from a direct call.
     func validate() throws {
         guard let total = PayInAmount.sendable(totalAmount) else {
             throw PayabliPayInError.invalidInput("Total amount is out of range.")
@@ -710,9 +645,11 @@ extension PayabliPayInPaymentDetails {
     }
 }
 
-private extension PayabliPayInCardData {
+extension PayabliPayInCardData {
     func normalizedCaptureExpiration() throws -> String {
-        let digits = expiry.payabliCaptureDigitsOnly
+        guard let digits = expiry.payabliInstrumentDigits else {
+            throw PayabliPayInError.invalidInput("Expiration contains unsupported characters.")
+        }
         guard digits.count == 4 else {
             throw PayabliPayInError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }
@@ -731,7 +668,12 @@ extension String {
     }
 
     var payabliCaptureDigitsOnly: String {
-        filter(\.isNumber)
+        filter { $0.isASCII && ("0" ... "9").contains($0) }
+    }
+
+    /// The ASCII digits this holds, or `nil` when it holds any character outside ASCII.
+    var payabliInstrumentDigits: String? {
+        allSatisfy(\.isASCII) ? payabliCaptureDigitsOnly : nil
     }
 
     var payabliCaptureNilIfEmpty: String? {
@@ -795,5 +737,27 @@ extension PayabliPayInCustomerData {
     ) {
         guard let value else { return }
         self[keyPath: keyPath] = value
+    }
+}
+
+extension PayabliPayInPaymentMethod {
+    /// The service's member names for a method, read by the body writer and the rejected-field mapping.
+    enum CodingKeys: String, CodingKey {
+        case method
+        case cardcvv
+        case cardexp
+        case cardHolder
+        case cardnumber
+        case cardzip
+        case achAccount
+        case achAccountType
+        case achCode
+        case achHolder
+        case achHolderType
+        case achRouting
+        case device
+        case initiator
+        case saveIfSuccess
+        case storedMethodId
     }
 }

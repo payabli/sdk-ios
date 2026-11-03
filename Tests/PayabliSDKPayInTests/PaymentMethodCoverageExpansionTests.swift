@@ -105,7 +105,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         ).validate(.default))
     }
 
-    func testPaymentMethodInputEncodingTrimsOptionalACHDevice() throws {
+    func testTheStoreBodyTrimsTheOptionalACHDevice() throws {
         let input = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             accountType: .checking,
@@ -114,7 +114,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             device: " terminal-1 "
         ))
 
-        let data = try JSONEncoder().encode(input)
+        let data = try Data(PayInBodyWriter.storeFragment(input).rawCopy())
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual(object["achCode"] as? String, "WEB")

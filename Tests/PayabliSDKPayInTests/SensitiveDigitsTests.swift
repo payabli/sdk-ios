@@ -11,9 +11,6 @@ final class SensitiveDigitsTests: XCTestCase {
 
         value.close()
 
-        // read() answers empty once wiped, so it cannot show whether the overwrite happened.
-        // The expected count comes from the source string, so a close() that discarded the
-        // storage instead of overwriting it cannot pass as an overwrite.
         XCTAssertEqual(Array(repeating: SensitiveDigits.wipedByte, count: pan.utf8.count), value.rawCopy())
         XCTAssertTrue(value.isWiped)
     }
@@ -124,38 +121,50 @@ final class SensitiveDigitsTests: XCTestCase {
         }
     }
 
-    func testUseDigitsRethrowsAndLeavesTheValueUntouched() {
-        // A reader that keeps the digits it was lent keeps them alive; wiping what a reader kept is
-        // the reader's work. What is asserted is the contract every reader relies on: the error is
-        // rethrown and the value itself is untouched.
-        let value = SensitiveDigits.ofString(pan)
+    func testUseDigitBytesDropsSeparatorsAndLeavesTheValueUsable() {
+        let value = SensitiveDigits.ofString("4111 1111 1111 1111")
         var lent: [UInt8]?
 
-        XCTAssertThrowsError(try value.useDigits { digits in
-            lent = digits
-            throw Sentinel()
-        })
-
-        XCTAssertEqual(Array(pan.utf8), lent)
-        XCTAssertEqual(Array(pan.utf8), value.read())
-        XCTAssertFalse(value.isWiped)
-        XCTAssertEqual(pan.count, value.length)
-    }
-
-    func testUseDigitsSeesTheDigitsAndLeavesTheValueUsable() {
-        let value = SensitiveDigits.ofString(pan)
-        var lent: [UInt8]?
-
-        let length = value.useDigits { digits -> Int in
+        let length = try? value.useDigitBytes(field: "Card number") { digits -> Int in
             lent = digits
             return digits.count
         }
 
         XCTAssertEqual(16, length)
-        XCTAssertEqual(Array(pan.utf8), lent)
-        // The value itself is untouched: lending the digits is not closing them.
+        XCTAssertEqual(Array("4111111111111111".utf8), lent)
+        XCTAssertEqual(Array("4111 1111 1111 1111".utf8), value.read())
+        XCTAssertFalse(value.isWiped)
+        XCTAssertEqual("4111 1111 1111 1111".count, value.length)
+    }
+
+    func testUseDigitBytesRefusesAByteThatIsNotAscii() {
+        let value = SensitiveDigits.ofString("٤" + String(repeating: "١", count: 15))
+
+        do {
+            _ = try value.useDigitBytes(field: "Card number") { _ in
+                XCTFail("A refused value never runs the rule")
+            }
+            XCTFail("Expected a refusal")
+        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
+            XCTAssertEqual(message, "Card number contains unsupported characters.")
+        } catch {
+            XCTFail("Wrong error: \(error)")
+        }
+
+        XCTAssertFalse(value.isWiped)
+        XCTAssertEqual(32, value.length)
+    }
+
+    func testUseDigitBytesRethrowsAndLeavesTheValueUntouched() {
+        let value = SensitiveDigits.ofString(pan)
+
+        XCTAssertThrowsError(try value.useDigitBytes(field: "Card number") { _ in
+            throw Sentinel()
+        })
+
         XCTAssertEqual(Array(pan.utf8), value.read())
         XCTAssertFalse(value.isWiped)
+        XCTAssertEqual(pan.count, value.length)
     }
 
     func testAnEmptyValueIsAllowedHereAndRefusedByValidation() {

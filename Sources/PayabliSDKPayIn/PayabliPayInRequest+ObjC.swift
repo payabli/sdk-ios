@@ -34,6 +34,14 @@ public final class PayabliPayInRequestObjC: NSObject {
         super.init()
     }
 
+    /// The buffers the factories built from strings: no host can reach them, so the wrapper
+    /// overwrites them when it is released.
+    deinit {
+        for digits in paymentMethod.sensitiveDigits {
+            digits.close()
+        }
+    }
+
     /// - Parameter storedMethodId: the stored method to charge.
     /// - Parameter method: `card` or `bankAccount`.
     /// - Parameter totalAmount: the amount to charge.
@@ -150,6 +158,8 @@ public final class PayabliPayInRequestObjC: NSObject {
         PayabliPayInRequestObjC(paymentMethod: .cash, totalAmount: totalAmount)
     }
 
+    /// The Swift request this wrapper carries, holding copies of the wrapper's digit buffers: a
+    /// payment spends its own copies and leaves the wrapper's digits for its next use.
     func toSwift() -> PayabliPayInRequest {
         let options = PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(
@@ -177,7 +187,7 @@ public final class PayabliPayInRequestObjC: NSObject {
                 validatesRoutingNumberChecksum: validatesRoutingNumberChecksum
             )
         )
-        return PayabliPayInRequest(paymentMethod: paymentMethod, options: options)
+        return PayabliPayInRequest(paymentMethod: paymentMethod.withCopiedDigitBuffers(), options: options)
     }
 }
 

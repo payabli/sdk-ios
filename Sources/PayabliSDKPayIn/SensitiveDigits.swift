@@ -43,13 +43,9 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
         wiped ? 0 : digits.count
     }
 
-    /// Overwrites the digits for every holder of this value. One object backs the value however many
-    /// copies of it are carrying it, so closing any copy closes them all. Idempotent, so closing a
-    /// value a caller already closed is not an error.
+    /// Overwrites the digits for every holder of this value, since one object backs every copy. Idempotent.
     ///
-    /// After this the value behaves as empty rather than throwing: a request built from a closed value
-    /// fails validation as a missing field, which is a better failure than an exception from inside a
-    /// body writer.
+    /// A closed value reads as empty, so a request built from one fails validation as a missing field.
     func close() {
         guard !wiped else { return }
         for index in digits.indices {
@@ -74,19 +70,38 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
         Mirror(self, children: ["length": length], displayStyle: .class)
     }
 
-    /// The digits, for a rule that reads them. Returns a copy, which the reader is responsible for
-    /// overwriting in turn; empty once the value is closed.
+    /// The digits, for a rule that reads them. The handed-out array shares this value's storage rather
+    /// than copying it up front: writing into it forks the storage, which leaves the value's own
+    /// untouched. Empty once the value is closed.
     func read() -> [UInt8] {
         wiped ? [] : digits
     }
 
-    /// Runs `body` over the digits, rethrowing whatever `body` throws. The value itself is untouched:
-    /// lending the digits is not closing them, so the same value can be lent again afterwards.
+    /// Runs `body` over the digits this holds, filtered to the ASCII digits a request can write, with
+    /// the filtered copy wiped before returning. A non-digit ASCII byte is dropped; a non-ASCII byte
+    /// is refused, because a digit-shaped character from another script is not the digit it resembles.
     ///
-    /// - Parameter body: the rule to run over the digits.
+    /// - Parameter field: the field's name, carried by the refusal when the bytes are not ASCII.
+    /// - Parameter body: the rule to run over the filtered digits.
     /// - Returns: what `body` returned.
-    func useDigits<T>(_ body: ([UInt8]) throws -> T) rethrows -> T {
-        return try body(read())
+    /// - Throws: ``PayabliPayInTokenStorageError/invalidInput(_:)`` when the digits hold a non-ASCII byte.
+    func useDigitBytes<T>(field: String, _ body: ([UInt8]) throws -> T) throws -> T {
+        var filtered: [UInt8] = []
+        filtered.reserveCapacity(digits.count)
+        defer {
+            for index in filtered.indices {
+                filtered[index] = Self.wipedByte
+            }
+        }
+        for byte in read() {
+            guard byte < 0x80 else {
+                throw PayabliPayInTokenStorageError.invalidInput("\(field) contains unsupported characters.")
+            }
+            if (0x30 ... 0x39).contains(byte) {
+                filtered.append(byte)
+            }
+        }
+        return try body(filtered)
     }
 
     /// True once `close()` has run.
@@ -99,13 +114,5 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
     /// the digits are gone.
     func rawCopy() -> [UInt8] {
         digits
-    }
-}
-
-extension SensitiveDigits {
-    /// The digits with everything that is not a digit dropped, for the validators and encoders that
-    /// read them as text.
-    var digitsOnly: String {
-        (String(bytes: read(), encoding: .utf8) ?? "").digitsOnly
     }
 }

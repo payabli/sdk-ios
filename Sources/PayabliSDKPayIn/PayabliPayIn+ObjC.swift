@@ -234,8 +234,26 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        let swiftRequest = request.toSwift()
-        complete(completion) { try await $0.capture(swiftRequest) }
+        capture(request.toSwift(), completion: completion)
+    }
+
+    /// Charges a payment the request carries, closing the request's digit buffers at the task's
+    /// end, on a result and a refusal alike: no host can reach them to close them itself.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the charge failed with.
+    func capture(
+        _ request: PayabliPayInRequest,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        complete(completion) {
+            defer {
+                for digits in request.paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
+            return try await $0.capture(request)
+        }
     }
 
     /// Holds an amount, as ``PayabliPayIn/authorize(_:)`` does.
@@ -248,8 +266,26 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        let swiftRequest = request.toSwift()
-        complete(completion) { try await $0.authorize(swiftRequest) }
+        authorize(request.toSwift(), completion: completion)
+    }
+
+    /// Holds an amount the request carries, closing the request's digit buffers at the task's end,
+    /// on a result and a refusal alike: no host can reach them to close them itself.
+    ///
+    /// - Parameter request: the payment and its settings.
+    /// - Parameter completion: the result, or the error the authorization failed with.
+    func authorize(
+        _ request: PayabliPayInRequest,
+        completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
+    ) {
+        complete(completion) {
+            defer {
+                for digits in request.paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
+            return try await $0.authorize(request)
+        }
     }
 
     /// Captures an authorization, as ``PayabliPayIn/captureAuthorizedTransaction(_:)`` does.
@@ -293,12 +329,23 @@ public final class PayabliPayInObjC: NSObject {
         }
     }
 
-    private func addPaymentMethod(
+    /// Stores a payment method the adapter built from strings, closing the buffers it built for
+    /// them at the task's end: a host cannot reach those buffers to close them itself.
+    ///
+    /// - Parameter paymentMethod: the method to store.
+    /// - Parameter options: what the request carries besides the method.
+    /// - Parameter completion: the stored method, or the error the store failed with.
+    func addPaymentMethod(
         _ paymentMethod: PayabliPayInMethodInput,
         options: PayabliPayInOptions,
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
         Task { @MainActor in
+            defer {
+                for digits in paymentMethod.sensitiveDigits {
+                    digits.close()
+                }
+            }
             do {
                 let result = try await component.addPaymentMethod(
                     paymentMethod,

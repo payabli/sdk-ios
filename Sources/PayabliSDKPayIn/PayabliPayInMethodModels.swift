@@ -556,47 +556,6 @@ public struct PayabliPayInStoredPaymentMethod: Sendable, Equatable {
     }
 }
 
-extension PayabliPayInMethodInput: Encodable {
-    enum CodingKeys: String, CodingKey {
-        case method
-        case cardcvv
-        case cardexp
-        case cardHolder
-        case cardnumber
-        case cardzip
-        case achAccount
-        case achAccountType
-        case achCode
-        case achHolder
-        case achHolderType
-        case achRouting
-        case device
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case let .card(data):
-            try c.encode(PayabliPayInMethodType.card.rawValue, forKey: .method)
-            try c.encode(data.normalizedExpiration(), forKey: .cardexp)
-            try c.encode(data.holderName.trimmed, forKey: .cardHolder)
-            try c.encode(data.cardNumber.digitsOnly, forKey: .cardnumber)
-            try c.encode(data.securityCode.digitsOnly, forKey: .cardcvv)
-            try c.encode(data.postalCode.trimmed, forKey: .cardzip)
-
-        case let .bankAccount(data):
-            try c.encode(PayabliPayInMethodType.bankAccount.rawValue, forKey: .method)
-            try c.encode(data.accountNumber.digitsOnly, forKey: .achAccount)
-            try c.encode(data.accountType.rawValue, forKey: .achAccountType)
-            try c.encode(data.holderName.trimmed, forKey: .achHolder)
-            try c.encode(data.routingNumber.digitsOnly, forKey: .achRouting)
-            try c.encode((data.secCode ?? .web).rawValue, forKey: .achCode)
-            try c.encodeIfPresent(data.holderType?.rawValue, forKey: .achHolderType)
-            try c.encodeIfPresent(data.device.map(\.trimmed)?.nilIfEmpty, forKey: .device)
-        }
-    }
-}
-
 public extension PayabliPayInMethodInput {
     func validate(_ validation: PayabliPayInValidation = .default) throws {
         switch self {
@@ -610,14 +569,15 @@ public extension PayabliPayInMethodInput {
 
 extension PayabliPayInCardData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let digits = cardNumber.digitsOnly
-        guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
-            .contains(digits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
-        }
-        if validation.requiresLuhnCheck, !Self.passesLuhn(digits) {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+        try cardNumber.useDigitBytes(field: "Card number") { pan in
+            guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
+                .contains(pan.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
+            }
+            if validation.requiresLuhnCheck, !Self.passesLuhn(pan) {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+            }
         }
         _ = try normalizedExpiration()
         let trimmedCardholderName = holderName.trimmed
@@ -634,19 +594,22 @@ extension PayabliPayInCardData {
         guard trimmedBillingZip.count <= PayabliPayInInputLimits.maximumPostalCodeCharacters else {
             throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code must be 12 characters or fewer.")
         }
-        let cvvDigits = securityCode.digitsOnly
-        guard !cvvDigits.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
-        }
-        guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-            .contains(cvvDigits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+        try securityCode.useDigitBytes(field: "CVV") { cvv in
+            guard !cvv.isEmpty else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
+            }
+            guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
+                .contains(cvv.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+            }
         }
     }
 
     func normalizedExpiration() throws -> String {
-        let digits = expiry.digitsOnly
+        guard let digits = expiry.payabliInstrumentDigits else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiration contains unsupported characters.")
+        }
         guard digits.count == 4 else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiration must be in MMYY or MM/YY format.")
         }
@@ -658,13 +621,12 @@ extension PayabliPayInCardData {
         return "\(monthPrefix)/\(year)"
     }
 
-    static func passesLuhn(_ digits: String) -> Bool {
-        let reversed = digits.reversed().compactMap { Int(String($0)) }
-        guard reversed.count == digits.count else { return false }
-
-        let sum = reversed.enumerated().reduce(0) { partial, pair in
-            let (index, digit) = pair
-            guard index % 2 == 1 else { return partial + digit }
+    static func passesLuhn(_ digits: [UInt8]) -> Bool {
+        guard !digits.isEmpty, digits.allSatisfy({ (0x30 ... 0x39).contains($0) }) else { return false }
+        let sum = digits.reversed().enumerated().reduce(0) { partial, pair in
+            let (offset, byte) = pair
+            let digit = Int(byte - 0x30)
+            guard offset % 2 == 1 else { return partial + digit }
             let doubled = digit * 2
             return partial + (doubled > 9 ? doubled - 9 : doubled)
         }
@@ -674,14 +636,17 @@ extension PayabliPayInCardData {
 
 extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let account = accountNumber.digitsOnly
-        let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
-        let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
-        guard (minimumDigits ... maximumDigits).contains(account.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+        try accountNumber.useDigitBytes(field: "Account number") { account in
+            let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
+            let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
+            guard (minimumDigits ... maximumDigits).contains(account.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+            }
         }
-        let routing = routingNumber.digitsOnly
+        guard let routing = routingNumber.payabliInstrumentDigits else {
+            throw PayabliPayInTokenStorageError.invalidInput("Routing number contains unsupported characters.")
+        }
         guard routing.count == PayabliPayInInputLimits.routingNumberDigits else {
             throw PayabliPayInTokenStorageError.invalidInput("Routing number must be 9 digits.")
         }
@@ -719,7 +684,7 @@ extension String {
     }
 
     var digitsOnly: String {
-        filter(\.isNumber)
+        payabliCaptureDigitsOnly
     }
 
     var nilIfEmpty: String? {
@@ -746,5 +711,24 @@ private extension KeyedDecodingContainer {
             return Int64(string)
         }
         return nil
+    }
+}
+
+extension PayabliPayInMethodInput {
+    /// The service's member names for a method, read by the body writer and the rejected-field mapping.
+    enum CodingKeys: String, CodingKey {
+        case method
+        case cardcvv
+        case cardexp
+        case cardHolder
+        case cardnumber
+        case cardzip
+        case achAccount
+        case achAccountType
+        case achCode
+        case achHolder
+        case achHolderType
+        case achRouting
+        case device
     }
 }

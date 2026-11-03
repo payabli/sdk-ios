@@ -2,19 +2,77 @@ import Foundation
 import PayabliSDKCore
 
 extension PayabliPayInViewModel {
-    func methodInput() -> PayabliPayInMethodInput {
+    /// The form's sensitive buffers for one submission, closed together once the submission ends.
+    final class FormBufferRegistry {
+        private var buffers: [SensitiveDigits] = []
+
+        /// Holds a copy of the supplied digits, registered so `close()` overwrites them too.
+        ///
+        /// - Parameter digits: the digits to hold a copy of.
+        /// - Returns: the value holding a copy of `digits`, registered here.
+        func of(_ digits: [UInt8]) -> SensitiveDigits {
+            let value = SensitiveDigits.of(digits)
+            buffers.append(value)
+            return value
+        }
+
+        /// For digits that are already a `String`, typically from a text field, registered so
+        /// `close()` overwrites them too.
+        ///
+        /// - Parameter source: the digits as a `String`, which this cannot unmake.
+        /// - Returns: the value holding the digits, registered here.
+        func ofString(_ source: String) -> SensitiveDigits {
+            let value = SensitiveDigits.ofString(source)
+            buffers.append(value)
+            return value
+        }
+
+        /// Closes every registered buffer. Idempotent, so a submission that already closed them is
+        /// not an error.
+        func close() {
+            for buffer in buffers {
+                buffer.close()
+            }
+            buffers = []
+        }
+    }
+
+    /// Runs `body` with a registry of the form's sensitive buffers, closing them all once it ends.
+    ///
+    /// - Parameter body: the submission, which takes its buffers from the registry.
+    /// - Returns: what `body` returned.
+    func withFormBuffers<T>(_ body: (FormBufferRegistry) async throws -> T) async rethrows -> T {
+        let registry = FormBufferRegistry()
+        defer { registry.close() }
+        return try await body(registry)
+    }
+
+    /// The expiry as the form sends it, with the configured separator after the month read as `/`. It is
+    /// matched by Unicode scalar, because a combining mark joins the month's second digit.
+    var submittedExpiration: String {
+        let separator = configuration.formatting.expirationSeparator.unicodeScalars
+        let scalars = cardExpiration.unicodeScalars
+        let afterMonth = scalars.dropFirst(2)
+        guard afterMonth.starts(with: separator) else { return cardExpiration }
+        var expiry = String.UnicodeScalarView(scalars.prefix(2))
+        expiry.append("/")
+        expiry.append(contentsOf: afterMonth.dropFirst(separator.count))
+        return String(expiry)
+    }
+
+    func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
-                cardNumber: cardNumber,
-                expiry: cardExpiration,
+                cardNumber: buffers.ofString(cardNumber),
+                expiry: submittedExpiration,
                 holderName: cardholderName,
-                securityCode: cardCvv,
+                securityCode: buffers.ofString(cardCvv),
                 postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: accountNumber,
+                accountNumber: buffers.ofString(accountNumber),
                 accountType: accountType,
                 holderName: accountHolder,
                 routingNumber: routingNumber,
@@ -25,22 +83,22 @@ extension PayabliPayInViewModel {
         }
     }
 
-    func paymentMethod() -> PayabliPayInPaymentMethod {
+    func paymentMethod(with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: cardNumber,
-                    expiry: cardExpiration,
+                    cardNumber: buffers.ofString(cardNumber),
+                    expiry: submittedExpiration,
                     holderName: cardholderName,
-                    securityCode: cardCvv,
+                    securityCode: buffers.ofString(cardCvv),
                     postalCode: cardZip
                 )
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: accountNumber,
+                    accountNumber: buffers.ofString(accountNumber),
                     accountType: accountType,
                     holderName: accountHolder,
                     routingNumber: routingNumber,
@@ -96,10 +154,8 @@ extension PayabliPayInViewModel {
         return fields
     }
 
-    /// What the payer typed into a field no offered instrument shows any more goes with the field,
-    /// so the form holds a value only while the configuration offers the field somewhere. Nothing
-    /// is written when nothing was held, so an update a payer has not typed into publishes once.
-    /// Host-supplied hidden values are not payer-typed and are untouched.
+    /// Drops what the payer typed into a field the configuration no longer offers, writing nothing when
+    /// nothing was held. Host-supplied hidden values are untouched.
     func dropValuesWithoutAField() {
         dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
@@ -243,13 +299,13 @@ extension PayabliPayInViewModel {
         case .cardNumber:
             return (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits
                 .maximumCardNumberDigits)
-                .contains(cardNumber.payabliCaptureDigitsOnly.count)
+                .contains(cardNumber.payabliInstrumentDigits?.count ?? 0)
                 && cardNumberValidationMessage == nil
         case .cardExpiration:
-            return cardExpiration.payabliCaptureDigitsOnly.count >= 4
+            return (submittedExpiration.payabliInstrumentDigits?.count ?? 0) >= 4
         case .cardCvv:
             return (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-                .contains(cardCvv.payabliCaptureDigitsOnly.count)
+                .contains(cardCvv.payabliInstrumentDigits?.count ?? 0)
         case .cardZip:
             return !cardZip.payabliCaptureTrimmed.isEmpty
         default:
@@ -262,11 +318,11 @@ extension PayabliPayInViewModel {
         case .accountHolder:
             return !accountHolder.payabliCaptureTrimmed.isEmpty
         case .routingNumber:
-            return routingNumber.payabliCaptureDigitsOnly.count == PayabliPayInInputLimits.routingNumberDigits
+            return routingNumber.payabliInstrumentDigits?.count == PayabliPayInInputLimits.routingNumberDigits
         case .accountNumber:
             return (PayabliPayInInputLimits.minimumAccountNumberDigits ... PayabliPayInInputLimits
                 .maximumAccountNumberDigits)
-                .contains(accountNumber.payabliCaptureDigitsOnly.count)
+                .contains(accountNumber.payabliInstrumentDigits?.count ?? 0)
         case .accountType:
             return true
         case .accountHolderType:

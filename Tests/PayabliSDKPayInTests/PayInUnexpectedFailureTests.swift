@@ -214,7 +214,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         )
     }
 
-    /// The one event the flow reported, failing rather than reading past the end.
+    /// The one event the flow reported; fails unless there is exactly one.
     private func onlyEvent(of flow: PayabliPayIn, file: StaticString = #filePath, line: UInt = #line) async throws
         -> TelemetryEvent
     {

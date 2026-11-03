@@ -24,10 +24,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// What the last submission the flow published ended as.
     ///
-    /// **``voidTransaction(_:)`` does not appear here.** One channel per caller: a reversal answers the
-    /// caller that asked for it and leaves this alone, so a screen showing what a payment did does not
-    /// start showing what was done to it afterwards. Read that member's return value instead, and do
-    /// not wait on this for it.
+    /// ``voidTransaction(_:)`` leaves this as it was and returns its result to its caller.
     @Published public private(set) var lastResult: PayabliPayInResult?
 
     public var lastStoredPaymentMethod: PayabliPayInStoredPaymentMethod? {
@@ -37,11 +34,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     public private(set) var entryPoint: String
     public private(set) var environment: PayabliEnvironment
     /// Mints the key for an attempt that supplied none.
-    ///
-    /// Settable rather than an initialiser parameter: every initialiser here already carries seven, and
-    /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
     var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
     var newPaymentReference: @Sendable () -> String = { UUID().uuidString.lowercased() }
+    var copyDigits: @Sendable (SensitiveDigits) -> SensitiveDigits = { SensitiveDigits.copy(of: $0) }
     /// Reads the clock a held key ages against. One that keeps counting while the device sleeps.
     var now: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
 
@@ -252,7 +247,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         options: PayabliPayInTokenStorageOptions,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: paymentMethod.method)) {
+        let paymentMethod = paymentMethod.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(paymentMethod.sensitiveDigits) }
+        return try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: paymentMethod.method)) {
             try beginSubmission()
             defer { endSubmission() }
 
@@ -297,7 +294,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        try await reported(.capture, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+        let request = request.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(request.paymentMethod.sensitiveDigits) }
+        return try await reported(.capture, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
             try await submit {
                 let reference = try paymentReference(of: request)
                 return try await sending(
@@ -332,7 +331,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        try await reported(.authorize, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+        let request = request.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(request.paymentMethod.sensitiveDigits) }
+        return try await reported(.authorize, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
             try await submit {
                 let reference = try paymentReference(of: request)
                 return try await sending(
@@ -375,11 +376,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reverses a transaction using `POST /api/v2/MoneyIn/void/{transId}`, releasing an
     /// authorization's hold or undoing a capture that has not settled.
     ///
-    /// Which transactions can still be reversed is the service's to decide, and is not mirrored here:
-    /// a state it will not reverse comes back as the refusal it sent, carrying its own reason.
+    /// The service decides which transactions can still be reversed, and a refusal carries its own reason.
     ///
-    /// The result is returned and not published: ``lastResult`` keeps whatever the last submission
-    /// left there, so a caller reads the outcome here rather than waiting on that.
+    /// ``lastResult`` is left as it was: the outcome is this call's return value.
     ///
     /// Calling again on a transaction whose reversal ended with its outcome unknown sends the key held for it.
     ///
@@ -630,17 +629,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// Runs one operation at a time and publishes its result as the flow's last.
     ///
-    /// For the operations a rendered form drives, where the screen observes the flow rather than
-    /// holding a return value.
+    /// For the operations a rendered form drives, whose screen observes ``lastResult``.
     ///
     /// - Parameter operation: the operation to run under the exclusion.
     /// - Returns: the result the operation ended with, published as ``lastResult``.
     private func submit(
         _ operation: () async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
-        // Inside the exclusion rather than after it, so the result is published before the
-        // submission reports itself finished. The other way round, an observer woken by
-        // `isSubmitting` going false reads the result of the submission before this one.
+        // Published inside the exclusion, so an observer woken by `isSubmitting` going false reads this result.
         try await exclusively {
             let result = try await operation()
             lastResult = result
@@ -659,5 +655,16 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private func endSubmission() {
         activeSubmissionCount = max(0, activeSubmissionCount - 1)
         isSubmitting = activeSubmissionCount > 0
+    }
+}
+
+extension PayabliPayIn {
+    /// Overwrites a call's own digit buffers.
+    ///
+    /// - Parameter buffers: the buffers to close.
+    static func close(_ buffers: [SensitiveDigits]) {
+        for buffer in buffers {
+            buffer.close()
+        }
     }
 }

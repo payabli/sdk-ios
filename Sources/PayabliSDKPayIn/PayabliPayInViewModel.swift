@@ -47,8 +47,8 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .accountNumber) }
     }
 
-    /// A pick clears its mark even when the value is unchanged, because the menu reports every tap,
-    /// including the one on the standing option, and the mark answers the tap rather than the change.
+    /// A pick clears its mark even when the value is unchanged: the menu reports every tap, the standing
+    /// option's included.
     @Published var accountType: PayabliPayInAccountType = .checking {
         didSet { acceptEdit(of: .accountType) }
     }
@@ -129,8 +129,15 @@ final class PayabliPayInViewModel: ObservableObject {
         objectWillChange.send()
         // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
         let replacesFlow = component !== self.component
+        // Before the swap: a combining-mark separator cannot be stripped back to digits.
+        let expiry = submittedExpiration
+        let separatorChanges = configuration.formatting.expirationSeparator
+            != self.configuration.formatting.expirationSeparator
         self.component = component
         self.configuration = configuration
+        if separatorChanges, !cardExpiration.isEmpty {
+            cardExpiration = formatExpiration(expiry)
+        }
         lifecycleSignature = nextSignature
         if replacesFlow {
             clearMarks()
@@ -260,7 +267,7 @@ final class PayabliPayInViewModel: ObservableObject {
             return fieldHasRequiredValue(.cardholderName)
                 && fieldHasRequiredValue(.cardNumber)
                 && cardNumberValidationMessage == nil
-                && cardExpiration.payabliCaptureDigitsOnly.count >= 4
+                && submittedExpiration.payabliCaptureDigitsOnly.count >= 4
                 && fieldHasRequiredValue(.cardCvv)
                 && fieldHasRequiredValue(.cardZip)
                 && operationConfigurationIsValid
@@ -326,31 +333,39 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
     ///
+    /// The submission runs inside `withFormBuffers`, so the buffers it built are closed once it ends,
+    /// whatever it ends in.
+    ///
     /// - Returns: what the flow returned.
     private func submitToFlow() async throws -> PayabliPayInResult {
-        let request: PayabliPayInRequest?
-        do {
-            request = try configuredRequest()
-        } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod)
-            throw error
+        try await withFormBuffers { buffers in
+            let request: PayabliPayInRequest?
+            do {
+                request = try configuredRequest(with: buffers)
+            } catch {
+                component.reportFormRefusal(error, method: effectiveSelectedMethod)
+                throw error
+            }
+            if let request {
+                return try await component.submitConfigured(request, origin: .form)
+            }
+            return try await component.submitConfigured(
+                methodInput(with: buffers), options: mergedTokenStorageOptions(), origin: .form
+            )
         }
-        if let request {
-            return try await component.submitConfigured(request, origin: .form)
-        }
-        return try await component.submitConfigured(methodInput(), options: mergedTokenStorageOptions(), origin: .form)
     }
 
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
+    /// - Parameter buffers: the registry the submission's sensitive buffers are built through.
     /// - Returns: the request built from the configuration and the fields.
-    private func configuredRequest() throws -> PayabliPayInRequest? {
+    private func configuredRequest(with buffers: FormBufferRegistry) throws -> PayabliPayInRequest? {
         guard component.operation != .storePaymentMethod else { return nil }
         guard let requestConfiguration = component.requestConfiguration else {
             throw PayabliPayInError.invalidInput("Payment request configuration is required.")
         }
         return requestConfiguration.request(
-            paymentMethod: paymentMethod(),
+            paymentMethod: paymentMethod(with: buffers),
             customerData: mergedCustomerData(),
             orderDescription: mergedOrderDescription()
         )
@@ -470,7 +485,7 @@ final class PayabliPayInViewModel: ObservableObject {
         if let cardExpirationMonth {
             return cardExpirationMonth
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
+        let digits = submittedExpiration.payabliCaptureDigitsOnly
         guard digits.count >= 2 else { return nil }
         let monthText = String(digits.prefix(2))
         guard let month = Int(monthText), (1 ... 12).contains(month) else { return nil }
@@ -481,7 +496,7 @@ final class PayabliPayInViewModel: ObservableObject {
         if let cardExpirationYear {
             return cardExpirationYear
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
+        let digits = submittedExpiration.payabliCaptureDigitsOnly
         guard digits.count >= 4 else { return nil }
         let yearSuffix = String(digits.suffix(2))
         guard let year = Int(yearSuffix) else { return nil }
