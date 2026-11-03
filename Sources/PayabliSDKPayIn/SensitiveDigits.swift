@@ -48,9 +48,7 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
     /// A closed value reads as empty, so a request built from one fails validation as a missing field.
     func close() {
         guard !wiped else { return }
-        for index in digits.indices {
-            digits[index] = Self.wipedByte
-        }
+        MemoryWipe.overwrite(&digits)
         wiped = true
     }
 
@@ -88,11 +86,7 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
     func useDigitBytes<T>(field: String, _ body: ([UInt8]) throws -> T) throws -> T {
         var filtered: [UInt8] = []
         filtered.reserveCapacity(digits.count)
-        defer {
-            for index in filtered.indices {
-                filtered[index] = Self.wipedByte
-            }
-        }
+        defer { MemoryWipe.overwrite(&filtered) }
         for byte in read() {
             guard byte < 0x80 else {
                 throw PayabliPayInTokenStorageError.invalidInput("\(field) contains unsupported characters.")

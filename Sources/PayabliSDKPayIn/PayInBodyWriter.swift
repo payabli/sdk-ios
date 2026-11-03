@@ -138,9 +138,7 @@ enum PayInBodyWriter {
         buffer.write(closeBrace)
         var finished = buffer.finishAndWipe()
         let spliced = ownedBody(finished, releaseNoted: releaseNoted)
-        for index in finished.indices {
-            finished[index] = 0
-        }
+        MemoryWipe.overwrite(&finished)
         return spliced
     }
 
@@ -164,7 +162,7 @@ enum PayInBodyWriter {
             memcpy(allocation, base, count)
         }
         return Data(bytesNoCopy: allocation, count: count, deallocator: .custom { pointer, count in
-            memset(pointer, 0, count)
+            MemoryWipe.overwrite(pointer, count: count)
             if let releaseNoted {
                 releaseNoted(UnsafeRawPointer(pointer), count)
             }
@@ -178,10 +176,7 @@ enum PayInBodyWriter {
     ///
     /// - Parameter body: the body to overwrite.
     static func wipe(_ body: inout Data) {
-        body.withUnsafeMutableBytes { storage in
-            guard let base = storage.baseAddress else { return }
-            memset(base, 0, storage.count)
-        }
+        body.withUnsafeMutableBytes { MemoryWipe.overwrite($0) }
     }
 
     /// Builds one fragment, wiping the writer's working buffer on every exit.
@@ -223,9 +218,7 @@ final class PayInMethodFragment: CustomReflectable {
     /// Overwrites the bytes in place, keeping the zeros. Idempotent, so wiping a fragment already
     /// spliced costs nothing.
     func wipe() {
-        for index in bytes.indices {
-            bytes[index] = 0
-        }
+        MemoryWipe.overwrite(&bytes)
     }
 
     /// The bytes as they stand, wiped or not, so a test can assert the overwrite actually happened.
@@ -324,9 +317,7 @@ struct ByteBuffer: CustomStringConvertible, CustomDebugStringConvertible, Custom
         ensure(extra: incoming.count)
         bytes.replaceSubrange(size ..< size + incoming.count, with: incoming)
         size += incoming.count
-        for index in incoming.indices {
-            incoming[index] = 0
-        }
+        MemoryWipe.overwrite(&incoming)
     }
 
     /// The exact-size result, after which the working storage holds zeros.
@@ -340,9 +331,7 @@ struct ByteBuffer: CustomStringConvertible, CustomDebugStringConvertible, Custom
 
     /// Overwrites what has been written so far, for an exit that produces no result.
     mutating func wipe() {
-        for index in bytes.indices {
-            bytes[index] = 0
-        }
+        MemoryWipe.overwrite(&bytes)
         size = 0
     }
 
@@ -374,9 +363,7 @@ struct ByteBuffer: CustomStringConvertible, CustomDebugStringConvertible, Custom
         }
         var grown: [UInt8] = Array(repeating: 0, count: capacity)
         grown.replaceSubrange(0 ..< size, with: bytes[0 ..< size])
-        for index in bytes.indices {
-            bytes[index] = 0
-        }
+        MemoryWipe.overwrite(&bytes)
         bytes = grown
     }
 }
