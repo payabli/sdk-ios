@@ -197,7 +197,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.deviceSetupRefused(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.configFailed(reason: "x"), .failed(reason: .configurationRejected)),
             (.entryPointRefused(reason: "x"), .failed(reason: .configurationRejected)),
-            (.cardPresentNotEnabled, .failed(reason: .configurationRejected)),
+            (.cardPresentNotEnabled(), .failed(reason: .configurationRejected)),
             (.readerSetupFailed(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.readerUnavailable(reason: "x"), .failed(reason: .serviceUnavailable)),
             (.readerCredentialsUnusable, .failed(reason: .configurationRejected)),

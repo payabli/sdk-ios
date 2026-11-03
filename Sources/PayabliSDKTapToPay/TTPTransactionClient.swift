@@ -68,7 +68,7 @@ package final class TTPTransactionClient: Sendable {
                 throw ChargeKeyRefusal()
             }
             if response.statusCode == 404 {
-                throw PayabliTTPError.cardPresentNotEnabled
+                throw PayabliTTPError.cardPresentNotEnabled(httpStatus: response.statusCode, rawCode: serviceCode(of: response))
             }
             if let refusal = CustomerDataRefusal(response: response) {
                 throw refusal

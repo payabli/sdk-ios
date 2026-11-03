@@ -38,7 +38,7 @@ final class PayabliTTPErrorDescriptionTests: XCTestCase {
             (.termsNotAccepted, "Contactless payment terms have not been accepted"),
             (.readerOSVersionNotSupported(), "This OS version does not support contactless payments"),
             (.readerHardwareUnsupported, "This device cannot take contactless payments"),
-            (.cardPresentNotEnabled, "Card-present payments are not enabled for this paypoint"),
+            (.cardPresentNotEnabled(), "Card-present payments are not enabled for this paypoint"),
             (.activationCodeMalformed, "The activation code must be six digits"),
             (.cardDeclined(paymentTransId: "TXN"), "The card was refused"),
             (.outcomeUnknown(paymentTransId: "TXN"), "The payment outcome is not known")

@@ -61,7 +61,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.deviceSetupRefused(reason: reason), "deviceSetupRefused"),
             (.entryPointRefused(reason: reason), "entryPointRefused"),
             (.configFailed(reason: reason), "configFailed"),
-            (.cardPresentNotEnabled, "cardPresentNotEnabled"),
+            (.cardPresentNotEnabled(), "cardPresentNotEnabled"),
             (.readerSetupFailed(reason: reason), "readerSetupFailed"),
             (.readerHardwareUnsupported, "readerHardwareUnsupported"),
             (.readerUnavailable(reason: reason), "readerUnavailable"),

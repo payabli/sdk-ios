@@ -13,7 +13,7 @@ enum AppRegistrationRefusals {
     static func hostError(status: Int, reason: String) -> TapToPayError? {
         guard refusals.contains(Refusal(status: status, reason: reason)) else { return nil }
         let type = PayabliErrorType.deviceSetupNotConfigured
-        return TapToPayError(type: type, reason: type.message, detail: reason)
+        return TapToPayError(type: type, reason: type.message, detail: reason, httpStatus: status)
     }
 
     private struct Refusal: Hashable {
