@@ -146,15 +146,17 @@ import { useEffect, useState } from 'react';
 import { Payabli } from './modules/payabli';
 
 export default function App() {
+  const [started, setStarted] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
 
   useEffect(() => {
-    Payabli.initialize('your-entry-point', 'sandbox').catch((e: { code?: string; message: string }) =>
-      setStartError(`${e.code ?? 'ERROR'}: ${e.message}`),
-    );
+    Payabli.initialize('your-entry-point', 'sandbox')
+      .then(() => setStarted(true))
+      .catch((e: { code?: string }) => setStartError(e.code ?? 'ERROR'));
   }, []);
 
-  return startError ? <SetupError message={startError} /> : <Checkout orderId="A-1001" amount={12.34} />;
+  if (startError) return <SetupError code={startError} />;
+  return started ? <Checkout orderId="A-1001" amount={12.34} /> : <Starting />;
 }
 ```
 
@@ -164,15 +166,18 @@ Calling `initialize` again with the same entry point and environment returns the
 
 ```tsx
 // Checkout.tsx
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Platform, Text, View } from 'react-native';
 import { Payabli, type PaymentOutcome } from './modules/payabli';
 
 export function Checkout({ orderId, amount }: { orderId: string; amount: number }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const paying = useRef(false); // set synchronously, so a second tap before the re-render can't start a payment
 
   async function pay(way: 'card' | 'tap') {
+    if (paying.current) return;
+    paying.current = true;
     setBusy(true);
     let canPayAgain = true;
     try {
@@ -185,7 +190,10 @@ export function Checkout({ orderId, amount }: { orderId: string; amount: number 
       setMessage(`Couldn't take the payment (${error.code ?? 'ERROR'})`);
     } finally {
       // A charged order isn't paid again, and an unknown one stays blocked until checkWithBackend settles it.
-      if (canPayAgain) setBusy(false);
+      if (canPayAgain) {
+        paying.current = false;
+        setBusy(false);
+      }
     }
   }
 
@@ -502,19 +510,20 @@ A failure that isn't a payment outcome reaches Dart as a `PlatformException` wit
 
 ```dart
 Future<void> _pay({required bool tap}) async {
+  if (_busy) return; // checked before the rebuild, so a second tap can't start a payment
   setState(() => _busy = true);
   var canPayAgain = true;
   try {
     final outcome = tap
         ? await widget.payabli.tapToPay(12.34, 'A-1001')
         : await widget.payabli.payWithCard(12.34, 'A-1001');
+    canPayAgain = outcome is NotCharged || outcome is Unsupported;
     final message = switch (outcome) {
       Charged(:final paymentTransId) => _saved(paymentTransId), // store it; don't log it
       NotCharged() => 'Not charged. Try again.',
       OutcomeUnknown(:final paymentTransId) => _check(paymentTransId), // look it up first
       Unsupported() => "Tap to Pay isn't available on this phone.",
     };
-    canPayAgain = outcome is NotCharged || outcome is Unsupported;
     if (mounted) setState(() => _message = message);
   } on PlatformException catch (e) {
     if (mounted) setState(() => _message = "Couldn't take the payment (${e.code})");
