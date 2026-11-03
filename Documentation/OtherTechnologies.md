@@ -296,10 +296,14 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
   let finish = { (outcome: [String: Any?]) in
     guard !settled else { return }
     settled = true
-    sheet?.dismiss(animated: true)
-    promise.resolve(outcome)
+    // Resolved once the sheet has gone, so the next payment isn't presented over a closing one.
+    if let sheet, sheet.presentingViewController != nil {
+      sheet.dismiss(animated: true) { promise.resolve(outcome) }
+    } else {
+      promise.resolve(outcome)
+    }
   }
-  let host = UIHostingController(rootView: PayabliPayInView(
+  let host = UIHostingController(rootView: ScrollView { PayabliPayInView(
     component: payIn,
     onCompleted: { result in
       finish(["status": "charged", "paymentTransId": result.transaction?.paymentTransId])
@@ -309,7 +313,7 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
       if case PayabliPayInError.submissionInProgress = error { return }
       finish(cardOutcome(for: error))
     }
-  ))
+  ).padding() })
   sheet = host
   presenter.present(host, animated: true)
 }.runOnQueue(.main)
@@ -501,7 +505,8 @@ class PayabliService {
 
   Future<void> activateDevice(String code) => _api.activateDevice(code);
 
-  Stream<SessionState> get sessionStates => sessionState();
+  // Made once: each call opens the channel again, and a second open cuts off the first.
+  late final Stream<SessionState> sessionStates = sessionState();
 
   PaymentOutcome _outcome(PaymentResult result) => switch (result.status) {
         PaymentStatus.charged => Charged(result.paymentTransId),
