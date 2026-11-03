@@ -2,9 +2,7 @@ import Foundation
 
 /// HTTP 429. The caller sent more requests than the service currently accepts.
 ///
-/// Its own type rather than a server error, because the two are different conditions: this one is about
-/// the caller's own rate and clears on its own, and a retry policy treating them alike is a coincidence
-/// rather than a reason to merge them.
+/// The condition is the caller's own rate, and it clears on its own.
 public struct PayabliRateLimitError: PayabliError, PayabliRetryAfter {
     public let retryAfter: TimeInterval?
     public let httpStatus: Int?
