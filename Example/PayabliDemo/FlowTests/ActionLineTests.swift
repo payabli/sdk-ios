@@ -17,6 +17,18 @@ final class ActionLineTests: XCTestCase {
         }
     }
 
+    private struct Thrown: PayabliError {
+        let type: PayabliErrorType
+
+        var reason: String {
+            "The service's own text."
+        }
+
+        var detail: String? {
+            nil
+        }
+    }
+
     private struct Shown: DisplayedFailure {
         let message = "This iPhone can't do that."
     }
@@ -28,5 +40,37 @@ final class ActionLineTests: XCTestCase {
     func testAFailureThatAlreadyCarriesItsMessageKeepsIt() {
         XCTAssertEqual(ActionLine.failed(Shown()), "✗ This iPhone can't do that.")
         XCTAssertEqual(ActionLine.message(for: Shown()), "This iPhone can't do that.")
+    }
+
+    func testAnOldOperatingSystemSaysToUpdateIt() {
+        XCTAssertEqual(
+            ActionLine.message(for: Thrown(type: .deviceOSUnsupported)),
+            "This iPhone's iOS version is too old for Tap to Pay. Update iOS and try again."
+        )
+    }
+
+    func testUnsupportedHardwareSaysThisIPhoneCannotTakeTapToPay() {
+        XCTAssertEqual(
+            ActionLine.message(for: Thrown(type: .deviceHardwareUnsupported)),
+            "This iPhone can't take Tap to Pay payments."
+        )
+    }
+
+    func testARefusedDeviceSaysToContactSupportWithTheDeviceId() {
+        XCTAssertEqual(
+            ActionLine.message(for: Thrown(type: .readerDeviceRefused)),
+            "This iPhone isn't set up for Tap to Pay with this app. Contact Payabli support with the device ID on the Config tab."
+        )
+    }
+
+    func testAnUnidentifiableDeviceSaysTapToPayCannotStart() {
+        XCTAssertEqual(
+            ActionLine.message(for: Thrown(type: .deviceIdentityUnavailable)),
+            "This iPhone can't be identified, so Tap to Pay can't start."
+        )
+    }
+
+    func testAnotherDeviceFailureKeepsTheCategoryLine() {
+        XCTAssertEqual(ActionLine.message(for: Thrown(type: .deviceSetupUnsupported)), "This iPhone can't do that.")
     }
 }
