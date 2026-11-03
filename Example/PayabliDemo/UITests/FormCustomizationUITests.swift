@@ -169,7 +169,7 @@ final class FormCustomizationLiveUITests: XCTestCase {
     func testTokenizingUnderTheBrandPreset() {
         app.buttons["Tokenize"].tap()
         fillAndSubmit("Save for later")
-        expectResult(prefix: "Saved:")
+        expectResult(prefix: "Payment method saved")
     }
 
     private func fillAndSubmit(_ submit: String) {
