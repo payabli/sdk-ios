@@ -2,15 +2,9 @@ import Foundation
 import PayabliSDKCore
 import PayabliSDKPayIn
 
-/// What a submission ended as, in this app's own words.
-///
-/// The form calls back with the SDK's own result and error types. These are what
-/// the screens are handed instead, so no view holds a type it would have to
-/// follow when the SDK changes.
-///
-/// The rows are derived here rather than transcribed by a screen: a result carries a dozen
-/// fields, and a screen that reads them one by one names the type again. A success shows its
-/// code and identifiers, never the service's text.
+/// What a submission ended as, in this app's own words, so no screen holds an SDK type it would have to follow.
+/// The rows are derived here: a screen reading a result's fields one by one names the type again.
+/// A success shows its code and identifiers, never the service's text.
 struct PayInOutcome {
     let code: String
     let transaction: PayInTransaction?
@@ -182,13 +176,10 @@ extension PayInFailure {
     private static let reversalStillRunningMessage =
         "The earlier reversal may still be running. Read the payment again shortly."
 
-    /// A failure reads as the message for its category, never as `localizedDescription`, which is the
-    /// service's text.
+    /// A failure reads as the message for its category, never as `localizedDescription`, which is the service's text.
     ///
-    /// - Parameter operation: what the form was for. A stored method sends no
-    ///   idempotency key and offers no new attempt, so a conflict on that flow is
-    ///   not the duplicate this message describes, and it reads as the service's own
-    ///   answer.
+    /// - Parameter operation: what the form was for. A stored method sends no idempotency key, so a conflict there
+    ///   is not a duplicate and reads as the service's own answer.
     init(_ error: Error, operation: PayInOperation) {
         let duplicate = operation.canRepeatUnderOneKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
