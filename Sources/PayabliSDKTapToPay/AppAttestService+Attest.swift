@@ -80,13 +80,9 @@ extension AppAttestService {
             logger.info("Device registered in pending state — completing attestation before prompting for activation code")
         }
 
-        // 4. Attest the key. `attestKey` is single-use per key, so drop the
-        //    pending slot before attesting: a failure here or at `/attest` mints
-        //    a new key next time, since a burned one is refused. Pre-attest
-        //    failures above keep the slot for reuse.
-        //
-        //    Raises on a drop that did not land: the key is about to be spent, and
-        //    a surviving record is one the next attempt reuses and is refused for.
+        // 4. Attest the key. A key is attested once, so the pending slot is dropped first and a failure from
+        //    here on mints a new key next time; a failure above keeps the slot. Raises when the drop does not
+        //    land, because the next attempt would reuse that record and be refused.
         try forgetPendingKey(for: entry)
         let clientDataHash = ClientDataHash(Data(SHA256.hash(data: challenge.challenge)))
         let attestation = try await settingUp("attestKey") {
