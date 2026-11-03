@@ -47,6 +47,32 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertNil(payabli.rawCode)
     }
 
+    func testATransactionTheCallerMayNotReadCarriesItsStatusAndCode() async throws {
+        let client = PayInPaymentFlowClient(
+            transport: MockPaymentCaptureTransport(statusCode: 401, responseBody: #"{"responseCode":9001}"#)
+        )
+
+        let error = await failure { _ = try await client.details(transId: "trans-1") }
+
+        let payabli = try XCTUnwrap(error as? any PayabliError)
+        XCTAssertEqual(payabli.type, .permissionDenied)
+        XCTAssertEqual(payabli.httpStatus, 401)
+        XCTAssertEqual(payabli.rawCode, "9001")
+    }
+
+    func testATransactionNotVisibleCarriesItsStatusAndCode() async throws {
+        let client = PayInPaymentFlowClient(
+            transport: MockPaymentCaptureTransport(statusCode: 400, responseBody: #"{"responseCode":7001}"#)
+        )
+
+        let error = await failure { _ = try await client.details(transId: "trans-1") }
+
+        let payabli = try XCTUnwrap(error as? any PayabliError)
+        XCTAssertEqual(payabli.type, .transactionNotFound)
+        XCTAssertEqual(payabli.httpStatus, 400)
+        XCTAssertEqual(payabli.rawCode, "7001")
+    }
+
     func testAnUnclassifiedStatusOnACaptureLeavesTheOutcomeOpenWithItsStatusAndCode() async throws {
         let transport = RecordingIdempotencyTransport(body: Data(#"{"code":"E1001"}"#.utf8), status: 418)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-418")
