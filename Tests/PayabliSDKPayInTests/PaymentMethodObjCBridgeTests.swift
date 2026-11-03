@@ -30,38 +30,6 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         return try PayabliPayInObjC.create()
     }
 
-    func testAddBankAccountRejectsInvalidHolderType() async throws {
-        let component = try await makeBridge(
-            tokenHandler: { completion in
-                completion("token", nil)
-            }
-        )
-        let expectation = expectation(description: "completion called")
-
-        component.addBankAccount(
-            accountNumber: "123456789",
-            routingNumber: "021000021",
-            accountType: "Checking",
-            holderName: "Jane Doe",
-            holderType: "company",
-            secCode: "WEB",
-            deviceId: nil,
-            achValidation: true,
-            createAnonymous: false,
-            forceCustomerCreation: true,
-            temporary: false,
-            source: "objc-test"
-        ) { method, error in
-            XCTAssertNil(method)
-            XCTAssertEqual(error?.domain, "com.payabli.payIn")
-            XCTAssertEqual(error?.code, -2)
-            XCTAssertEqual(error?.localizedDescription, "holderType must be personal or business")
-            expectation.fulfill()
-        }
-
-        await fulfillment(of: [expectation], timeout: 1)
-    }
-
     func testStoredPaymentMethodWrapperConvertsValuesAndResponse() {
         let storedMethod = PayabliPayInStoredPaymentMethod(
             storedMethodId: "stored-123",
@@ -94,58 +62,6 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.customerId, 4440)
         XCTAssertEqual(wrapper.responseText, "Success")
         XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
-    }
-
-    func testAddBankAccountRejectsInvalidArgumentsSynchronously() async throws {
-        let component = try await makeBridge(
-            tokenHandler: { completion in completion("unused", nil) }
-        )
-
-        var invalidAccountTypeError: NSError?
-        component.addBankAccount(
-            accountNumber: "111111111",
-            routingNumber: "123456780",
-            accountType: "Business",
-            holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
-            deviceId: nil,
-            achValidation: false,
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
-        ) { result, error in
-            XCTAssertNil(result)
-            invalidAccountTypeError = error
-        }
-
-        var invalidSecCodeError: NSError?
-        component.addBankAccount(
-            accountNumber: "111111111",
-            routingNumber: "123456780",
-            accountType: PayabliPayInAccountType.checking.rawValue,
-            holderName: "Jane Doe",
-            holderType: nil,
-            secCode: "POP",
-            deviceId: nil,
-            achValidation: false,
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
-        ) { result, error in
-            XCTAssertNil(result)
-            invalidSecCodeError = error
-        }
-
-        XCTAssertEqual(invalidAccountTypeError?.code, -2)
-        XCTAssertEqual(
-            invalidAccountTypeError?.localizedDescription,
-            "accountType must be Checking or Savings"
-        )
-        XCTAssertEqual(invalidSecCodeError?.code, -2)
-        XCTAssertEqual(invalidSecCodeError?.localizedDescription, "secCode must be PPD, WEB, TEL, CCD, or BOC")
     }
 
     func testAddCardReturnsValidationErrorWithoutCallingTokenHandler() async throws {
@@ -296,10 +212,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.addBankAccount(
             accountNumber: "1111111111",
             routingNumber: "123456780",
-            accountType: PayabliPayInAccountType.checking.rawValue,
+            accountType: .checking,
             holderName: "Jane Doe",
-            holderType: PayabliPayInAccountHolderType.personal.rawValue,
-            secCode: nil,
+            holderType: .personal,
+            secCode: .unspecified,
             deviceId: nil,
             achValidation: true,
             createAnonymous: false,

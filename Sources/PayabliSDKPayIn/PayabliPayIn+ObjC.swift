@@ -152,10 +152,10 @@ public final class PayabliPayInObjC: NSObject {
     @objc public func addBankAccount(
         accountNumber: String,
         routingNumber: String,
-        accountType: String,
+        accountType: PayabliPayInAccountTypeCode,
         holderName: String,
-        holderType: String?,
-        secCode: String?,
+        holderType: PayabliPayInAccountHolderTypeCode,
+        secCode: PayabliPayInSecCodeCode,
         deviceId: String?,
         achValidation: Bool,
         createAnonymous: Bool,
@@ -164,38 +164,13 @@ public final class PayabliPayInObjC: NSObject {
         source: String?,
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
-        guard let resolvedAccountType = PayabliPayInAccountType(rawValue: accountType) else {
-            completion(nil, invalidArgument("accountType must be Checking or Savings"))
-            return
-        }
-        let resolvedSecCode: PayabliPayInSecCode
-        if let secCode {
-            guard let secCode = PayabliPayInSecCode(rawValue: secCode) else {
-                completion(nil, invalidArgument("secCode must be PPD, WEB, TEL, CCD, or BOC"))
-                return
-            }
-            resolvedSecCode = secCode
-        } else {
-            resolvedSecCode = .web
-        }
-        let resolvedHolderType: PayabliPayInAccountHolderType?
-        if let holderType {
-            guard let holderType = PayabliPayInAccountHolderType(rawValue: holderType) else {
-                completion(nil, invalidArgument("holderType must be personal or business"))
-                return
-            }
-            resolvedHolderType = holderType
-        } else {
-            resolvedHolderType = nil
-        }
-
         let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             routingNumber: routingNumber,
-            accountType: resolvedAccountType,
+            accountType: accountType.accountType,
             holderName: holderName,
-            holderType: resolvedHolderType,
-            secCode: resolvedSecCode,
+            holderType: holderType.holderType,
+            secCode: secCode.secCode ?? .web,
             deviceId: deviceId
         )
         let options = PayabliPayInOptions(
@@ -361,18 +336,11 @@ public final class PayabliPayInObjC: NSObject {
             }
         }
     }
-
-    private func invalidArgument(_ message: String) -> NSError {
-        NSError(
-            domain: payInObjCErrorDomain,
-            code: -2,
-            userInfo: [NSLocalizedDescriptionKey: message]
-        )
-    }
 }
 
 extension Error {
-    /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId` and `paymentReference`.
+    /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId`, `paymentReference` and its
+    /// redacted cause under `NSUnderlyingErrorKey`.
     ///
     /// - Parameter movesMoney: whether the call could take a payment, so the error says whether it may have.
     /// - Returns: the error, with `capture` set to 1 when the payment may have been taken, a refusal because another
