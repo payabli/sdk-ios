@@ -151,8 +151,7 @@ package extension PayabliTTPError {
         }
     }
 
-    /// The same refusal, carrying the status of the answer it was read from. A device or activation refusal's code is
-    /// the status itself, so it carries no code.
+    /// The same refusal, carrying the status of the answer it was read from, and no code.
     ///
     /// - Parameter httpStatus: the status the refusing answer came with.
     /// - Returns: the refusal with `httpStatus` set, or this failure unchanged when it is not a refusal read from an answer.

@@ -79,6 +79,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         let failure = await failure { try await ttp.initialize() }
 
         XCTAssertEqual((failure as? any PayabliError)?.code, 1002, "got \(failure)")
+        XCTAssertEqual((failure as? any PayabliError)?.httpStatus, 401, "the second refusal was answered")
         XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
         XCTAssertEqual(stub.configBearers.count, 2)
         XCTAssertEqual(tokens.count, 2, "renewed once only")

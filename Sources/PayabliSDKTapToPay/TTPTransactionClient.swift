@@ -96,6 +96,7 @@ package final class TTPTransactionClient: Sendable {
         // already be taken.
         guard let data = envelope.data, Self.isAddressable(data.paymentTransId) else {
             throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
+                .carrying(httpStatus: status)
         }
         return data.paymentTransId
     }
