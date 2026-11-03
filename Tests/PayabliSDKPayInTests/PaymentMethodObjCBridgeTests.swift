@@ -30,6 +30,48 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         return try PayabliPayInObjC.create()
     }
 
+    func testEachStoreFlagReachesItsOwnOption() throws {
+        let flags: [(ReferenceWritableKeyPath<PayabliPayInStoreRequestObjC, NSNumber?>, KeyPath<PayabliPayInStoreOptions, Bool?>)] = [
+            (\.achValidation, \.achValidation),
+            (\.createAnonymous, \.createAnonymous),
+            (\.forceCustomerCreation, \.forceCustomerCreation),
+            (\.temporary, \.temporary)
+        ]
+
+        for (set, _) in flags {
+            let request = try storeRequest()
+            request[keyPath: set] = true
+            let options = request.toSwift().options
+            for (other, read) in flags {
+                XCTAssertEqual(options[keyPath: read], other == set ? true : nil, "\(set) set \(read)")
+            }
+        }
+    }
+
+    func testAStoreRequestCarriesItsSourceAndLeavesUnsetFlagsUnsent() throws {
+        let request = try storeRequest()
+        request.source = "objc-source"
+
+        let options = request.toSwift().options
+
+        XCTAssertEqual(options.source, "objc-source")
+        XCTAssertNil(options.achValidation)
+        XCTAssertNil(options.createAnonymous)
+        XCTAssertNil(options.forceCustomerCreation)
+        XCTAssertNil(options.temporary)
+    }
+
+    private func storeRequest() throws -> PayabliPayInStoreRequestObjC {
+        try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
+            accountNumber: "123456789",
+            accountType: "Checking",
+            holderName: "Jane Doe",
+            routingNumber: "021000021",
+            secCode: nil,
+            holderType: nil
+        ))
+    }
+
     func testTheBankAccountFactoryRejectsAnInvalidHolderType() {
         XCTAssertNil(
             PayabliPayInStoreRequestObjC.bankAccount(
