@@ -153,6 +153,32 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertNil(error.userInfo["capture"])
     }
 
+    func testAnUnrecognizedErrorThroughObjectiveCCarriesTheInternalErrorsDomainAndCode() async throws {
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: ForeignErrorTransport(failure: HostThrew()),
+            key: "reserved-1"
+        ))
+
+        let (result, error) = await call { bridge.capture(PayabliPayInRequestObjC.cash(totalAmount: 10), completion: $0) }
+
+        XCTAssertNil(result)
+        let failure = try XCTUnwrap(error)
+        XCTAssertEqual(failure.domain, "com.payabli.payIn")
+        XCTAssertEqual(failure.code, PayabliErrorType.unknown.number)
+        XCTAssertEqual(failure.userInfo["capture"] as? Int, 1)
+    }
+
+    func testAConvertedFailureFromACallThatMovesMoneySaysThePaymentMayHaveBeenTaken() {
+        let converted = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(URLError(.notConnectedToInternet))
+        )
+
+        XCTAssertEqual(converted.toPayabliPayInNSError(movesMoney: true).userInfo["capture"] as? Int, 1)
+        XCTAssertNil(converted.toPayabliPayInNSError().userInfo["capture"])
+    }
+
     func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {
         let error = CancellationError().toPayabliPayInNSError(movesMoney: true)
 

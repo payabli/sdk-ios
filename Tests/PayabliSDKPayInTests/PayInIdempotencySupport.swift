@@ -156,3 +156,31 @@ final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable
         return try decodePayabliV2Envelope(T.self, from: response)
     }
 }
+
+/// An error a host might throw, carrying a message no boundary may hand on.
+struct HostThrew: Error {
+    let message = "a message the boundary must not carry"
+}
+
+/// Throws where the service would answer, without the mark that says a request may have left, so the
+/// outcome of a money-moving call stays known.
+final class ForeignErrorTransport: PayabliTransport, @unchecked Sendable {
+    private let failure: any Error
+
+    init(failure: any Error) {
+        self.failure = failure
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        throw failure
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        let response = try await perform(request)
+        try mapPayabliHTTPError(response: response)
+        return try decodePayabliV2Envelope(T.self, from: response)
+    }
+}
