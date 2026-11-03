@@ -111,6 +111,17 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
         copies.assertAllOverwritten(expected: 3)
     }
 
+    func testASuccessfulAuthorizationOverwritesTheCallsCopies() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let flow = PayInFixture.makeFlow(transport: transport, key: "k1")
+        let copies = DigitCopies.recording(flow)
+
+        _ = try await flow.authorize(Self.request(Self.card(), .newPayment, reference: "p-card"))
+
+        XCTAssertEqual(transport.count, 1, "the authorization reached the service")
+        copies.assertAllOverwritten(expected: 2)
+    }
+
     func testARefusalBeforeSendingOverwritesTheCallsCopies() async {
         let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
         let flow = PayInFixture.makeFlow(transport: transport, key: "k1")
