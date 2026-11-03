@@ -135,10 +135,20 @@ final class PayInPaymentFlowClient: Sendable {
         }
         // The decoding error is not attached: it quotes the body it rejected.
         guard let record = try? JSONDecoder().decode(TransactionDetailsRecord.self, from: response.body) else {
-            throw PayabliGenericError(type: .decodingError, reason: "Failed to decode the transaction")
+            throw PayabliGenericError(
+                type: .decodingError,
+                reason: "Failed to decode the transaction",
+                httpStatus: response.statusCode,
+                rawCode: nil
+            )
         }
         guard record.paymentTransId == transId else {
-            throw PayabliGenericError(type: .decodingError, reason: "The answer names a different transaction")
+            throw PayabliGenericError(
+                type: .decodingError,
+                reason: "The answer names a different transaction",
+                httpStatus: response.statusCode,
+                rawCode: nil
+            )
         }
         return record.transaction
     }
@@ -337,7 +347,7 @@ final class PayInPaymentFlowClient: Sendable {
         } catch {
             let refusedKey = error is IdempotencyCheckRefusal
             let failure: any Error = if refusedKey {
-                PayabliGenericError(type: .conflict, reason: "Conflict (409)")
+                PayabliGenericError(type: .conflict, reason: "Conflict (409)", httpStatus: answer?.statusCode, rawCode: nil)
             } else if PayInInterruption.isCancellation(error) {
                 CancellationError()
             } else {
