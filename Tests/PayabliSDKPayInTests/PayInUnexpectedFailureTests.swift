@@ -228,10 +228,10 @@ final class PayInUnexpectedFailureTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "12/30",
-        cardholderName: "Jane",
-        cvv: "123",
-        billingZip: "12345"
+        expiry: "12/30",
+        holderName: "Jane",
+        securityCode: "123",
+        postalCode: "12345"
     )
 
     private static let bankAccount = PayabliPayInBankAccountData(
