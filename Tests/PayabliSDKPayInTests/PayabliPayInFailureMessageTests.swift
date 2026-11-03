@@ -97,6 +97,38 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         }
     }
 
+    func testAConvertedFailureDrawsItsCategorysMessage() {
+        let converted = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(URLError(.notConnectedToInternet))
+        )
+        for operation in PayabliPayInOperation.Kind.allCases {
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(for: converted, operation: operation),
+                PayabliPayInFailureMessage.text(for: .outcomeUnknown, operation: operation),
+                "\(operation)"
+            )
+        }
+        XCTAssertEqual(
+            PayabliPayInFailureMessage.text(for: converted, operation: .capture),
+            "This payment may have gone through. Check before paying again."
+        )
+    }
+
+    func testAnUnrecognizedStatusWarnsItsOutcomeIsUnknown() {
+        for operation in [PayabliPayInOperation.Kind.capture, .authorize] {
+            XCTAssertEqual(
+                PayabliPayInFailureMessage.text(
+                    for: PayabliGenericError(type: .unknown, reason: "HTTP 580"),
+                    operation: operation
+                ),
+                "This payment may have gone through. Check before paying again.",
+                "\(operation)"
+            )
+        }
+    }
+
     func testACatalogErrorDrawsItsCategorysMessage() {
         XCTAssertEqual(
             PayabliPayInFailureMessage.text(

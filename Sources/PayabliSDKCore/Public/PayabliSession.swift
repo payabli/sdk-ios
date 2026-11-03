@@ -128,12 +128,29 @@ public final class PayabliSession: @unchecked Sendable {
     ///   is equal, or a new one.
     @discardableResult
     public static func initialize(config: PayabliConfig) async throws -> PayabliSession {
+        try await initialize(config: config, makeSession: defaultSessionBuilder)
+    }
+
+    /// Installs the process's session as ``initialize(config:)`` does, building any new session with `makeSession`.
+    ///
+    /// A refusal is reported and rethrown. Any other error the SDK did not classify is reported and thrown as the
+    /// SDK's unknown failure.
+    ///
+    /// - Parameter config: the configuration to install; equal by entry point and environment.
+    /// - Parameter makeSession: builds a session when none is installed for this configuration.
+    /// - Returns: the process's installed session.
+    static func initialize(config: PayabliConfig, makeSession: SessionBuilder) async throws -> PayabliSession {
         let startedAt = ContinuousClock.now
         do {
-            return try install(config: config)
+            return try install(config: config, makeSession: makeSession)
         } catch let refusal as PayabliGenericError {
             await current?.reportRefusedInitialize(refusal, after: ContinuousClock.now - startedAt)
             throw refusal
+        } catch {
+            // The refusal above takes the errors the SDK classified; this converts what it did not.
+            guard let failure = error.payabliUnexpectedFailure else { throw error }
+            await current?.reportFailedInitialize(failure, original: error, after: ContinuousClock.now - startedAt)
+            throw failure
         }
     }
 
@@ -156,10 +173,49 @@ public final class PayabliSession: @unchecked Sendable {
         ])
     }
 
+    /// Reports an initialize that failed outside the refusals the SDK names, as a start and its
+    /// failure on this session's channel, so the start is answered.
+    ///
+    /// - Parameter failure: what the call is about to throw, converted.
+    /// - Parameter original: the error as it was thrown, before conversion, whose type the report names.
+    /// - Parameter duration: how long the call took.
+    private func reportFailedInitialize(_ failure: PayabliGenericError, original: any Error, after duration: Duration) async {
+        let (seconds, attoseconds) = duration.components
+        let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
+        await telemetry.emit([
+            (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
+            (TelemetryEventName.sdkInitializeFailed, [
+                TelemetryProperty.outcome.rawValue: "failed",
+                TelemetryProperty.code.rawValue: failure.type.rawValue,
+                TelemetryProperty.errorNumber.rawValue: String(failure.code),
+                TelemetryProperty.reason.rawValue: failure.reason,
+                TelemetryProperty.durationMs.rawValue: String(milliseconds),
+                TelemetryProperty.failureType.rawValue: RedactedCause(original).simpleTypeName
+            ])
+        ])
+    }
+
+    /// Builds the session `install` installs: from the configuration, the URL session, the telemetry transport and the
+    /// finished session whose queue it inherits, or nil.
+    typealias SessionBuilder = (PayabliConfig, URLSession?, (any TelemetryTransport)?, TelemetryClient?) throws
+        -> PayabliSession
+
+    /// The builder every public path installs with.
+    private static let defaultSessionBuilder: SessionBuilder = { config, urlSession, telemetryTransport, predecessor in
+        PayabliSession(
+            config: config,
+            urlSession: urlSession,
+            telemetryTransport: telemetryTransport,
+            sink: PayabliSession.sink,
+            predecessor: predecessor
+        )
+    }
+
     static func install(
         config: PayabliConfig,
         urlSession: URLSession? = nil,
-        telemetryTransport: (any TelemetryTransport)? = nil
+        telemetryTransport: (any TelemetryTransport)? = nil,
+        makeSession: SessionBuilder = defaultSessionBuilder
     ) throws -> PayabliSession {
         try lock.withLock {
             let identity = ConfigIdentity(config)
@@ -181,12 +237,11 @@ public final class PayabliSession: @unchecked Sendable {
             // A finished credential refuses every send, so the old queue can only leave under the new session's token,
             // and only a session reporting for the same entry point and environment takes it.
             let inherits = current?.identity == identity
-            let session = PayabliSession(
-                config: config,
-                urlSession: urlSession,
-                telemetryTransport: telemetryTransport ?? testTelemetryTransport,
-                sink: sink,
-                predecessor: inherits ? current?.telemetry : nil
+            let session = try makeSession(
+                config,
+                urlSession,
+                telemetryTransport ?? testTelemetryTransport,
+                inherits ? current?.telemetry : nil
             )
             session.machine.markReady()
             installed = session

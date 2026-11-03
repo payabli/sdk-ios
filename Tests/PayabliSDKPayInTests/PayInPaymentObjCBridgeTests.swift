@@ -28,10 +28,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
         let card = PayabliPayInRequestObjC.card(
             cardNumber: "4111111111111111",
-            expiration: "02/30",
-            cardholderName: "Jane Doe",
-            cvv: "999",
-            billingZip: "12345",
+            expiry: "02/30",
+            holderName: "Jane Doe",
+            securityCode: "999",
+            postalCode: "12345",
             saveIfSuccess: false,
             totalAmount: 10
         )
@@ -151,6 +151,32 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let error = PayabliGenericError(type: .networkError, reason: "lost").toPayabliPayInNSError()
 
         XCTAssertNil(error.userInfo["capture"])
+    }
+
+    func testAnUnrecognizedErrorThroughObjectiveCCarriesTheInternalErrorsDomainAndCode() async throws {
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
+            transport: ForeignErrorTransport(failure: HostThrew()),
+            key: "reserved-1"
+        ))
+
+        let (result, error) = await call { bridge.capture(PayabliPayInRequestObjC.cash(totalAmount: 10), completion: $0) }
+
+        XCTAssertNil(result)
+        let failure = try XCTUnwrap(error)
+        XCTAssertEqual(failure.domain, "com.payabli.payIn")
+        XCTAssertEqual(failure.code, PayabliErrorType.unknown.number)
+        XCTAssertEqual(failure.userInfo["capture"] as? Int, 1)
+    }
+
+    func testAConvertedFailureFromACallThatMovesMoneySaysThePaymentMayHaveBeenTaken() {
+        let converted = PayabliGenericError(
+            type: .unknown,
+            reason: PayabliErrorType.unknown.message,
+            underlying: RedactedCause(URLError(.notConnectedToInternet))
+        )
+
+        XCTAssertEqual(converted.toPayabliPayInNSError(movesMoney: true).userInfo["capture"] as? Int, 1)
+        XCTAssertNil(converted.toPayabliPayInNSError().userInfo["capture"])
     }
 
     func testACancelledPaymentSaysThePaymentMayHaveBeenTaken() {

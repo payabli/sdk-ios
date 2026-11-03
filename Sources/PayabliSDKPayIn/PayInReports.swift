@@ -175,23 +175,22 @@ final class PayInReports {
             return true
         }
         guard case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error else { return false }
-        return simpleName(causeType) == "CancellationError"
+        return RedactedCause.simpleName(causeType) == "CancellationError"
     }
 
-    /// The simple name of the type the SDK converted, never a message or a cause chain.
+    /// The simple name of the type the SDK converted or redacted, never a message or a cause chain.
     ///
     /// - Parameter error: what the operation threw.
-    /// - Returns: the converted type's name, or the thrown type's when nothing was converted.
+    /// - Returns: the converted or redacted type's name, or the thrown type's otherwise, a platform error by its Swift
+    ///   type.
     static func failureType(of error: any Error) -> String {
         if case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error {
-            return simpleName(causeType)
+            return RedactedCause.simpleName(causeType)
         }
-        return String(describing: type(of: error))
-    }
-
-    /// Drops every module and enclosing-type qualifier, generic arguments included, as `String(describing:)` spells it.
-    private static func simpleName(_ qualified: String) -> String {
-        qualified.replacingOccurrences(of: #"[A-Za-z_][A-Za-z0-9_]*\."#, with: "", options: .regularExpression)
+        if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
+            return redacted.simpleTypeName
+        }
+        return RedactedCause(error).simpleTypeName
     }
 
     private func enqueue(_ report: @escaping @Sendable (TelemetryClient) async -> Void) {

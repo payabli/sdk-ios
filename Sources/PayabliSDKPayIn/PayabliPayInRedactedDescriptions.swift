@@ -4,21 +4,6 @@ import Foundation
 ///
 /// A request meets `String(describing:)` in assertion failures and diagnostic output, so the
 /// card prints its kind, not its number, and the two requests compose these.
-extension PayabliPayInCardData: CustomStringConvertible {
-    /// No field of a card belongs in a message, the expiry included.
-    public var description: String {
-        "PayabliPayInCardData"
-    }
-}
-
-extension PayabliPayInBankAccountData: CustomStringConvertible {
-    /// The account type names checking or savings, which is how the account is debited rather than
-    /// anything the payer entered.
-    public var description: String {
-        "PayabliPayInBankAccountData(accountType: \(accountType))"
-    }
-}
-
 extension PayabliPayInMethodInput: CustomStringConvertible {
     /// The kind of instrument entered, without its details.
     public var description: String {

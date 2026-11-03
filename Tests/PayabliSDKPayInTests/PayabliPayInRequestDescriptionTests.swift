@@ -170,10 +170,10 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
 
     private static let enteredCard = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "02/30",
-        cardholderName: "Jane Doe",
-        cvv: "1234",
-        billingZip: "33139"
+        expiry: "02/30",
+        holderName: "Jane Doe",
+        securityCode: "1234",
+        postalCode: "33139"
     )
 
     private static let enteredBankAccount = PayabliPayInBankAccountData(

@@ -227,10 +227,10 @@ Sheet:
 let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
     instrument: .card(PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "02/28",
-        cardholderName: "Jane Doe",
-        cvv: "123",
-        billingZip: "33139"
+        expiry: "02/28",
+        holderName: "Jane Doe",
+        securityCode: "123",
+        postalCode: "33139"
     )),
     options: PayabliPayInStoreOptions(
         createAnonymous: false,
@@ -259,10 +259,10 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | Field | Notes |
 | --- | --- |
 | `cardNumber` | Full PAN. Direct API only; PCI-sensitive. Digits are normalized before request. |
-| `expiration` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
-| `cardholderName` | Required. |
-| `cvv` | Required. Direct API only; PCI-sensitive. |
-| `billingZip` | Postal code for card billing. Default label is `Postal code`. |
+| `expiry` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
+| `holderName` | Required. |
+| `securityCode` | Required. Direct API only; PCI-sensitive. |
+| `postalCode` | Postal code for card billing. Default label is `Postal code`. |
 
 `PayabliPayInBankAccountData` fields:
 
@@ -275,6 +275,8 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | `secCode` | Optional; defaults to `.web`. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
 | `holderType` | Optional `.personal` or `.business`. |
 | `device` | Optional device identifier for bank account request payloads. |
+
+`cardNumber`, `securityCode` and `accountNumber` are passed as `String` and copied into buffers the SDK overwrites once each request is written. They can be set, and never read back from the value.
 
 `PayabliPayInStoreOptions` is what a store request carries besides the
 instrument, and what a form's `.storePaymentMethod(options)` sends. The form

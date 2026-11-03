@@ -112,10 +112,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.storeMethod(
             PayabliPayInStoreRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiration: "02/28",
-                cardholderName: "",
-                cvv: "123",
-                billingZip: "33139"
+                expiry: "02/28",
+                holderName: "",
+                securityCode: "123",
+                postalCode: "33139"
             )
         ) { result, error in
             XCTAssertNil(result)
@@ -145,10 +145,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.storeMethod(
             PayabliPayInStoreRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiration: "02/28",
-                cardholderName: "Jane Doe",
-                cvv: "123",
-                billingZip: "33139"
+                expiry: "02/28",
+                holderName: "Jane Doe",
+                securityCode: "123",
+                postalCode: "33139"
             )
         ) { result, error in
             XCTAssertNil(result)

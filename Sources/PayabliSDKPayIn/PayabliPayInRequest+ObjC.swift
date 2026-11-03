@@ -54,28 +54,28 @@ public final class PayabliPayInRequestObjC: NSObject {
     }
 
     /// - Parameter cardNumber: the card number the payer entered.
-    /// - Parameter expiration: the expiry, as `MM/YY`.
-    /// - Parameter cardholderName: the name on the card.
-    /// - Parameter cvv: the card's security code.
-    /// - Parameter billingZip: the billing postal code.
+    /// - Parameter expiry: the expiry, as `MM/YY`.
+    /// - Parameter holderName: the name on the card.
+    /// - Parameter securityCode: the card's security code.
+    /// - Parameter postalCode: the billing postal code.
     /// - Parameter saveIfSuccess: whether to store the card when the payment succeeds.
     /// - Parameter totalAmount: the amount to charge.
     /// - Returns: the request.
     @objc public static func card(
         cardNumber: String,
-        expiration: String,
-        cardholderName: String,
-        cvv: String,
-        billingZip: String,
+        expiry: String,
+        holderName: String,
+        securityCode: String,
+        postalCode: String,
         saveIfSuccess: Bool,
         totalAmount: Double
     ) -> PayabliPayInRequestObjC {
         let data = PayabliPayInCardData(
             cardNumber: cardNumber,
-            expiration: expiration,
-            cardholderName: cardholderName,
-            cvv: cvv,
-            billingZip: billingZip
+            expiry: expiry,
+            holderName: holderName,
+            securityCode: securityCode,
+            postalCode: postalCode
         )
         let card = PayabliPayInPaymentMethod.Card(data: data, saveIfSuccess: saveIfSuccess)
         return PayabliPayInRequestObjC(paymentMethod: .card(card), totalAmount: totalAmount)
@@ -199,24 +199,24 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
     }
 
     /// - Parameter cardNumber: the card number the payer entered.
-    /// - Parameter expiration: the expiry, as `MM/YY`.
-    /// - Parameter cardholderName: the name on the card.
-    /// - Parameter cvv: the card's security code.
-    /// - Parameter billingZip: the billing postal code.
+    /// - Parameter expiry: the expiry, as `MM/YY`.
+    /// - Parameter holderName: the name on the card.
+    /// - Parameter securityCode: the card's security code.
+    /// - Parameter postalCode: the billing postal code.
     /// - Returns: the request.
     @objc public static func card(
         cardNumber: String,
-        expiration: String,
-        cardholderName: String,
-        cvv: String,
-        billingZip: String
+        expiry: String,
+        holderName: String,
+        securityCode: String,
+        postalCode: String
     ) -> PayabliPayInStoreRequestObjC {
         let data = PayabliPayInCardData(
             cardNumber: cardNumber,
-            expiration: expiration,
-            cardholderName: cardholderName,
-            cvv: cvv,
-            billingZip: billingZip
+            expiry: expiry,
+            holderName: holderName,
+            securityCode: securityCode,
+            postalCode: postalCode
         )
         return PayabliPayInStoreRequestObjC(instrument: .card(data))
     }

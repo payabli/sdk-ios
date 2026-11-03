@@ -47,6 +47,27 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(event.properties["failure_type"], "PayabliPayInError")
     }
 
+    func testAFailedTokenProviderReportsTheTypeItThrewRatherThanTheSDKsWrapper() async throws {
+        let config = try PayabliConfig(
+            entryPoint: "entry",
+            environment: .sandbox,
+            tokenProvider: { throw URLError(.notConnectedToInternet) }
+        )
+        let session = PayabliSession(config: config, telemetryTransport: recorder)
+        let flow = PayabliPayIn(session: session)
+
+        let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
+
+        XCTAssertEqual((told as? any PayabliError)?.type, .tokenProviderFailed)
+        let reports = try XCTUnwrap(flow.reports)
+        await reports.sent()
+        await session.telemetry.flush()
+        let captures = await recorder.events.filter { $0.event == "payin.capture.completed" }
+        XCTAssertEqual(captures.count, 1)
+        XCTAssertEqual(captures.first?.properties["code"], "TOKEN_PROVIDER_FAILED")
+        XCTAssertEqual(captures.first?.properties["failure_type"], "URLError")
+    }
+
     func testAnAuthorizationReportsItsOwnEvent() async throws {
         let flow = makeFlow(RecordingIdempotencyTransport(body: PayInFixture.approved))
 
@@ -92,6 +113,12 @@ final class PayInTelemetryTests: XCTestCase {
         )
 
         XCTAssertEqual(PayInReports.failureType(of: interrupted), "Wrap<Inner>")
+    }
+
+    func testAPlatformErrorNothingConvertedIsNamedByItsSwiftType() {
+        XCTAssertEqual(PayInReports.failureType(of: URLError(.badServerResponse)), "URLError")
+        XCTAssertEqual(PayInReports.failureType(of: CocoaError(.fileNoSuchFile)), "CocoaError")
+        XCTAssertEqual(PayInReports.failureType(of: POSIXError(.ENOENT)), "POSIXError")
     }
 
     func testCapturingAnAuthorizationIsReportedAsACaptureWithNoMethod() async throws {
@@ -466,10 +493,10 @@ final class PayInTelemetryTests: XCTestCase {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiration: "12/30",
-                cardholderName: "Jane",
-                cvv: cvv,
-                billingZip: "12345"
+                expiry: "12/30",
+                holderName: "Jane",
+                securityCode: cvv,
+                postalCode: "12345"
             ))),
             options: PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
@@ -481,10 +508,10 @@ final class PayInTelemetryTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiration: "12/30",
-        cardholderName: "Jane",
-        cvv: "123",
-        billingZip: "12345"
+        expiry: "12/30",
+        holderName: "Jane",
+        securityCode: "123",
+        postalCode: "12345"
     )
 
     private static let stored = Data("""
