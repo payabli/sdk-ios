@@ -101,11 +101,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
                 storedMethodId: decoded.responseData?.referenceId,
                 method: method,
                 methodReferenceId: decoded.responseData?.methodReferenceId,
-                resultCode: decoded.responseData?.resultCode,
-                resultText: decoded.responseData?.resultText,
-                customerId: decoded.responseData?.customerId,
-                responseText: decoded.responseText,
-                apiResponse: decoded
+                customerId: decoded.responseData?.customerId
             )
         } catch let error as PayabliPayInTokenStorageError {
             throw error

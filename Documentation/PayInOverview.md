@@ -296,12 +296,11 @@ try await paymentFlow.authorize(PayabliPayInRequest(
 `PayabliPayInResult` is a unified result wrapper:
 
 - `kind == .storedPaymentMethod` for token-storage success
-- `storedPaymentMethod` contains stored-method identifiers, the `method` to charge
-  it as, and response text
+- `storedPaymentMethod` contains stored-method identifiers and the `method` to charge
+  it as
 - `kind == .transaction` for capture, authorize, and capture-authorized success
 - `transaction` contains transaction IDs, method, amount, status, response data,
   and other MoneyIn response fields
-- `apiResponse` carries the full MoneyIn response for transaction operations
 
 ## Other Technologies
 

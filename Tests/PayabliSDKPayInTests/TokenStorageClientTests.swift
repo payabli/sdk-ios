@@ -790,10 +790,8 @@ private func firstRequest(from transport: MockTransport) async throws -> Payabli
 
 private func assertCardPaymentMethodResult(_ result: PayabliPayInStoredMethod) {
     XCTAssertEqual(result.storedMethodId, "stored-123")
-    XCTAssertEqual(result.apiResponse.isSuccess, true)
-    XCTAssertEqual(result.apiResponse.responseText, "Success")
-    XCTAssertEqual(result.apiResponse.responseData?.referenceId, "stored-123")
-    XCTAssertEqual(result.apiResponse.responseData?.customerId, 4440)
+    XCTAssertEqual(result.method, .card)
+    XCTAssertEqual(result.customerId, 4440)
 }
 
 private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {

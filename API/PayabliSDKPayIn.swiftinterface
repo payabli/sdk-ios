@@ -18,11 +18,7 @@ import _SwiftConcurrencyShims
   @objc final public let storedMethodId: Swift::String?
   @objc final public let method: Swift::String
   @objc final public let methodReferenceId: Swift::String?
-  @objc final public let resultCode: Foundation::NSNumber?
-  @objc final public let resultText: Swift::String?
   @objc final public let customerId: Foundation::NSNumber?
-  @objc final public let responseText: Swift::String
-  @objc final public let apiResponse: Foundation::NSDictionary
   @objc deinit
 }
 @_hasMissingDesignatedInitializers @objc(PayabliPayInTransactionObjC) final public class PayabliPayInTransactionObjC : ObjectiveC::NSObject {
@@ -611,40 +607,12 @@ public struct PayabliPayInStoreOptions : Swift::Sendable {
   public var validation: PayabliSDKPayIn::PayabliPayInValidation
   public init(achValidation: Swift::Bool? = nil, createAnonymous: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, temporary: Swift::Bool? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, vendorData: PayabliSDKPayIn::PayabliPayInVendorData? = nil, fallbackAuth: Swift::Bool? = nil, fallbackAuthAmount: Swift::Int? = nil, methodDescription: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
 }
-public struct PayabliPayInTokenStorageAPIResponseData : Swift::Codable, Swift::Sendable, Swift::Equatable {
-  public let referenceId: Swift::String?
-  public let resultCode: Swift::Int?
-  public let resultText: Swift::String?
-  public let explanation: Swift::String?
-  public let todoAction: Swift::String?
-  public let customerId: Swift::Int64?
-  public let methodReferenceId: Swift::String?
-  public init(referenceId: Swift::String? = nil, resultCode: Swift::Int? = nil, resultText: Swift::String? = nil, explanation: Swift::String? = nil, todoAction: Swift::String? = nil, customerId: Swift::Int64? = nil, methodReferenceId: Swift::String? = nil)
-  public init(from decoder: any Swift::Decoder) throws
-  public static func == (a: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData, b: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData) -> Swift::Bool
-  public func encode(to encoder: any Swift::Encoder) throws
-}
-public struct PayabliPayInTokenStorageAPIResponse : Swift::Codable, Swift::Sendable, Swift::Equatable {
-  public let isSuccess: Swift::Bool?
-  public let responseText: Swift::String
-  public let responseCode: Swift::Int?
-  public let responseData: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData?
-  public init(isSuccess: Swift::Bool? = nil, responseText: Swift::String, responseCode: Swift::Int? = nil, responseData: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponseData? = nil)
-  public init(from decoder: any Swift::Decoder) throws
-  public func failure(httpStatusCode: Swift::Int? = nil) -> PayabliSDKPayIn::PayabliPayInSaveFailure
-  public static func == (a: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse, b: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse) -> Swift::Bool
-  public func encode(to encoder: any Swift::Encoder) throws
-}
 public struct PayabliPayInStoredMethod : Swift::Sendable, Swift::Equatable {
   public let storedMethodId: Swift::String?
   public let method: PayabliSDKPayIn::PayabliPayInStoredMethodType
   public let methodReferenceId: Swift::String?
-  public let resultCode: Swift::Int?
-  public let resultText: Swift::String?
   public let customerId: Swift::Int64?
-  public let responseText: Swift::String
-  public let apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse
-  public init(storedMethodId: Swift::String?, method: PayabliSDKPayIn::PayabliPayInStoredMethodType, methodReferenceId: Swift::String?, resultCode: Swift::Int?, resultText: Swift::String?, customerId: Swift::Int64?, responseText: Swift::String, apiResponse: PayabliSDKPayIn::PayabliPayInTokenStorageAPIResponse? = nil)
+  public init(storedMethodId: Swift::String?, method: PayabliSDKPayIn::PayabliPayInStoredMethodType, methodReferenceId: Swift::String?, customerId: Swift::Int64?)
   public static func == (a: PayabliSDKPayIn::PayabliPayInStoredMethod, b: PayabliSDKPayIn::PayabliPayInStoredMethod) -> Swift::Bool
 }
 extension PayabliSDKPayIn::PayabliPayInMethodInput : Swift::Encodable {
@@ -1014,26 +982,8 @@ public struct PayabliPayInResult : Swift::Sendable, Swift::Equatable {
   public let action: Swift::String?
   public let transaction: PayabliSDKPayIn::PayabliPayInTransaction?
   public let storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredMethod?
-  public let apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse?
-  public init(apiResponse: PayabliSDKPayIn::PayabliPayInAPIResponse)
   public init(storedPaymentMethod: PayabliSDKPayIn::PayabliPayInStoredMethod)
   public static func == (a: PayabliSDKPayIn::PayabliPayInResult, b: PayabliSDKPayIn::PayabliPayInResult) -> Swift::Bool
-}
-public struct PayabliPayInAPIResponse : Swift::Codable, Swift::Sendable, Swift::Equatable {
-  public let code: Swift::String
-  public let reason: Swift::String?
-  public let explanation: Swift::String?
-  public let action: Swift::String?
-  public let data: PayabliSDKPayIn::PayabliPayInTransaction?
-  public let token: Swift::String?
-  public init(code: Swift::String, reason: Swift::String? = nil, explanation: Swift::String? = nil, action: Swift::String? = nil, data: PayabliSDKPayIn::PayabliPayInTransaction? = nil, token: Swift::String? = nil)
-  public var isApproved: Swift::Bool {
-    get
-  }
-  public func failure(httpStatusCode: Swift::Int? = nil) -> PayabliSDKPayIn::PayabliPayInFailure
-  public static func == (a: PayabliSDKPayIn::PayabliPayInAPIResponse, b: PayabliSDKPayIn::PayabliPayInAPIResponse) -> Swift::Bool
-  public func encode(to encoder: any Swift::Encoder) throws
-  public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliPayInTransaction : Swift::Codable, Swift::Sendable, Swift::Equatable {
   public let paymentTransId: Swift::String?

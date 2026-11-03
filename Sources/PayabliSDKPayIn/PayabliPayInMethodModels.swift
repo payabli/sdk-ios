@@ -419,7 +419,7 @@ private func payabliEncodedJSONSignature(_ value: (some Encodable)?) -> String {
     return text
 }
 
-public struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
+struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
     public let referenceId: String?
     public let resultCode: Int?
     public let resultText: String?
@@ -468,7 +468,7 @@ public struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equata
     }
 }
 
-public struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
+struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
     public let isSuccess: Bool?
     public let responseText: String
     public let responseCode: Int?
@@ -519,39 +519,18 @@ public struct PayabliPayInStoredMethod: Sendable, Equatable {
     public let storedMethodId: String?
     public let method: PayabliPayInStoredMethodType
     public let methodReferenceId: String?
-    public let resultCode: Int?
-    public let resultText: String?
     public let customerId: Int64?
-    public let responseText: String
-    public let apiResponse: PayabliPayInTokenStorageAPIResponse
 
     public init(
         storedMethodId: String?,
         method: PayabliPayInStoredMethodType,
         methodReferenceId: String?,
-        resultCode: Int?,
-        resultText: String?,
-        customerId: Int64?,
-        responseText: String,
-        apiResponse: PayabliPayInTokenStorageAPIResponse? = nil
+        customerId: Int64?
     ) {
         self.storedMethodId = storedMethodId
         self.method = method
         self.methodReferenceId = methodReferenceId
-        self.resultCode = resultCode
-        self.resultText = resultText
         self.customerId = customerId
-        self.responseText = responseText
-        self.apiResponse = apiResponse ?? PayabliPayInTokenStorageAPIResponse(
-            responseText: responseText,
-            responseData: PayabliPayInTokenStorageAPIResponseData(
-                referenceId: storedMethodId,
-                resultCode: resultCode,
-                resultText: resultText,
-                customerId: customerId,
-                methodReferenceId: methodReferenceId
-            )
-        )
     }
 }
 

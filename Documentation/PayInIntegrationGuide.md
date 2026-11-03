@@ -868,18 +868,13 @@ func handle(_ result: PayabliPayInResult) {
 - `action`
 - `transaction`
 - `storedPaymentMethod`
-- `apiResponse`
 
 Stored-method fields:
 
 - `storedMethodId`
 - `method`, the `PayabliPayInStoredMethodType` to charge it as
 - `methodReferenceId`
-- `resultCode`
-- `resultText`
 - `customerId`
-- `responseText`
-- `apiResponse`
 
 Transaction fields include:
 

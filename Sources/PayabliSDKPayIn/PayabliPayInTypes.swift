@@ -365,9 +365,8 @@ public struct PayabliPayInResult: Sendable, Equatable {
     public let action: String?
     public let transaction: PayabliPayInTransaction?
     public let storedPaymentMethod: PayabliPayInStoredMethod?
-    public let apiResponse: PayabliPayInAPIResponse?
 
-    public init(apiResponse: PayabliPayInAPIResponse) {
+    init(apiResponse: PayabliPayInAPIResponse) {
         kind = .transaction
         self.code = apiResponse.code
         self.reason = apiResponse.reason
@@ -375,22 +374,20 @@ public struct PayabliPayInResult: Sendable, Equatable {
         self.action = apiResponse.action
         transaction = apiResponse.data
         storedPaymentMethod = nil
-        self.apiResponse = apiResponse
     }
 
     public init(storedPaymentMethod: PayabliPayInStoredMethod) {
         kind = .storedPaymentMethod
-        code = storedPaymentMethod.resultCode.map(String.init) ?? "1"
-        reason = storedPaymentMethod.resultText ?? storedPaymentMethod.responseText
+        code = "1"
+        reason = nil
         explanation = nil
         action = nil
         transaction = nil
         self.storedPaymentMethod = storedPaymentMethod
-        apiResponse = nil
     }
 }
 
-public struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
+struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
     public let code: String
     public let reason: String?
     public let explanation: String?
