@@ -420,15 +420,15 @@ private func payabliEncodedJSONSignature(_ value: (some Encodable)?) -> String {
 }
 
 struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
-    public let referenceId: String?
-    public let resultCode: Int?
-    public let resultText: String?
-    public let explanation: String?
-    public let todoAction: String?
-    public let customerId: Int64?
-    public let methodReferenceId: String?
+    let referenceId: String?
+    let resultCode: Int?
+    let resultText: String?
+    let explanation: String?
+    let todoAction: String?
+    let customerId: Int64?
+    let methodReferenceId: String?
 
-    public init(
+    init(
         referenceId: String? = nil,
         resultCode: Int? = nil,
         resultText: String? = nil,
@@ -456,7 +456,7 @@ struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
         case methodReferenceId
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         referenceId = try c.decodeIfPresent(String.self, forKey: .referenceId)
         resultCode = c.decodeLossyIntIfPresent(forKey: .resultCode)
@@ -469,12 +469,12 @@ struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
 }
 
 struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
-    public let isSuccess: Bool?
-    public let responseText: String
-    public let responseCode: Int?
-    public let responseData: PayabliPayInTokenStorageAPIResponseData?
+    let isSuccess: Bool?
+    let responseText: String
+    let responseCode: Int?
+    let responseData: PayabliPayInTokenStorageAPIResponseData?
 
-    public init(
+    init(
         isSuccess: Bool? = nil,
         responseText: String,
         responseCode: Int? = nil,
@@ -493,7 +493,7 @@ struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
         case responseData
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         isSuccess = try c.decodeIfPresent(Bool.self, forKey: .isSuccess)
         responseText = try c.decode(String.self, forKey: .responseText)
@@ -501,7 +501,7 @@ struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
         responseData = try? c.decodeIfPresent(PayabliPayInTokenStorageAPIResponseData.self, forKey: .responseData)
     }
 
-    public func failure(httpStatusCode: Int? = nil) -> PayabliPayInSaveFailure {
+    func failure(httpStatusCode: Int? = nil) -> PayabliPayInSaveFailure {
         PayabliPayInSaveFailure(
             isSuccess: isSuccess,
             responseText: responseText,

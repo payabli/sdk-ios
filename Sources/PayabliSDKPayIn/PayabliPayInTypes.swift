@@ -388,14 +388,14 @@ public struct PayabliPayInResult: Sendable, Equatable {
 }
 
 struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
-    public let code: String
-    public let reason: String?
-    public let explanation: String?
-    public let action: String?
-    public let data: PayabliPayInTransaction?
-    public let token: String?
+    let code: String
+    let reason: String?
+    let explanation: String?
+    let action: String?
+    let data: PayabliPayInTransaction?
+    let token: String?
 
-    public init(
+    init(
         code: String,
         reason: String? = nil,
         explanation: String? = nil,
@@ -411,11 +411,11 @@ struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
         self.token = token
     }
 
-    public var isApproved: Bool {
+    var isApproved: Bool {
         code.hasPrefix("A")
     }
 
-    public func failure(httpStatusCode: Int? = nil) -> PayabliPayInFailure {
+    func failure(httpStatusCode: Int? = nil) -> PayabliPayInFailure {
         PayabliPayInFailure(
             code: code,
             reason: reason,
