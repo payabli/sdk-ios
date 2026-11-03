@@ -114,6 +114,51 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         XCTAssertEqual(interruption?.causeType, String(reflecting: type(of: HostThrew())))
     }
 
+    func testAnUnknownOutcomeCarriesItsForeignCauseRedactedAndKeepsItsHandles() async throws {
+        let flow = makeFlow(RecordingIdempotencyTransport(failure: HostThrew()))
+        let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
+
+        let unsettled = try XCTUnwrap(told as? PayabliPayInError.Unsettled, "\(told)")
+        let cause = try XCTUnwrap(unsettled.underlying as? RedactedCause, "\(unsettled.underlying)")
+        XCTAssertEqual(cause.originalType, String(reflecting: HostThrew.self))
+        XCTAssertFalse(String(describing: unsettled.underlying).contains(HostThrew().message))
+        XCTAssertFalse(String(reflecting: unsettled.underlying).contains(HostThrew().message))
+        XCTAssertNotEqual(unsettled.detail, cause.originalType)
+        XCTAssertNil(unsettled.detail)
+        XCTAssertNotNil(unsettled.paymentReference, "the reference the SDK made for the payment")
+        XCTAssertNil(unsettled.paymentTransId, "no answer named a transaction")
+    }
+
+    func testAnUnknownOutcomeFromAnSdkFailureCarriesThatFailuresReasonAsItsDetail() {
+        let unsettled = PayabliPayInError.Unsettled(
+            cause: PayabliGenericError(type: .networkError, reason: "The network connection was lost."),
+            paymentTransId: "trans-1",
+            paymentReference: "ref-1"
+        )
+
+        XCTAssertEqual(unsettled.detail, "The network connection was lost.")
+        XCTAssertEqual(unsettled.paymentTransId, "trans-1")
+        XCTAssertEqual(unsettled.paymentReference, "ref-1")
+    }
+
+    func testACauseAlreadyRedactedIsNotRedactedAgain() {
+        let once = RedactedCause(HostThrew())
+
+        let unsettled = PayabliPayInError.Unsettled(type: .unknown, cause: once, paymentTransId: nil, paymentReference: nil)
+
+        XCTAssertEqual(unsettled.redactedCause, once)
+    }
+
+    func testAnObjectiveCHostReadsTheRedactedCauseUnderTheUnderlyingErrorKey() throws {
+        let unsettled = PayabliPayInError.Unsettled(cause: PayabliGenericError(type: .networkError, reason: "offline"))
+
+        let error = unsettled.toPayabliPayInNSError(movesMoney: true)
+
+        let underlying = try XCTUnwrap(error.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertTrue(underlying.description.contains("PayabliGenericError"), underlying.description)
+        XCTAssertFalse(underlying.description.contains("offline"), underlying.description)
+    }
+
     // MARK: - Reporting
 
     func testAConvertedFailureIsReportedOnceByTheEntryPointThatConvertedIt() async throws {

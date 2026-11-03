@@ -282,7 +282,10 @@ extension PayabliPayInViewModel {
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(configuration.labels.label(for: field)) is required.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.form(field),
+                    reason: "\(configuration.labels.label(for: field)) is required."
+                )
             }
         }
     }

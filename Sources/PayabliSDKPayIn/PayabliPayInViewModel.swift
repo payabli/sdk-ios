@@ -286,7 +286,7 @@ final class PayabliPayInViewModel: ObservableObject {
         errorMessage = nil
         clearMarks()
         guard !isSubmitting else {
-            let error = PayabliPayInError.submissionInProgress
+            let error = PayabliPayInError.AlreadySubmitting()
             component.reportFormRefusal(error, method: effectiveSelectedMethod)
             errorMessage = PayabliPayInFailureMessage.text(for: error, operation: component.operation)
             throw error
@@ -363,7 +363,7 @@ final class PayabliPayInViewModel: ObservableObject {
     private func configuredRequest(with buffers: FormBufferRegistry) throws -> PayabliPayInRequest? {
         guard component.operation != .storePaymentMethod else { return nil }
         guard let requestConfiguration = component.requestConfiguration else {
-            throw PayabliPayInError.invalidInput("Payment request configuration is required.")
+            throw PayabliPayInError.InvalidInput(field: nil, reason: "Payment request configuration is required.")
         }
         return requestConfiguration.request(
             paymentMethod: paymentMethod(with: buffers),

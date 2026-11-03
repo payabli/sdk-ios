@@ -115,7 +115,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(interrupted.type, .networkError)
         XCTAssertEqual(transport.sentKeys, ["reserved-5"], "the key still went out")
@@ -157,7 +157,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(interrupted.type, .networkError)
         // The failing type and none of its message: that message can name a host or quote a body.
@@ -180,7 +180,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
         XCTAssertEqual(interrupted.type, .serverError)
@@ -198,7 +198,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
         XCTAssertEqual(interrupted.type, .serverError)
@@ -217,7 +217,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
         XCTAssertEqual(interrupted.type, .userCancelled)
@@ -250,7 +250,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
         XCTAssertEqual(interrupted.type, .decodingError)
@@ -267,8 +267,8 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case .transactionFailed = failure as? PayabliPayInError else {
-            return XCTFail("expected transactionFailed, got \(failure)")
+        guard failure is PayabliPayInError.Refused else {
+            return XCTFail("expected Refused, got \(failure)")
         }
         XCTAssertEqual((failure as? any PayabliError)?.type, .paymentDeclined)
         XCTAssertNil(PayInFixture.interruption(failure), "a refusal settles the outcome")
@@ -288,7 +288,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(transport.sentKeys.last, "reserved-9")
         XCTAssertEqual(interrupted.type, .serverError)
@@ -309,11 +309,11 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(interrupted.type, .conflict)
         // A decoded body reaches the wrap as the flow's own error, so that is the type named here.
-        XCTAssertEqual(interrupted.causeType, "PayabliSDKPayIn.PayabliPayInError")
+        XCTAssertEqual(interrupted.causeType, "PayabliSDKPayIn.PayabliPayInError.ServiceError")
     }
 
     /// The same repeat with no body at all, which is the shape the status mapping answers rather than
@@ -327,7 +327,7 @@ final class PayInIdempotencyTests: XCTestCase {
         })
 
         guard let interrupted = PayInFixture.interruption(failure) else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+            return XCTFail("expected Unsettled, got \(failure)")
         }
         XCTAssertEqual(interrupted.type, .conflict)
         XCTAssertEqual(interrupted.causeType, "PayabliSDKCore.PayabliGenericError")
@@ -432,7 +432,7 @@ final class PayInIdempotencyTests: XCTestCase {
             )
         })
 
-        guard case .submissionInterrupted = failure as? PayabliPayInError else {
+        guard failure is PayabliPayInError.Unsettled else {
             XCTAssertEqual(transport.sentKeys, [], "the store route sends no key")
             return
         }

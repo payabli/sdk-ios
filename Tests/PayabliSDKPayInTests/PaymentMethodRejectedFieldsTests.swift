@@ -39,8 +39,8 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a decline must not read as a payment")
-        } catch let PayabliPayInError.transactionFailed(failure) {
-            XCTAssertEqual(failure.code, "D0200")
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.failure.code, "D0200")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

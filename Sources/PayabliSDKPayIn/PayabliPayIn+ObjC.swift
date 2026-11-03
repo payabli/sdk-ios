@@ -348,9 +348,10 @@ extension Error {
     func toPayabliPayInNSError(movesMoney: Bool = false) -> NSError {
         let error = payabliNSError(domain: payInObjCErrorDomain)
         var userInfo = error.userInfo
-        if case let .submissionInterrupted(_, _, paymentTransId, paymentReference) = self as? PayabliPayInError {
-            userInfo["paymentTransId"] = paymentTransId
-            userInfo["paymentReference"] = paymentReference
+        if let unsettled = self as? PayabliPayInError.Unsettled {
+            userInfo["paymentTransId"] = unsettled.paymentTransId
+            userInfo["paymentReference"] = unsettled.paymentReference
+            userInfo[NSUnderlyingErrorKey] = unsettled.underlying as NSError
             if movesMoney {
                 userInfo["capture"] = 1
             }

@@ -13,7 +13,7 @@ enum PayabliPayInFailureMessage {
     /// - Returns: The unknown-outcome message for an interrupted submission, whatever its category; otherwise the
     ///   message for the error's category, or the default message for an error outside the catalog.
     static func text(for error: any Error, operation: PayabliPayInOperation) -> String {
-        if case .submissionInterrupted = error as? PayabliPayInError {
+        if error is PayabliPayInError.Unsettled {
             return text(for: .outcomeUnknown, operation: operation)
         }
         return text(for: (error as? any PayabliError)?.category ?? .internal, operation: operation)
