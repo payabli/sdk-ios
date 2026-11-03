@@ -23,8 +23,9 @@ package enum PayabliTTPError: Error, Sendable {
     /// A gateway credential the reader needs is blank. Carries no field name.
     case readerCredentialsUnusable
     case nfcFailed(reason: String, paymentTransId: String? = nil)
-    /// The service refused to open the payment, in its own words, before any card was asked for.
-    case paymentNotOpened(reason: String)
+    /// The service refused to open the payment, in its own words, before any card was asked for. `httpStatus` and
+    /// `rawCode` are the refusing answer's status and the code its envelope named.
+    case paymentNotOpened(reason: String, httpStatus: Int? = nil, rawCode: String? = nil)
     case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture, retryAfter: TimeInterval? = nil)
     case tokenExpired
     case activationFailed(reason: String)
@@ -166,7 +167,7 @@ extension PayabliTTPError: LocalizedError {
              let .deviceSetupRefused(reason),
              let .entryPointRefused(reason),
              let .configFailed(reason),
-             let .paymentNotOpened(reason),
+             let .paymentNotOpened(reason, _, _),
              let .activationFailed(reason),
              let .networkError(reason):
             return reason
