@@ -105,7 +105,7 @@ struct AuthenticatedTransport: PayabliTransport {
                 "recovery exhausted: the replay was refused too"
                     + " (\(request.method.rawValue) \(secondAttempt.statusCode))"
             )
-            throw await finishingTheSession(refusedOn: replayed)
+            throw await finishingTheSession(refusedOn: replayed, answeredWith: secondAttempt)
         }
         return secondAttempt
     }
@@ -160,9 +160,13 @@ struct AuthenticatedTransport: PayabliTransport {
     /// records that in one turn.
     ///
     /// - Parameter replayed: the token the refused replay carried, if one was stamped.
+    /// - Parameter refusal: the answer to that replay, whose status and code the failure carries.
     /// - Returns: the failure the caller throws.
-    private func finishingTheSession(refusedOn replayed: SentToken) async -> PayabliGenericError {
-        let exhausted = recovery.exhausted()
+    private func finishingTheSession(
+        refusedOn replayed: SentToken,
+        answeredWith refusal: PayabliResponse
+    ) async -> PayabliGenericError {
+        let exhausted = recovery.exhausted(by: refusal)
         let finished: Bool
         if let sent = replayed.value {
             finished = await auth.finishIfSettled(on: sent, with: exhausted)
