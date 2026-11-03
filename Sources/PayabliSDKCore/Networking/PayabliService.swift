@@ -236,38 +236,50 @@ package func mapPayabliHTTPError(
     }
 
     let decoder = JSONDecoder()
+    let status = response.statusCode
+    // One read of the body's `code` for every arm, so a body the typed shape cannot read costs only that shape.
+    let rawCode = (try? decoder.decode(ErrorCodeBody.self, from: response.body))?.code
 
-    switch response.statusCode {
+    switch status {
     case 400:
         let validation = (try? decoder.decode(PayabliValidationError.self, from: response.body))
             ?? PayabliValidationError()
-        throw PayabliPaymentError.validation(validation)
+        throw PayabliPaymentError.validation(validation.carrying(httpStatus: status, rawCode: rawCode))
 
     case 401:
-        throw PayabliGenericError(type: .tokenExpired, reason: "Unauthorized (401)")
+        throw PayabliGenericError(type: .tokenExpired, reason: "Unauthorized (401)", httpStatus: status, rawCode: rawCode)
 
     case 402:
         let decline = (try? decoder.decode(PayabliDeclineError.self, from: response.body))
             ?? PayabliDeclineError()
-        throw PayabliPaymentError.decline(decline)
+        throw PayabliPaymentError.decline(decline.carrying(httpStatus: status, rawCode: rawCode))
 
     case 403:
-        throw PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
+        throw PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)", httpStatus: status, rawCode: rawCode)
 
     case 408:
         // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
         // MAY repeat the request without modifications at any later time". Retryable, and classified as a
         // network failure because that is what it is: the request did not arrive, so nothing ran.
-        throw PayabliGenericError(type: .networkError, reason: "Request timeout (408)")
+        throw PayabliGenericError(
+            type: .networkError,
+            reason: "Request timeout (408)",
+            httpStatus: status,
+            rawCode: rawCode
+        )
 
     case 409:
-        throw PayabliGenericError(type: .conflict, reason: "Conflict (409)")
+        throw PayabliGenericError(type: .conflict, reason: "Conflict (409)", httpStatus: status, rawCode: rawCode)
 
     case 410:
-        throw PayabliGenericError(type: .sessionBurned, reason: "Session burned (410)")
+        throw PayabliGenericError(type: .sessionBurned, reason: "Session burned (410)", httpStatus: status, rawCode: rawCode)
 
     case 429:
-        throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
+        throw PayabliRateLimitError(
+            retryAfter: RetryAfterHeader.value(from: response),
+            httpStatus: status,
+            rawCode: rawCode
+        )
 
     // Everything at or above 500, including the 6xx and up a proxy or a library may invent. RFC 9110
     // Section 15: "A client that receives a response with an invalid status code SHOULD process the
@@ -277,7 +289,8 @@ package func mapPayabliHTTPError(
             ?? PayabliServerError()
         throw PayabliPaymentError.server(
             server.carrying(
-                httpStatus: response.statusCode,
+                httpStatus: status,
+                rawCode: rawCode,
                 retryAfter: RetryAfterHeader.value(from: response)
             )
         )
@@ -285,7 +298,27 @@ package func mapPayabliHTTPError(
     default:
         throw PayabliGenericError(
             type: .unknown,
-            reason: "HTTP \(response.statusCode)"
+            reason: "HTTP \(status)",
+            httpStatus: status,
+            rawCode: rawCode
         )
+    }
+}
+
+/// The service's code, read apart from the typed shapes: the body's `code`, else the older envelope's integer
+/// `responseCode` as text. Each is read on its own, so one malformed field doesn't lose the other.
+private struct ErrorCodeBody: Decodable {
+    let code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case code
+        case responseCode
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let named = (try? container.decodeIfPresent(String.self, forKey: .code)) ?? nil
+        let legacy = (try? container.decodeIfPresent(Int.self, forKey: .responseCode)) ?? nil
+        code = named ?? legacy.map(String.init)
     }
 }
