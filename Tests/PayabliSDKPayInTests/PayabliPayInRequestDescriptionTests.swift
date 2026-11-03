@@ -116,7 +116,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
                 storedMethodId: Self.storedMethodId
             )),
             PayabliPayInPaymentMethod.cloudDevice(PayabliPayInPaymentMethod.CloudDevice(device: Self.device)),
-            PayabliPayInPaymentMethod.check(PayabliPayInPaymentMethod.Check(holderName: "Jane Doe")),
+            PayabliPayInPaymentMethod.check(PayabliPayInPaymentMethod.Check(holderName: Self.checkHolderName)),
             PayabliPayInPaymentMethod.cash
         ]
 
@@ -127,6 +127,25 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
                     description.contains(value),
                     "\(description) carries \"\(value)\""
                 )
+            }
+        }
+    }
+
+    func testDescribingEachPaymentMethodPayloadExposesNoMethodValues() {
+        let payloads: [Any] = [
+            PayabliPayInPaymentMethod.Card(data: Self.enteredCard, initiator: "payor", saveIfSuccess: true),
+            PayabliPayInPaymentMethod.BankAccount(data: Self.enteredBankAccount),
+            PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: Self.storedMethodId),
+            PayabliPayInPaymentMethod.CloudDevice(device: Self.device),
+            PayabliPayInPaymentMethod.Check(holderName: Self.checkHolderName)
+        ]
+        let values = Self.cardValues + Self.bankValues + [Self.storedMethodId, Self.device, Self.checkHolderName]
+
+        for payload in payloads {
+            for rendered in [String(describing: payload), String(reflecting: payload)] {
+                for value in values {
+                    XCTAssertFalse(rendered.contains(value), "\(rendered) carries \"\(value)\"")
+                }
             }
         }
     }
@@ -198,6 +217,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
     private static let methodDescription = "House account"
     private static let storedMethodId = "stm_4111"
     private static let device = "device-99"
+    private static let checkHolderName = "Jane Doe"
 
     private static var cardValues: [String] {
         ["4111111111111111", "02/30", "Jane Doe", "1234", "33139"]
