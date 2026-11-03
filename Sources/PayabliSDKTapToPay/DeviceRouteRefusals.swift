@@ -39,12 +39,11 @@ struct PinnedTokenRefusal: PayabliError {
     }
 }
 
-/// Puts the refusing answer's status on a device or activation refusal. Its code stays nil: the envelope's result code
-/// is the status itself.
+/// Puts the refusing answer's status on a device or activation refusal, which carries no code.
 enum DeviceRefusalStatus {
     /// - Parameter status: the status the refusing answer came with.
     /// - Parameter refusal: the refusal a route's classifier built from the answer's words.
-    /// - Returns: the same refusal carrying `status`, or `refusal` unchanged where it is not one read from an answer.
+    /// - Returns: the same refusal carrying `status`, or `refusal` unchanged when it is none of the refusal types.
     static func carrying(_ status: Int, on refusal: any Error) -> any Error {
         switch refusal {
         case let failure as PayabliTTPError:
