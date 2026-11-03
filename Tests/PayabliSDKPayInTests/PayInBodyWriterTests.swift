@@ -225,7 +225,8 @@ final class PayInBodyWriterTests: XCTestCase {
         let fragment = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(
             data: cardData()
         )))
-        XCTAssertFalse(fragment.rawCopy().isEmpty, "the fragment holds its bytes until the splice copies them")
+        let length = fragment.rawCopy().count
+        XCTAssertGreaterThan(length, 0, "the fragment holds its bytes until the splice copies them")
 
         let body = try PayInBodyWriter.splice(outer: Data(#"{"entryPoint":"entry"}"#.utf8), fragment: fragment)
 
@@ -234,7 +235,7 @@ final class PayInBodyWriterTests: XCTestCase {
             #"{"entryPoint":"entry","paymentMethod":{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","#
                 + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card"}}"#
         )
-        XCTAssertTrue(fragment.rawCopy().isEmpty, "the splice overwrites the fragment once copied")
+        XCTAssertEqual(fragment.rawCopy(), zeros(length), "the splice overwrites the fragment once copied")
     }
 
     func testTheSpliceTakesNoSeparatorIntoAnEmptyObject() throws {
@@ -252,6 +253,8 @@ final class PayInBodyWriterTests: XCTestCase {
         let fragment = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(
             data: cardData()
         )))
+        let length = fragment.rawCopy().count
+        XCTAssertGreaterThan(length, 0)
 
         XCTAssertThrowsError(try PayInBodyWriter.splice(outer: Data("[1,2]".utf8), fragment: fragment)) { error in
             guard let error = error as? PayabliGenericError else {
@@ -260,20 +263,53 @@ final class PayInBodyWriterTests: XCTestCase {
             }
             XCTAssertEqual(error.type, .decodingError)
         }
-        XCTAssertTrue(fragment.rawCopy().isEmpty, "the refusal still overwrites the fragment")
+        XCTAssertEqual(fragment.rawCopy(), zeros(length), "the refusal still overwrites the fragment")
     }
 
-    func testAWipedFragmentHoldsNothing() throws {
+    func testAWipedFragmentHoldsOnlyZeros() throws {
         let fragment = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(
             data: cardData()
         )))
-        XCTAssertFalse(fragment.rawCopy().isEmpty)
+        let length = fragment.rawCopy().count
+        XCTAssertGreaterThan(length, 0)
 
         fragment.wipe()
-        XCTAssertTrue(fragment.rawCopy().isEmpty)
+        XCTAssertEqual(fragment.rawCopy(), zeros(length))
 
         fragment.wipe()
-        XCTAssertTrue(fragment.rawCopy().isEmpty, "wiping a wiped fragment is not an error")
+        XCTAssertEqual(fragment.rawCopy(), zeros(length), "wiping a wiped fragment is not an error")
+    }
+
+    func testFinishingABufferReturnsTheBytesAndLeavesItsStorageZeroed() {
+        var buffer = ByteBuffer()
+        buffer.write(Array("4111111111111111".utf8))
+
+        XCTAssertEqual(buffer.finishAndWipe(), Array("4111111111111111".utf8))
+        XCTAssertEqual(buffer.rawStorage(), zeros(buffer.rawStorage().count))
+    }
+
+    func testWipingABufferZeroesItsStorage() {
+        var buffer = ByteBuffer()
+        buffer.write(Array("4111111111111111".utf8))
+        XCTAssertTrue(buffer.rawStorage().contains(0x34), "the storage holds the digits before the wipe")
+
+        buffer.wipe()
+        XCTAssertEqual(buffer.rawStorage(), zeros(buffer.rawStorage().count))
+    }
+
+    func testAGrownBufferKeepsItsBytesAndZeroesOnFinish() {
+        var buffer = ByteBuffer()
+        let initialCapacity = buffer.rawStorage().count
+        let digits = Array(repeating: UInt8(0x39), count: initialCapacity + 1)
+        buffer.write(digits)
+        XCTAssertGreaterThan(buffer.rawStorage().count, initialCapacity, "the write grew the storage")
+
+        XCTAssertEqual(buffer.finishAndWipe(), digits)
+        XCTAssertEqual(buffer.rawStorage(), zeros(buffer.rawStorage().count))
+    }
+
+    private func zeros(_ count: Int) -> [UInt8] {
+        Array(repeating: 0, count: count)
     }
 
     func testWipeOverwritesABodyTheRoutesBuilt() {

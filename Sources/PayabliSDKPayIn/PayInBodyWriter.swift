@@ -220,12 +220,12 @@ final class PayInMethodFragment: CustomReflectable {
         Mirror(self, children: ["count": bytes.count], displayStyle: .class)
     }
 
-    /// Overwrites the bytes. Idempotent, so wiping a fragment already spliced costs nothing.
+    /// Overwrites the bytes in place, keeping the zeros. Idempotent, so wiping a fragment already
+    /// spliced costs nothing.
     func wipe() {
         for index in bytes.indices {
             bytes[index] = 0
         }
-        bytes = []
     }
 
     /// The bytes as they stand, wiped or not, so a test can assert the overwrite actually happened.
@@ -344,6 +344,11 @@ struct ByteBuffer: CustomStringConvertible, CustomDebugStringConvertible, Custom
             bytes[index] = 0
         }
         size = 0
+    }
+
+    /// The whole working storage, written or not, so a test can assert the overwrite actually happened.
+    func rawStorage() -> [UInt8] {
+        bytes
     }
 
     var description: String {
