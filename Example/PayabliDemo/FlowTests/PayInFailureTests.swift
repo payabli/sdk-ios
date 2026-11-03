@@ -66,11 +66,8 @@ final class PayInFailureTests: XCTestCase {
 
     /// A refused repeat of a reversal says the earlier one may still be running, and leaves the read as the next step.
     func testARefusedRepeatOfAReversalSaysTheEarlierOneMayStillBeRunning() {
-        let refused = PayabliPayInError.submissionInterrupted(
-            type: .retryRefused,
-            causeType: "PayabliSDKCore.PayabliGenericError",
-            paymentTransId: nil,
-            paymentReference: nil
+        let refused = PayabliPayInError.Unsettled(
+            cause: PayabliGenericError(type: .retryRefused, reason: "retryRefused")
         )
 
         let failure = PayInFailure(refused, operation: .void)
@@ -97,23 +94,17 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
-    private static let interruptedReversal = PayabliPayInError.submissionInterrupted(
-        type: .networkError,
-        causeType: "PayabliSDKCore.PayabliGenericError",
-        paymentTransId: nil,
-        paymentReference: nil
+    private static let interruptedReversal = PayabliPayInError.Unsettled(
+        cause: PayabliGenericError(type: .networkError, reason: "networkError")
     )
 
     /// What the SDK hands over for a `409` on a money-in route. A reversal carries a key too, but mints a
     /// fresh one per call, so no repeat of one can be recognised and the case this fixture stands for does
-    /// not arise there. The `causeType` is the one the bodyless route produces; a `409` answered with a
+    /// not arise there. The cause is the one the bodyless route produces; a `409` answered with a
     /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
     /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
-    private static let interruptedConflict = PayabliPayInError.submissionInterrupted(
-        type: .conflict,
-        causeType: "PayabliSDKCore.PayabliGenericError",
-        paymentTransId: nil,
-        paymentReference: nil
+    private static let interruptedConflict = PayabliPayInError.Unsettled(
+        cause: PayabliGenericError(type: .conflict, reason: "conflict")
     )
 
     func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
@@ -148,8 +139,8 @@ final class PayInFailureTests: XCTestCase {
 
     func testAFailureThatIsNotAConflictReadsAsItself() {
         let failure = PayInFailure(
-            PayabliPayInError.transactionFailed(
-                PayabliPayInFailure(reason: "Declined", httpStatusCode: 402)
+            PayabliPayInError.ServiceError(
+                failure: PayabliPayInFailure(reason: "Declined", httpStatusCode: 402)
             ),
             operation: .capture
         )
@@ -187,8 +178,8 @@ final class PayInFailureTests: XCTestCase {
     // MARK: -
 
     private var typedConflict: Error {
-        PayabliPayInError.transactionFailed(
-            PayabliPayInFailure(reason: "Conflict", httpStatusCode: 409)
+        PayabliPayInError.ServiceError(
+            failure: PayabliPayInFailure(reason: "Conflict", httpStatusCode: 409)
         )
     }
 }

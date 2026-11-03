@@ -341,10 +341,9 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             }
             XCTFail("a retry naming no payment was not refused: code=\(charged.code)")
         } catch {
-            XCTAssertEqual(
-                error as? PayabliPayInError,
-                .invalidInput("A retry must name the paymentReference of the payment it repeats.")
-            )
+            let refusal = error as? PayabliPayInError.InvalidInput
+            XCTAssertEqual(refusal?.reason, "A retry must name the paymentReference of the payment it repeats.")
+            XCTAssertEqual(refusal?.field, "paymentReference")
         }
         let sent = await recorder.sent
         XCTAssertEqual(sent, 0, "a request was sent")
