@@ -107,6 +107,34 @@ final class PayabliHTTPErrorStatusTests: XCTestCase {
         XCTAssertEqual(error.rawCode, "E0404")
     }
 
+    func testAQuotedResponseCodeIsReadAsTheCode() throws {
+        let error = try mapped(status: 400, body: #"{"responseCode":"9001"}"#)
+
+        XCTAssertEqual(error.rawCode, "9001")
+    }
+
+    func testANumericCodeDoesNotLoseAServerErrorsBody() throws {
+        let error = try mapped(status: 500, body: #"{"title":"Down","detail":"Try later","code":5001}"#)
+
+        XCTAssertEqual(error.type, .serverError)
+        XCTAssertEqual(error.detail, "Try later")
+        XCTAssertEqual(error.httpStatus, 500)
+    }
+
+    func testANumericCodeDoesNotLoseAValidationBody() throws {
+        let error = try mapped(status: 400, body: #"{"title":"Bad","detail":"Amount is required","code":2001}"#)
+
+        XCTAssertEqual(error.type, .validation)
+        XCTAssertEqual(error.detail, "Amount is required")
+    }
+
+    func testANumericCodeDoesNotLoseADeclineBody() throws {
+        let error = try mapped(status: 402, body: #"{"reason":"Declined","explanation":"Insufficient funds","code":329}"#)
+
+        XCTAssertEqual(error.type, .paymentDeclined)
+        XCTAssertEqual(error.detail, "Insufficient funds")
+    }
+
     private func mapped(status: Int, body: String) throws -> any PayabliError {
         let response = PayabliResponse(statusCode: status, headers: [:], body: Data(body.utf8))
         do {

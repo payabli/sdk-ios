@@ -156,17 +156,17 @@ struct AuthenticatedTransport: PayabliTransport {
     }
 
     /// Finishes the session on a replay refused in turn, unless its token has moved on or is being replaced: then the
-    /// refusal is about a token, and finishing would end a session whose next token works. The holder decides and
-    /// records that in one turn.
+    /// refusal is about a token. The holder decides and records that in one turn, and keeps the failure without the
+    /// answer's status and code, because every later request on a finished session throws it unsent.
     ///
     /// - Parameter replayed: the token the refused replay carried, if one was stamped.
-    /// - Parameter refusal: the answer to that replay, whose status and code the failure carries.
+    /// - Parameter refusal: the answer to that replay, whose status and code the returned failure carries.
     /// - Returns: the failure the caller throws.
     private func finishingTheSession(
         refusedOn replayed: SentToken,
         answeredWith refusal: PayabliResponse
     ) async -> PayabliGenericError {
-        let exhausted = recovery.exhausted(by: refusal)
+        let exhausted = recovery.exhausted()
         let finished: Bool
         if let sent = replayed.value {
             finished = await auth.finishIfSettled(on: sent, with: exhausted)
@@ -179,7 +179,7 @@ struct AuthenticatedTransport: PayabliTransport {
         if finished {
             onUnrecoverable(exhausted)
         }
-        return exhausted
+        return recovery.exhausted(by: refusal)
     }
 
     /// Whether sending `request` a second time is defensible after `rejection`.
