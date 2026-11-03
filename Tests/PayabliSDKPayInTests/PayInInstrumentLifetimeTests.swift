@@ -163,6 +163,38 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
         Self.assertIntact(.card(card), .bankAccount(bank))
     }
 
+    func testARefusedStorageCallOverwritesItsCopiesAndLeavesTheValues() async {
+        let transport = RecordingIdempotencyTransport(body: Self.stored)
+        let flow = PayabliPayIn(entryPoint: " ", environment: .sandbox, transport: transport)
+        let copies = DigitCopies.recording(flow)
+        guard case let .card(card) = Self.card(), case let .bankAccount(bank) = Self.bankAccount() else {
+            return XCTFail("fixture shapes changed")
+        }
+
+        _ = await PayInFixture.failure { _ = try await flow.addCard(card.data) }
+        _ = await PayInFixture.failure { _ = try await flow.addBankAccount(bank.data) }
+
+        XCTAssertEqual(transport.count, 0, "the refusal came before sending")
+        copies.assertAllOverwritten(expected: 3)
+        Self.assertIntact(.card(card), .bankAccount(bank))
+    }
+
+    func testAThrownStorageFailureOverwritesItsCopiesAndLeavesTheValues() async {
+        let transport = RecordingIdempotencyTransport(failure: URLError(.notConnectedToInternet))
+        let flow = PayInFixture.makeFlow(transport: transport, key: "k1")
+        let copies = DigitCopies.recording(flow)
+        guard case let .card(card) = Self.card(), case let .bankAccount(bank) = Self.bankAccount() else {
+            return XCTFail("fixture shapes changed")
+        }
+
+        _ = await PayInFixture.failure { _ = try await flow.addCard(card.data) }
+        _ = await PayInFixture.failure { _ = try await flow.addBankAccount(bank.data) }
+
+        XCTAssertEqual(transport.count, 2, "both calls reached the transport and failed there")
+        copies.assertAllOverwritten(expected: 3)
+        Self.assertIntact(.card(card), .bankAccount(bank))
+    }
+
     private static let stored = Data("""
     {"responseText":"Success","isSuccess":true,"responseData":{"referenceId":"stored-1","resultCode":1,\
     "resultText":"Approved","customerId":1,"methodReferenceId":"stored-1"}}
