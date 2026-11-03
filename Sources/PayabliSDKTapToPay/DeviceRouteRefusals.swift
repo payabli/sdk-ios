@@ -26,6 +26,10 @@ struct PinnedTokenRefusal: PayabliError {
         .tokenExpired
     }
 
+    var httpStatus: Int? {
+        401
+    }
+
     var reason: String {
         "Unauthorized (401)"
     }

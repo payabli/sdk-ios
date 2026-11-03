@@ -60,8 +60,10 @@ package final class TTPTransactionClient: Sendable {
         logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
+        let status: Int
         do {
             let response = try await transport.perform(request)
+            status = response.statusCode
             if response.statusCode == 409, !Self.isJSONObject(response.body) {
                 throw ChargeKeyRefusal()
             }
@@ -84,7 +86,11 @@ package final class TTPTransactionClient: Sendable {
             )
 
         guard envelope.isApproved else {
-            throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
+            throw PayabliTTPError.paymentNotOpened(
+                reason: envelope.reason ?? envelope.code,
+                httpStatus: status,
+                rawCode: envelope.code
+            )
         }
         // A blank or dot-segment identifier counts as none: the close could not address it, and the card would
         // already be taken.
@@ -197,6 +203,10 @@ struct ChargeKeyRefusal: PayabliError {
         .conflict
     }
 
+    var httpStatus: Int? {
+        409
+    }
+
     var reason: String {
         PayabliErrorType.conflict.message
     }
@@ -222,7 +232,7 @@ struct CustomerDataRefusal: PayabliError {
               validation.rawCode == "E7020",
               let entries = validation.errors?["customerData"]
         else { return nil }
-        self.validation = validation
+        self.validation = validation.carrying(httpStatus: response.statusCode, rawCode: validation.rawCode)
         requiredFields = entries.lazy.compactMap { Self.fieldsNamed(in: $0.message) }.first ?? []
     }
 
@@ -236,6 +246,14 @@ struct CustomerDataRefusal: PayabliError {
 
     var detail: String? {
         validation.detail
+    }
+
+    var httpStatus: Int? {
+        validation.httpStatus
+    }
+
+    var rawCode: String? {
+        validation.rawCode
     }
 
     var errorDescription: String? {

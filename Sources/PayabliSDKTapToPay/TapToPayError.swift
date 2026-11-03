@@ -17,6 +17,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let capture: PayabliTTPCapture
     public let retryAfter: TimeInterval?
     public let refusal: TapToPayChargeRefusal?
+    public let httpStatus: Int?
+    public let rawCode: String?
 
     package init(
         type: PayabliErrorType,
@@ -25,7 +27,9 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         paymentTransId: String? = nil,
         capture: PayabliTTPCapture = .notCharged,
         retryAfter: TimeInterval? = nil,
-        refusal: TapToPayChargeRefusal? = nil
+        refusal: TapToPayChargeRefusal? = nil,
+        httpStatus: Int? = nil,
+        rawCode: String? = nil
     ) {
         self.type = type
         self.reason = reason
@@ -34,6 +38,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         self.capture = capture
         self.retryAfter = retryAfter
         self.refusal = refusal
+        self.httpStatus = httpStatus
+        self.rawCode = rawCode
     }
 }
 

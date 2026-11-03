@@ -15,28 +15,37 @@ enum TapToPayErrorTranslation {
         case let refusal as ActivationRefusal:
             return refusal.hostError
         case let refusal as CustomerDataRefusal:
+            let answer = answer(of: refusal)
             return TapToPayError(
                 type: refusal.type,
                 reason: refusal.reason,
                 detail: displayedDetail(of: refusal.validation),
-                refusal: .customerDataRefused(requiredFields: refusal.requiredFields)
+                refusal: .customerDataRefused(requiredFields: refusal.requiredFields),
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
             )
         case let error as PayabliTTPError:
             let type = catalogType(of: error)
+            let answer = answer(of: error)
             return TapToPayError(
                 type: type,
                 reason: type.message,
                 detail: serviceText(of: error),
                 paymentTransId: error.paymentTransId,
                 capture: error.capture,
-                retryAfter: retryAfter(of: error)
+                retryAfter: retryAfter(of: error),
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
             )
         case let error as any PayabliError:
+            let answer = answer(of: error)
             return TapToPayError(
                 type: error.type,
                 reason: error.reason,
                 detail: displayedDetail(of: error),
-                retryAfter: (error as? PayabliRetryAfter)?.retryAfter
+                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
             )
         default:
             return TapToPayError(type: .unknown, reason: PayabliErrorType.unknown.message, detail: nil)
@@ -84,9 +93,34 @@ enum TapToPayErrorTranslation {
             paymentTransId: failure.paymentTransId ?? paymentTransId,
             capture: (resentKey || retriesHeldSale) && capture == .notCharged ? .unknown : capture,
             retryAfter: failure.retryAfter,
-            refusal: failure.refusal
+            refusal: failure.refusal,
+            httpStatus: failure.httpStatus,
+            rawCode: failure.rawCode
         )
     }
+
+    /// The status and code of the first answer in a failure's chain. Both come from the one link that carries a
+    /// status, so a code is never paired with another answer's status.
+    ///
+    /// - Parameter error: the failure, whose wrapped failures are followed until one carries a status.
+    /// - Returns: that link's status and code, or nil for both when no link in the chain carries a status.
+    static func answer(of error: Error) -> (httpStatus: Int?, rawCode: String?) {
+        var link: Error? = error
+        for _ in 0 ..< maximumChainLength {
+            guard let current = link else { break }
+            if case let .paymentNotOpened(_, httpStatus?, rawCode) = current as? PayabliTTPError {
+                return (httpStatus, rawCode)
+            }
+            if let answered = current as? any PayabliError, let httpStatus = answered.httpStatus {
+                return (httpStatus, answered.rawCode)
+            }
+            link = (current as? PayabliGenericError)?.underlying
+        }
+        return (nil, nil)
+    }
+
+    /// The most wrapped failures ``answer(of:)`` follows before it stops looking.
+    private static let maximumChainLength = 8
 
     /// One branch per case, with no `default`, so a case added without an entry stops this compiling. A
     /// case collecting causes that do not share a code reports `unknown`.
@@ -196,7 +230,7 @@ enum TapToPayErrorTranslation {
              let .deviceSetupRefused(reason),
              let .entryPointRefused(reason),
              let .configFailed(reason),
-             let .paymentNotOpened(reason),
+             let .paymentNotOpened(reason, _, _),
              let .activationFailed(reason),
              let .networkError(reason),
              let .readerSetupFailed(reason, _),
