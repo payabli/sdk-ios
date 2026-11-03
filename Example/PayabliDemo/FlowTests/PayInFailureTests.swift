@@ -98,11 +98,8 @@ final class PayInFailureTests: XCTestCase {
         cause: PayabliGenericError(type: .networkError, reason: "networkError")
     )
 
-    /// What the SDK hands over for a `409` on a money-in route. A reversal carries a key too, but mints a
-    /// fresh one per call, so no repeat of one can be recognised and the case this fixture stands for does
-    /// not arise there. The cause is the one the bodyless route produces; a `409` answered with a
-    /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
-    /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
+    /// What the SDK hands over for a bodyless `409` on a money-in route. The adapter branches on the code, not
+    /// the cause, and both values are pinned in the SDK's own idempotency cases.
     private static let interruptedConflict = PayabliPayInError.Unsettled(
         cause: PayabliGenericError(type: .conflict, reason: "conflict")
     )
