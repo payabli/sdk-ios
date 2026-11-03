@@ -278,7 +278,7 @@ struct PaymentCaptureQAView: View {
                 ).info("Payment reversed: \(outcome.code, privacy: .public)")
                 reversal.reversed(
                     transId,
-                    saying: "Reversed. Code: \(outcome.code) Reason: \(outcome.reason ?? "-")",
+                    saying: "Reversed. Code: \(outcome.code)",
                     onScreen: onScreen
                 )
             } catch {
@@ -323,7 +323,6 @@ struct PaymentCaptureQAView: View {
         capturedResult = outcome
         resultText = [
             "Code: \(outcome.code)",
-            "Reason: \(outcome.reason ?? "-")",
             "Payment trans ID: \(outcome.transaction?.paymentTransId ?? "-")",
             "Gateway trans ID: \(outcome.transaction?.gatewayTransId ?? "-")",
             "Method: \(outcome.transaction?.method ?? "-")",

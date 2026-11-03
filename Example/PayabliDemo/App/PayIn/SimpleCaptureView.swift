@@ -1,3 +1,4 @@
+import os
 import PayabliSDKPayIn
 import SwiftUI
 
@@ -257,9 +258,9 @@ struct SimpleCaptureView: View {
     }
 
     private func handleCompleted(_ outcome: PayInOutcome, for operation: PayInOperation) {
-        if let method = outcome.storedMethod {
+        if outcome.storedMethod != nil {
             // Never the stored-method id: it charges the card again, and tests keep screenshots of this text.
-            resultText = "Saved: \(method.responseText)"
+            resultText = "Saved: \(outcome.code)"
         } else {
             let verb = operation == .authorize ? "Authorized" : "Captured"
             resultText = "\(verb): \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
@@ -279,6 +280,10 @@ struct SimpleCaptureView: View {
     private func handleFailed(_ failure: PayInFailure) {
         guard !failure.refusedForAnotherSubmission else { return }
         resultText = "Failed: \(failure.message)"
+        Logger(
+            subsystem: "com.payabli.example.app",
+            category: "SimpleCaptureDiagnostics"
+        ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
             flow(for: operation).chargeFailed(failure)
         }

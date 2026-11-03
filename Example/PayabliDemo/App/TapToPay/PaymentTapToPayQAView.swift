@@ -439,7 +439,7 @@ struct PaymentTapToPayQAView: View {
                 let accepted = try await terminal.termsAccepted()
                 termsMessage = accepted ? "✓ Accepted" : "✗ Not accepted"
             } catch {
-                termsMessage = "? Could not ask: \(error.localizedDescription)"
+                termsMessage = "? Could not ask: \(ActionLine.message(for: error))"
             }
         }
     }

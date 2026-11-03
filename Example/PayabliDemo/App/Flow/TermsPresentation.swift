@@ -20,7 +20,7 @@ enum TermsPresentation {
         case .returned(accepted: .success(false)):
             "returned; still ✗ Not accepted"
         case let .returned(accepted: .failure(error)):
-            "returned; could not ask whether accepted: " + error.localizedDescription
+            "returned; could not ask whether accepted: " + ActionLine.message(for: error)
         }
     }
 }

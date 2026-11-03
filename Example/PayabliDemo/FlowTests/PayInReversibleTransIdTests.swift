@@ -34,8 +34,6 @@ final class PayInReversibleTransIdTests: XCTestCase {
     private func outcome(withTransId transId: String?) -> PayInOutcome {
         PayInOutcome(
             code: "A0000",
-            reason: "Approved",
-            explanation: nil,
             transaction: PayInTransaction(
                 paymentTransId: transId,
                 gatewayTransId: nil,
@@ -43,8 +41,7 @@ final class PayInReversibleTransIdTests: XCTestCase {
                 operation: "Sale"
             ),
             storedMethod: nil,
-            summaryRows: [],
-            responseJSON: ""
+            summaryRows: []
         )
     }
 }

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 import PayabliSDKTapToPay
 
 /// A screen's grip on the card reader.
@@ -101,17 +102,9 @@ final class TapToPayTerminal: ObservableObject {
 }
 
 /// Something the reader refused.
-///
-/// `LocalizedError`, because the screens show `localizedDescription`. Without it
-/// Foundation answers a generic "operation couldn't be completed" for a struct
-/// error and the reason the reader gave never reaches the payer.
-struct TapToPayFailure: LocalizedError {
-    /// Displayable, and what a screen shows.
+struct TapToPayFailure: DisplayedFailure {
+    /// The message for the failure's category; the error's own text is the service's and goes to no screen.
     let message: String
-
-    var errorDescription: String? {
-        message
-    }
 
     /// Whether this device has to be set up again: its attestation was revoked,
     /// its registration was replaced, or its key is gone. The way out is a fresh
@@ -122,7 +115,9 @@ struct TapToPayFailure: LocalizedError {
     let isRefused: Bool
 
     init(_ error: Error, session: TapToPaySessionStatus) {
-        message = error.localizedDescription
+        message = ActionLine.message(for: error)
+        Logger(subsystem: "com.payabli.example.app", category: "TapToPayDiagnostics")
+            .error("Tap to Pay failed: \(LoggableError.label(for: error), privacy: .public)")
         isDeviceSetupRequired = (error as? TapToPayError)?.type == .deviceSetupRequired
         isRefused = session == .refused
     }

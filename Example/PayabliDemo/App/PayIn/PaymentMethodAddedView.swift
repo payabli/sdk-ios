@@ -47,20 +47,6 @@ struct PaymentCaptureResultView: View {
                 }
 
                 responseSummary
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Response")
-                        .font(.headline)
-
-                    Text(outcome.responseJSON)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(Color.payabliOnSurfaceVariant)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(12)
-                        .background(Color.payabliSurfaceContainer)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
             }
             .padding(16)
         }
