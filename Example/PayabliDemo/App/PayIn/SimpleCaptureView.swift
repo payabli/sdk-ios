@@ -259,8 +259,7 @@ struct SimpleCaptureView: View {
 
     private func handleCompleted(_ outcome: PayInOutcome, for operation: PayInOperation) {
         if outcome.storedMethod != nil {
-            // Never the stored-method id: it charges the card again, and tests keep screenshots of this text.
-            resultText = "Saved: \(outcome.code)"
+            resultText = "Payment method saved"
         } else {
             let verb = operation == .authorize ? "Authorized" : "Captured"
             resultText = "\(verb): \(outcome.code), \(outcome.transaction?.paymentTransId ?? "-")"
