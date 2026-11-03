@@ -131,8 +131,9 @@ final class PayabliPayInViewModel: ObservableObject {
         let replacesFlow = component !== self.component
         // Before the swap: a combining-mark separator cannot be stripped back to digits.
         let expiry = submittedExpiration
-        let separatorChanges = configuration.formatting.expirationSeparator
-            != self.configuration.formatting.expirationSeparator
+        // By scalar, as the expiry is read: two spellings of one separator compare equal as strings.
+        let separatorChanges = !configuration.formatting.expirationSeparator.unicodeScalars
+            .elementsEqual(self.configuration.formatting.expirationSeparator.unicodeScalars)
         self.component = component
         self.configuration = configuration
         if separatorChanges, !cardExpiration.isEmpty {

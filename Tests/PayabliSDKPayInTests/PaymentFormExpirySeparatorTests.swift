@@ -87,6 +87,22 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         await assertSubmits("02/30", from: viewModel)
     }
 
+    /// Two spellings of one separator are equal as strings but not as scalars, and the expiry is read by scalar,
+    /// so a change between them rewrites the expiry like any other separator change.
+    @MainActor
+    func testChangingBetweenTwoSpellingsOfOneSeparatorRewritesTheExpiry() async {
+        let viewModel = form(separator: "\u{E9}")
+        viewModel.cardExpiration = viewModel.formatExpiration("0230")
+
+        viewModel.update(
+            component: viewModel.component,
+            configuration: configuration(separator: "e\u{301}", insertsCardNumberSpaces: false)
+        )
+
+        XCTAssertEqual(Array(viewModel.cardExpiration.unicodeScalars), Array("02e\u{301}30".unicodeScalars))
+        await assertSubmits("02/30", from: viewModel)
+    }
+
     @MainActor
     private func assertSubmits(
         _ expiry: String,
@@ -120,10 +136,16 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         )
     }
 
-    private func configuration(separator: String) -> PayabliPayInFormConfiguration {
+    private func configuration(
+        separator: String,
+        insertsCardNumberSpaces: Bool = true
+    ) -> PayabliPayInFormConfiguration {
         PayabliPayInFormConfiguration(
             allowedMethods: [.card],
-            formatting: PayabliPayInFormatting(expirationSeparator: separator)
+            formatting: PayabliPayInFormatting(
+                insertsCardNumberSpaces: insertsCardNumberSpaces,
+                expirationSeparator: separator
+            )
         )
     }
 }
