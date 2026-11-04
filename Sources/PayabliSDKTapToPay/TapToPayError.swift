@@ -38,8 +38,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
 }
 
 /// Bridges to `NSError` with the catalog number as its code, so an Objective-C caller branches on the same number
-/// telemetry reports, and ``PayabliError/answerUserInfo``. A refused customer adds `refusal` and `requiredFields`,
-/// every identifier the paypoint requires named by its ``PayabliTTPCustomerData`` property.
+/// telemetry reports. `userInfo` carries ``PayabliError/answerUserInfo``, and a refused customer adds `refusal` and
+/// `requiredFields`, every identifier the paypoint requires named by its ``PayabliTTPCustomerData`` property.
 extension TapToPayError: CustomNSError {
     public static var errorDomain: String {
         "com.payabli.ttp"
