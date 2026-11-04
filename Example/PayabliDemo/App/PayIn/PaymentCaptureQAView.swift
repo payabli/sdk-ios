@@ -257,7 +257,7 @@ struct PaymentCaptureQAView: View {
     /// Reverses the payment on screen.
     ///
     /// The identifier comes from the result the flow reported, so nothing here builds a
-    /// request or holds a key. A refusal is shown as the service worded it.
+    /// request or holds a key. A refusal shows its category's message, and its code goes to the log.
     private func reverse(_ transId: String) {
         // Both, because they cover different windows. The flow reports a submission from the moment
         // it reaches the service's door, and this screen knows from the moment it decided to send
@@ -282,8 +282,13 @@ struct PaymentCaptureQAView: View {
                     onScreen: onScreen
                 )
             } catch {
+                let failure = PayInFailure(error, operation: .void)
+                Logger(
+                    subsystem: "com.payabli.example.app",
+                    category: "PaymentCaptureDiagnostics"
+                ).error("Payment reversal failed: \(failure.logLabel, privacy: .public)")
                 reversal.failed(
-                    PayInFailure(error, operation: .void),
+                    failure,
                     for: transId,
                     onScreen: onScreen
                 )
