@@ -233,16 +233,6 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
 
     func testAMethodKindTheFactoryDoesNotNameIsRefused() {
         XCTAssertNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "wallet", totalAmount: 1))
-        XCTAssertNil(PayabliPayInRequestObjC.bankAccount(
-            accountNumber: "1",
-            routingNumber: "021000021",
-            accountType: "Brokerage",
-            holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
-            deviceId: nil,
-            totalAmount: 1
-        ))
         XCTAssertNotNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "bankAccount", totalAmount: 1))
     }
 
@@ -282,10 +272,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "021000021",
-                accountType: "Checking",
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
+                holderType: .unspecified,
+                secCode: .unspecified,
                 deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
@@ -318,10 +308,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "021000021",
-                accountType: "Checking",
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
+                holderType: .unspecified,
+                secCode: .unspecified,
                 deviceId: nil,
                 totalAmount: 10
             ) else { return [] }

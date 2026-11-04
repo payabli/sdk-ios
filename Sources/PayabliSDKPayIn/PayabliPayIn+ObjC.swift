@@ -359,7 +359,7 @@ public final class PayabliPayInObjC: NSObject {
     /// - Parameter holderType: the holder type the host passed.
     /// - Returns: the values in their Swift types.
     /// - Throws: ``PayabliPayInError/InvalidInput`` naming the request member, for a number that names no case.
-    static func validated(
+    nonisolated static func validated(
         accountType: PayabliPayInAccountTypeCode,
         secCode: PayabliPayInSecCodeCode,
         holderType: PayabliPayInAccountHolderTypeCode
@@ -380,7 +380,7 @@ public final class PayabliPayInObjC: NSObject {
     /// - Parameter type: the enum it names no case of.
     /// - Parameter field: the request member it fills.
     /// - Returns: the refusal, naming that member.
-    private static func refusal(
+    private nonisolated static func refusal(
         _ value: Int,
         of type: (some Any).Type,
         field: PayabliPayInMethodInput.CodingKeys
