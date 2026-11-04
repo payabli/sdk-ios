@@ -39,7 +39,7 @@ enum PayInFieldPath {
         case .secCode: storedMethod(.achCode)
         case .deviceId: storedMethod(.device)
         case .methodDescription: "methodDescription"
-        case .firstName, .lastName, .customerNumber, .billingEmail, .billingZip: field.rawValue
+        case .firstName, .lastName, .customerNumber, .billingEmail, .billingZip: "customerData.\(field.rawValue)"
         case .amount: totalAmount
         case .serviceFee: serviceFee
         case .surchargeFee: surchargeFee

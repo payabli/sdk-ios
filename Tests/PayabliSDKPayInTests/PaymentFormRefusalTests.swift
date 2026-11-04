@@ -163,7 +163,7 @@ final class PaymentFormRefusalTests: XCTestCase {
             XCTFail("a missing first name is refused")
         } catch let refusal as PayabliPayInError.InvalidInput {
             XCTAssertEqual(refusal.reason, "First name is required.")
-            XCTAssertEqual(refusal.field, "firstName")
+            XCTAssertEqual(refusal.field, "customerData.firstName")
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
