@@ -338,6 +338,9 @@ error.httpStatus  // 402                  402
 error.rawCode     // "D0329"              "D0583"
 ```
 
+From Objective-C the error is an `NSError`: `userInfo[@"httpStatus"]` is the status as an `NSNumber` and
+`userInfo[@"rawCode"]` is the code as an `NSString`, and each key is absent when its field is `nil`.
+
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
 

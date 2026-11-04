@@ -419,4 +419,20 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             start { result, error in continuation.resume(returning: (result, error)) }
         }
     }
+
+    func testAnObjectiveCPayInErrorCarriesTheStatusAndCodeUnderTheirNames() {
+        let error = PayabliGenericError(type: .unknown, reason: "HTTP 418", httpStatus: 418, rawCode: "E1001")
+            .toPayabliPayInNSError(movesMoney: true)
+
+        XCTAssertEqual(error.domain, "com.payabli.payIn")
+        XCTAssertEqual(error.userInfo["httpStatus"] as? NSNumber, 418)
+        XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "E1001")
+    }
+
+    func testAnObjectiveCPayInErrorWithNeitherCarriesNeitherKey() {
+        let error = PayabliGenericError(type: .networkError, reason: "offline").toPayabliPayInNSError()
+
+        XCTAssertNil(error.userInfo["httpStatus"])
+        XCTAssertNil(error.userInfo["rawCode"])
+    }
 }

@@ -42,4 +42,20 @@ final class PayabliErrorStatusTests: XCTestCase {
         XCTAssertEqual(error.httpStatus, 418)
         XCTAssertEqual(error.rawCode, "E1001")
     }
+
+    func testAnObjectiveCSessionErrorCarriesTheStatusAndCodeUnderTheirNames() {
+        let error = PayabliGenericError(type: .unknown, reason: "HTTP 418", httpStatus: 418, rawCode: "E1001")
+            .payabliNSError(domain: "com.payabli.session")
+
+        XCTAssertEqual(error.userInfo["httpStatus"] as? NSNumber, 418)
+        XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "E1001")
+    }
+
+    func testAnObjectiveCSessionErrorWithNeitherCarriesNeitherKey() {
+        let error = PayabliGenericError(type: .networkError, reason: "offline")
+            .payabliNSError(domain: "com.payabli.session")
+
+        XCTAssertNil(error.userInfo["httpStatus"])
+        XCTAssertNil(error.userInfo["rawCode"])
+    }
 }
