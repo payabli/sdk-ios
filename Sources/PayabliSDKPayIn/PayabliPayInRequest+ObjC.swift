@@ -97,7 +97,7 @@ public final class PayabliPayInRequestObjC: NSObject {
     /// - Parameter accountType: `Checking` or `Savings`.
     /// - Parameter holderName: the account holder's name.
     /// - Parameter holderType: `personal` or `business`, or nil.
-    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil sends `WEB`.
+    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil for `WEB`.
     /// - Parameter deviceId: the device identifier, or nil.
     /// - Parameter totalAmount: the amount to debit.
     /// - Returns: the request, or nil when a named value is none of those listed.
@@ -112,10 +112,12 @@ public final class PayabliPayInRequestObjC: NSObject {
         totalAmount: Double
     ) -> PayabliPayInRequestObjC? {
         guard let type = PayabliPayInAccountType(rawValue: accountType) else { return nil }
-        var code: PayabliPayInSecCode?
+        let code: PayabliPayInSecCode
         if let secCode {
             guard let named = PayabliPayInSecCode(rawValue: secCode) else { return nil }
             code = named
+        } else {
+            code = .web
         }
         var holder: PayabliPayInAccountHolderType?
         if let holderType {

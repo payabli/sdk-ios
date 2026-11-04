@@ -168,13 +168,15 @@ public final class PayabliPayInObjC: NSObject {
             completion(nil, invalidArgument("accountType must be Checking or Savings"))
             return
         }
-        var resolvedSecCode: PayabliPayInSecCode?
+        let resolvedSecCode: PayabliPayInSecCode
         if let secCode {
             guard let secCode = PayabliPayInSecCode(rawValue: secCode) else {
                 completion(nil, invalidArgument("secCode must be PPD, WEB, TEL, CCD, or BOC"))
                 return
             }
             resolvedSecCode = secCode
+        } else {
+            resolvedSecCode = .web
         }
         let resolvedHolderType: PayabliPayInAccountHolderType?
         if let holderType {
