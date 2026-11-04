@@ -21,14 +21,25 @@ lock = threading.Lock()
 
 class Relay(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
+        self.relay()
+
+    def do_POST(self):
+        self.relay()
+
+    def relay(self):
         global count
         with lock:
             count += 1
             held = count > 1
         if held:
             time.sleep(HOLD_SECONDS)
+        length = int(self.headers.get("Content-Length") or 0)
+        body = self.rfile.read(length) if length else None
+        request = urllib.request.Request(UPSTREAM + self.path, data=body, method=self.command)
+        if self.headers.get("Content-Type"):
+            request.add_header("Content-Type", self.headers["Content-Type"])
         try:
-            with urllib.request.urlopen(UPSTREAM + self.path, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=30) as response:
                 body, status, content_type = response.read(), response.status, response.headers.get("Content-Type")
         except urllib.error.HTTPError as error:
             body, status, content_type = error.read(), error.code, error.headers.get("Content-Type")
