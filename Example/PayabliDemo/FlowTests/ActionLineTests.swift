@@ -34,6 +34,13 @@ final class ActionLineTests: XCTestCase {
         let message = "This iPhone can't do that."
     }
 
+    private struct Coded: DisplayedFailure, CodedFailure {
+        let message = "This iPhone can't do that."
+        let eventCode = "3024"
+    }
+
+    private struct Unrelated: Error {}
+
     func testAFailureIsTheMarkPlusItsCategorysMessageAndNeverItsOwnText() {
         XCTAssertEqual(ActionLine.failed(Refusal()), "✗ The payment was declined.")
     }
@@ -105,5 +112,42 @@ final class ActionLineTests: XCTestCase {
             ActionLine.chargeMessage(for: Thrown(type: .deviceOSUnsupported), capture: .notCharged, paymentTransId: nil),
             "This iPhone's iOS version is too old for Tap to Pay. Update iOS and try again."
         )
+    }
+
+    func testEachActivationRefusalHasItsOwnLineNamingWhatToDoNext() {
+        let types: [PayabliErrorType] = [
+            .activationCodeMalformed,
+            .activationCodeIncorrect,
+            .activationCodeExpired,
+            .activationAttemptsExhausted,
+            .activationCodeNotIssued,
+            .deviceNotPending
+        ]
+
+        let lines = types.map { ActionLine.message(for: Thrown(type: $0)) }
+
+        XCTAssertEqual(lines, [
+            "Enter the six-digit activation code.",
+            "That activation code isn't right. Check it and enter it again.",
+            "That activation code has expired. Get a new code and enter it.",
+            "Too many wrong codes were entered. Get a new code and enter it.",
+            "No activation code has been issued for this iPhone. Get a code and enter it.",
+            "This iPhone isn't waiting for activation. Enable the terminal again."
+        ])
+    }
+
+    func testAFailedStepRecordsItsCatalogCodeInTheStateLog() {
+        XCTAssertEqual(
+            ActionLine.failureEvent(step: "activation", error: Thrown(type: .activationCodeIncorrect)),
+            "activation failed · code=3024"
+        )
+    }
+
+    func testAFailureAlreadyInTheScreensWordsRecordsTheCodeItWasRaisedWith() {
+        XCTAssertEqual(ActionLine.failureEvent(step: "charge", error: Coded()), "charge failed · code=3024")
+    }
+
+    func testAFailureTheSDKDidNotRaiseRecordsItsTypeAndNoText() {
+        XCTAssertEqual(ActionLine.failureEvent(step: "enable", error: Unrelated()), "enable failed · code=Unrelated")
     }
 }

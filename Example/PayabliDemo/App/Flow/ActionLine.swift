@@ -8,8 +8,38 @@ protocol DisplayedFailure: Error {
     var message: String { get }
 }
 
+/// A failure already in a screen's words that keeps the code it was raised with.
+protocol CodedFailure: Error {
+    var eventCode: String { get }
+}
+
 /// The line a failed action leaves on the Tap to Pay tab.
 enum ActionLine {
+    /// The state log's entry for a failed step.
+    ///
+    /// - Parameters:
+    ///   - step: the step that failed, as the log names it.
+    ///   - error: what the step threw.
+    /// - Returns: the step and the failure's catalog code, or its type for an error the SDK did not raise, never
+    ///   its text.
+    static func failureEvent(step: String, error: Error) -> String {
+        "\(step) failed · code=\(eventCode(for: error))"
+    }
+
+    /// The code the state log records for a failure.
+    ///
+    /// - Parameter error: what an action threw.
+    /// - Returns: the catalog code, the code a failure in a screen's words was raised with, or the error's type.
+    static func eventCode(for error: Error) -> String {
+        if let coded = error as? CodedFailure {
+            return coded.eventCode
+        }
+        if let payabli = error as? any PayabliError {
+            return String(payabli.code)
+        }
+        return String(describing: type(of: error))
+    }
+
     /// - Parameter error: what the action threw.
     /// - Returns: "✗ " and the message for the failure's category, with no step name. The error's code goes to
     ///   the log, and its own text to neither.
@@ -25,13 +55,15 @@ enum ActionLine {
     /// This app's message for a failure's category.
     ///
     /// - Parameter error: what the action threw.
-    /// - Returns: the message the failure already carries, this app's line for a device that cannot run Tap to Pay,
-    ///   or the one for its category, with an error outside the catalog read as an unknown outcome, as the SDK reads it.
+    /// - Returns: the message the failure already carries, this app's line for a device that cannot run Tap to Pay
+    ///   or for a refused activation code, or the one for its category, with an error outside the catalog read as an
+    ///   unknown outcome, as the SDK reads it.
     static func message(for error: Error) -> String {
         if let failure = error as? DisplayedFailure {
             return failure.message
         }
-        if let line = ineligibleDeviceLine((error as? any PayabliError)?.type) {
+        let type = (error as? any PayabliError)?.type
+        if let line = ineligibleDeviceLine(type) ?? activationLine(type) {
             return line
         }
         return switch (error as? any PayabliError)?.category ?? PayabliErrorType.unknown.category {
@@ -80,6 +112,30 @@ enum ActionLine {
             "This iPhone isn't set up for Tap to Pay with this app. Contact Payabli support with the device ID on the Config tab."
         case .deviceIdentityUnavailable:
             "This iPhone can't be identified, so Tap to Pay can't start."
+        default:
+            nil
+        }
+    }
+
+    /// This app's line for each refused activation, naming what the operator does next. The category alone would give
+    /// six refusals with six different remedies the same two lines.
+    ///
+    /// - Parameter type: the failure's type, or nil for an error outside the catalog.
+    /// - Returns: the line for that type, or nil for any other.
+    private static func activationLine(_ type: PayabliErrorType?) -> String? {
+        switch type {
+        case .activationCodeMalformed:
+            "Enter the six-digit activation code."
+        case .activationCodeIncorrect:
+            "That activation code isn't right. Check it and enter it again."
+        case .activationCodeExpired:
+            "That activation code has expired. Get a new code and enter it."
+        case .activationAttemptsExhausted:
+            "Too many wrong codes were entered. Get a new code and enter it."
+        case .activationCodeNotIssued:
+            "No activation code has been issued for this iPhone. Get a code and enter it."
+        case .deviceNotPending:
+            "This iPhone isn't waiting for activation. Enable the terminal again."
         default:
             nil
         }

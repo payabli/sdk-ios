@@ -102,9 +102,15 @@ final class TapToPayTerminal: ObservableObject {
 }
 
 /// Something the reader refused.
-struct TapToPayFailure: DisplayedFailure {
+struct TapToPayFailure: DisplayedFailure, CodedFailure {
     /// The message for whether the card was charged, then for the failure's category; the error's own text goes to no screen.
     let message: String
+
+    let eventCode: String
+
+    /// Whether the session was left waiting for an activation code, which the activation step asks for rather than
+    /// reports as a failure.
+    let isPendingActivation: Bool
 
     /// Whether this device has to be set up again: its attestation was revoked,
     /// its registration was replaced, or its key is gone. The way out is a fresh
@@ -121,9 +127,11 @@ struct TapToPayFailure: DisplayedFailure {
             capture: failure?.capture ?? .notCharged,
             paymentTransId: failure?.paymentTransId
         )
+        eventCode = ActionLine.eventCode(for: error)
         Logger(subsystem: "com.payabli.example.app", category: "TapToPayDiagnostics")
             .error("Tap to Pay failed: \(LoggableError.label(for: error), privacy: .public)")
         isDeviceSetupRequired = failure?.type == .deviceSetupRequired
         isRefused = session == .refused
+        isPendingActivation = session == .pendingActivation
     }
 }
