@@ -616,7 +616,7 @@ extension PayabliPayInCardData {
             throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be four digits.")
         }
         // The request carries two digits of the year, so a year after 2099 can't be sent as given.
-        guard expiryYear <= 2099 else {
+        guard expiryYear <= Self.expiryYears.upperBound else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be 2099 or earlier.")
         }
         let today = Self.expiryCalendar.dateComponents([.year, .month], from: Date())
@@ -629,6 +629,20 @@ extension PayabliPayInCardData {
     /// The calendar the current month is read on. A card's expiry is a Gregorian month, and `Calendar.current`
     /// follows the device's setting: on the Buddhist calendar the year reads 2569.
     static let expiryCalendar = Calendar(identifier: .gregorian)
+
+    /// The years a two-digit expiry can name.
+    static let expiryYears = 2000 ... 2099
+
+    /// The month and year at `date` on ``expiryCalendar``, the year held to ``expiryYears``, so a device clock
+    /// outside them never offers a year the request would carry as another.
+    ///
+    /// - Parameter date: the moment to read.
+    /// - Returns: the month, 1 to 12, and the year.
+    static func currentExpiryMonth(at date: Date) -> (month: Int, year: Int) {
+        let parts = expiryCalendar.dateComponents([.year, .month], from: date)
+        let year = min(max(parts.year ?? expiryYears.lowerBound, expiryYears.lowerBound), expiryYears.upperBound)
+        return (parts.month ?? 1, year)
+    }
 
     /// The expiry as the request carries it, `MM/YY`. Written only after ``validateExpiry()``.
     var wireExpiry: String {

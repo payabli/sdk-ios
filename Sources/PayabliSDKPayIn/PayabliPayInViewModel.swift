@@ -432,13 +432,22 @@ final class PayabliPayInViewModel: ObservableObject {
         acceptEdit(of: .cardExpiration)
     }
 
+    /// The years the expiry picker offers: the current year, held to 2000 to 2099, and the 20 after it, up to 2099.
+    ///
+    /// - Parameter now: the moment read as the current year.
+    /// - Returns: the years, earliest first.
+    func expirationYearChoices(now: Date = Date()) -> [Int] {
+        let first = PayabliPayInCardData.currentExpiryMonth(at: now).year
+        return Array(first ... min(first + 20, PayabliPayInCardData.expiryYears.upperBound))
+    }
+
     func ensureExpirationSelection(defaultDate: Date = Date()) {
-        let calendar = Calendar.current
+        let current = PayabliPayInCardData.currentExpiryMonth(at: defaultDate)
         if cardExpirationMonth == nil {
-            cardExpirationMonth = selectedExpirationMonth ?? calendar.component(.month, from: defaultDate)
+            cardExpirationMonth = selectedExpirationMonth ?? current.month
         }
         if cardExpirationYear == nil {
-            cardExpirationYear = selectedExpirationYear ?? calendar.component(.year, from: defaultDate)
+            cardExpirationYear = selectedExpirationYear ?? current.year
         }
         synchronizeExpirationText()
     }

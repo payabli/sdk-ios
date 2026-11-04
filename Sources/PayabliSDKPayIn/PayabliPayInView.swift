@@ -1007,21 +1007,20 @@ extension PayabliPayInView {
 
     var expirationMonthSelection: Binding<Int> {
         Binding(
-            get: { viewModel.cardExpirationMonth ?? Calendar.current.component(.month, from: Date()) },
+            get: { viewModel.cardExpirationMonth ?? PayabliPayInCardData.currentExpiryMonth(at: Date()).month },
             set: { viewModel.selectExpirationMonth($0) }
         )
     }
 
     var expirationYearSelection: Binding<Int> {
         Binding(
-            get: { viewModel.cardExpirationYear ?? Calendar.current.component(.year, from: Date()) },
+            get: { viewModel.cardExpirationYear ?? PayabliPayInCardData.currentExpiryMonth(at: Date()).year },
             set: { viewModel.selectExpirationYear($0) }
         )
     }
 
     var expirationYears: [Int] {
-        let current = Calendar.current.component(.year, from: Date())
-        return Array(current ... current + 20)
+        viewModel.expirationYearChoices()
     }
 
     func expirationWheelMonthLabel(_ month: Int) -> String {
