@@ -1,6 +1,7 @@
 import Foundation
 import os
 import PayabliSDKCore
+import PayabliSDKTapToPay
 
 /// A failure that already carries the message a screen shows.
 protocol DisplayedFailure: Error {
@@ -43,6 +44,25 @@ enum ActionLine {
         case .device: "This iPhone can't do that."
         case .internal: "Something went wrong."
         }
+    }
+
+    /// This app's message for a Tap to Pay failure, which reads whether the card was charged before the category,
+    /// since the two can disagree.
+    ///
+    /// - Parameters:
+    ///   - error: what the reader threw.
+    ///   - capture: whether the card was charged.
+    ///   - paymentTransId: the payment the failure names, if any.
+    /// - Returns: a charged or may-have-been-charged line with the payment's ID when it names one, or the category's
+    ///   message when the card was not charged.
+    static func chargeMessage(for error: Error, capture: PayabliTTPCapture, paymentTransId: String?) -> String {
+        let line = switch capture {
+        case .charged: "The card was charged. Don't charge it again."
+        case .unknown: "This payment may have gone through. Check before charging again."
+        case .notCharged: message(for: error)
+        }
+        guard capture != .notCharged, let paymentTransId else { return line }
+        return "\(line) · txn \(paymentTransId)"
     }
 
     /// This app's line for each failure that means the device cannot run Tap to Pay. The category alone would give all

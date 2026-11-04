@@ -103,7 +103,7 @@ final class TapToPayTerminal: ObservableObject {
 
 /// Something the reader refused.
 struct TapToPayFailure: DisplayedFailure {
-    /// The message for the failure's category; the error's own text is the service's and goes to no screen.
+    /// The message for whether the card was charged, then for the failure's category; the error's own text goes to no screen.
     let message: String
 
     /// Whether this device has to be set up again: its attestation was revoked,
@@ -115,10 +115,15 @@ struct TapToPayFailure: DisplayedFailure {
     let isRefused: Bool
 
     init(_ error: Error, session: TapToPaySessionStatus) {
-        message = ActionLine.message(for: error)
+        let failure = error as? TapToPayError
+        message = ActionLine.chargeMessage(
+            for: error,
+            capture: failure?.capture ?? .notCharged,
+            paymentTransId: failure?.paymentTransId
+        )
         Logger(subsystem: "com.payabli.example.app", category: "TapToPayDiagnostics")
             .error("Tap to Pay failed: \(LoggableError.label(for: error), privacy: .public)")
-        isDeviceSetupRequired = (error as? TapToPayError)?.type == .deviceSetupRequired
+        isDeviceSetupRequired = failure?.type == .deviceSetupRequired
         isRefused = session == .refused
     }
 }
