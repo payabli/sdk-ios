@@ -60,25 +60,36 @@ extension PayabliPayInViewModel {
         return String(expiry)
     }
 
+    /// The form's expiry as a month and a four-digit year, read from ``submittedExpiration`` as `MM/YY` in
+    /// 2000 to 2099. Text that isn't four ASCII digits reads as month 0 and year 0, which the card's own check
+    /// refuses before anything is sent.
+    var submittedExpiry: (month: Int, year: Int) {
+        guard let digits = submittedExpiration.payabliInstrumentDigits, digits.count == 4,
+              let month = Int(digits.prefix(2)), let year = Int(digits.suffix(2))
+        else { return (0, 0) }
+        return (month, 2000 + year)
+    }
+
     func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
                 cardNumber: buffers.ofString(cardNumber),
-                expiry: submittedExpiration,
-                holderName: cardholderName,
+                expiryMonth: submittedExpiry.month,
+                expiryYear: submittedExpiry.year,
                 securityCode: buffers.ofString(cardCvv),
+                holderName: cardholderName,
                 postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: buffers.ofString(accountNumber),
+                routingNumber: routingNumber,
                 accountType: accountType,
                 holderName: accountHolder,
-                routingNumber: routingNumber,
-                secCode: configuration.hiddenValues.secCode ?? .web,
                 holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                secCode: configuration.hiddenValues.secCode,
+                deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
             ))
         }
     }
@@ -89,9 +100,10 @@ extension PayabliPayInViewModel {
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: buffers.ofString(cardNumber),
-                    expiry: submittedExpiration,
-                    holderName: cardholderName,
+                    expiryMonth: submittedExpiry.month,
+                    expiryYear: submittedExpiry.year,
                     securityCode: buffers.ofString(cardCvv),
+                    holderName: cardholderName,
                     postalCode: cardZip
                 )
             ))
@@ -99,12 +111,12 @@ extension PayabliPayInViewModel {
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
                     accountNumber: buffers.ofString(accountNumber),
+                    routingNumber: routingNumber,
                     accountType: accountType,
                     holderName: accountHolder,
-                    routingNumber: routingNumber,
-                    secCode: configuration.hiddenValues.secCode ?? .web,
                     holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                    device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                    secCode: configuration.hiddenValues.secCode,
+                    deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
                 )
             ))
         }

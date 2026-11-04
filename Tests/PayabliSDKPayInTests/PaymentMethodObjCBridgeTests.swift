@@ -40,11 +40,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
         component.addBankAccount(
             accountNumber: "123456789",
+            routingNumber: "021000021",
             accountType: "Checking",
             holderName: "Jane Doe",
-            routingNumber: "021000021",
-            secCode: "WEB",
             holderType: "company",
+            secCode: "WEB",
+            deviceId: nil,
             achValidation: true,
             createAnonymous: false,
             forceCustomerCreation: true,
@@ -103,11 +104,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         var invalidAccountTypeError: NSError?
         component.addBankAccount(
             accountNumber: "111111111",
+            routingNumber: "123456780",
             accountType: "Business",
             holderName: "Jane Doe",
-            routingNumber: "123456780",
-            secCode: nil,
             holderType: nil,
+            secCode: nil,
+            deviceId: nil,
             achValidation: false,
             createAnonymous: false,
             forceCustomerCreation: false,
@@ -121,11 +123,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         var invalidSecCodeError: NSError?
         component.addBankAccount(
             accountNumber: "111111111",
+            routingNumber: "123456780",
             accountType: PayabliPayInAccountType.checking.rawValue,
             holderName: "Jane Doe",
-            routingNumber: "123456780",
-            secCode: "POP",
             holderType: nil,
+            secCode: "POP",
+            deviceId: nil,
             achValidation: false,
             createAnonymous: false,
             forceCustomerCreation: false,
@@ -153,9 +156,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
         component.addCard(
             cardNumber: "4111111111111111",
-            expiry: "02/28",
-            holderName: "",
+            expiryMonth: 2,
+            expiryYear: 2028,
             securityCode: "123",
+            holderName: "",
             postalCode: "33139",
             createAnonymous: false,
             forceCustomerCreation: false,
@@ -188,9 +192,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
         component.addCard(
             cardNumber: "4111111111111111",
-            expiry: "02/28",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2028,
             securityCode: "123",
+            holderName: "Jane Doe",
             postalCode: "33139",
             createAnonymous: false,
             forceCustomerCreation: false,
@@ -223,9 +228,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.addPaymentMethod(
             .card(PayabliPayInCardData(
                 cardNumber: cardNumber,
-                expiry: "02/28",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2028,
                 securityCode: securityCode,
+                holderName: "Jane Doe",
                 postalCode: "33139"
             )),
             options: PayabliPayInOptions()
@@ -258,9 +264,9 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.addPaymentMethod(
             .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: accountNumber,
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "Jane Doe",
-                routingNumber: "123456780"
+                holderName: "Jane Doe"
             )),
             options: PayabliPayInOptions()
         ) { method, error in
@@ -289,11 +295,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
 
         component.addBankAccount(
             accountNumber: "1111111111",
+            routingNumber: "123456780",
             accountType: PayabliPayInAccountType.checking.rawValue,
             holderName: "Jane Doe",
-            routingNumber: "123456780",
-            secCode: nil,
             holderType: PayabliPayInAccountHolderType.personal.rawValue,
+            secCode: nil,
+            deviceId: nil,
             achValidation: true,
             createAnonymous: false,
             forceCustomerCreation: false,

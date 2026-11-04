@@ -120,9 +120,10 @@ public final class PayabliPayInObjC: NSObject {
     // swiftlint:disable:next function_parameter_count
     @objc public func addCard(
         cardNumber: String,
-        expiry: String,
-        holderName: String,
+        expiryMonth: Int,
+        expiryYear: Int,
         securityCode: String,
+        holderName: String,
         postalCode: String,
         createAnonymous: Bool,
         forceCustomerCreation: Bool,
@@ -132,9 +133,10 @@ public final class PayabliPayInObjC: NSObject {
     ) {
         let card = PayabliPayInCardData(
             cardNumber: cardNumber,
-            expiry: expiry,
-            holderName: holderName,
+            expiryMonth: expiryMonth,
+            expiryYear: expiryYear,
             securityCode: securityCode,
+            holderName: holderName,
             postalCode: postalCode
         )
         let options = PayabliPayInOptions(
@@ -149,11 +151,12 @@ public final class PayabliPayInObjC: NSObject {
     // swiftlint:disable:next function_parameter_count
     @objc public func addBankAccount(
         accountNumber: String,
+        routingNumber: String,
         accountType: String,
         holderName: String,
-        routingNumber: String,
-        secCode: String?,
         holderType: String?,
+        secCode: String?,
+        deviceId: String?,
         achValidation: Bool,
         createAnonymous: Bool,
         forceCustomerCreation: Bool,
@@ -165,15 +168,13 @@ public final class PayabliPayInObjC: NSObject {
             completion(nil, invalidArgument("accountType must be Checking or Savings"))
             return
         }
-        let resolvedSecCode: PayabliPayInSecCode
+        var resolvedSecCode: PayabliPayInSecCode?
         if let secCode {
             guard let secCode = PayabliPayInSecCode(rawValue: secCode) else {
                 completion(nil, invalidArgument("secCode must be PPD, WEB, TEL, CCD, or BOC"))
                 return
             }
             resolvedSecCode = secCode
-        } else {
-            resolvedSecCode = .web
         }
         let resolvedHolderType: PayabliPayInAccountHolderType?
         if let holderType {
@@ -188,11 +189,12 @@ public final class PayabliPayInObjC: NSObject {
 
         let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
+            routingNumber: routingNumber,
             accountType: resolvedAccountType,
             holderName: holderName,
-            routingNumber: routingNumber,
+            holderType: resolvedHolderType,
             secCode: resolvedSecCode,
-            holderType: resolvedHolderType
+            deviceId: deviceId
         )
         let options = PayabliPayInOptions(
             achValidation: achValidation,

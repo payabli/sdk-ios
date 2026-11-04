@@ -29,9 +29,10 @@ final class TokenStorageBodyWriterTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2,
+                expiryYear: 2035,
                 securityCode: SensitiveDigits.ofString("123"),
+                holderName: "John Doe",
                 postalCode: "12345"
             )),
             options: PayabliPayInOptions(
@@ -53,7 +54,7 @@ final class TokenStorageBodyWriterTests: XCTestCase {
             bodyText,
             #"{"customerData":{"customerId":4440},"entryPoint":"f743aed24a","fallbackAuth":true,"fallbackAuthAmount":100,"#
                 + #""methodDescription":"Primary Visa card","source":"ios-sdk","subdomain":"checkout","#
-                + #""paymentMethod":{"method":"card","cardexp":"02\/25","cardHolder":"John Doe","#
+                + #""paymentMethod":{"method":"card","cardexp":"02\/35","cardHolder":"John Doe","#
                 + #""cardnumber":"4111111111111111","cardcvv":"123","cardzip":"12345"}}"#
         )
     }
@@ -63,23 +64,25 @@ final class TokenStorageBodyWriterTests: XCTestCase {
         let scenarios: [(PayabliPayInMethodInput, String)] = [
             (PayabliPayInMethodInput.card(PayabliPayInCardData(
                 cardNumber: SensitiveDigits.ofString("٤" + String(repeating: "١", count: 15)),
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2,
+                expiryYear: 2035,
                 securityCode: SensitiveDigits.ofString("123"),
+                holderName: "John Doe",
                 postalCode: "12345"
             )), "Card number contains unsupported characters."),
             (PayabliPayInMethodInput.card(PayabliPayInCardData(
                 cardNumber: SensitiveDigits.ofString("4111 1111 1111 1111"),
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2,
+                expiryYear: 2035,
                 securityCode: SensitiveDigits.ofString(String(repeating: "٤", count: 3)),
+                holderName: "John Doe",
                 postalCode: "12345"
             )), "CVV contains unsupported characters."),
             (PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
                 accountNumber: SensitiveDigits.ofString(String(repeating: "١", count: 13)),
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "John Doe",
-                routingNumber: "123456780"
+                holderName: "John Doe"
             )), "Account number contains unsupported characters.")
         ]
 

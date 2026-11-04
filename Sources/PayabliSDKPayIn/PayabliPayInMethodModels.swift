@@ -579,7 +579,7 @@ extension PayabliPayInCardData {
                 throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
             }
         }
-        _ = try normalizedExpiration()
+        try validateExpiry()
         let trimmedCardholderName = holderName.trimmed
         guard !trimmedCardholderName.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("Cardholder name is required.")
@@ -606,19 +606,29 @@ extension PayabliPayInCardData {
         }
     }
 
-    func normalizedExpiration() throws -> String {
-        guard let digits = expiry.payabliInstrumentDigits else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiration contains unsupported characters.")
+    /// Refuses a month outside 1 to 12, a year that isn't four digits or is after 2099, or an expiry before the
+    /// device's current month. A card is good through the last day of its expiry month.
+    func validateExpiry() throws {
+        guard (1 ... 12).contains(expiryMonth) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry month must be between 1 and 12.")
         }
-        guard digits.count == 4 else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiration must be in MMYY or MM/YY format.")
+        guard (1000 ... 9999).contains(expiryYear) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be four digits.")
         }
-        let monthPrefix = String(digits.prefix(2))
-        guard let month = Int(monthPrefix), (1 ... 12).contains(month) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiration month must be between 01 and 12.")
+        // The request carries two digits of the year, so a year after 2099 can't be sent as given.
+        guard expiryYear <= 2099 else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be 2099 or earlier.")
         }
-        let year = String(digits.suffix(2))
-        return "\(monthPrefix)/\(year)"
+        let today = Calendar.current.dateComponents([.year, .month], from: Date())
+        guard let year = today.year, let month = today.month else { return }
+        guard (expiryYear, expiryMonth) >= (year, month) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Card is expired.")
+        }
+    }
+
+    /// The expiry as the request carries it, `MM/YY`. Written only after ``validateExpiry()``.
+    var wireExpiry: String {
+        String(format: "%02d/%02d", expiryMonth, expiryYear % 100)
     }
 
     static func passesLuhn(_ digits: [UInt8]) -> Bool {

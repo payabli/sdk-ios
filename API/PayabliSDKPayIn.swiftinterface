@@ -41,8 +41,8 @@ import _SwiftConcurrencyShims
 }
 @_inheritsConvenienceInitializers @_hasMissingDesignatedInitializers @_Concurrency::MainActor @objc(PayabliPayInObjC) final public class PayabliPayInObjC : ObjectiveC::NSObject {
   @objc @_Concurrency::MainActor public static func create() throws -> PayabliSDKPayIn::PayabliPayInObjC
-  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
-  @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func addCard(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
+  @objc @_Concurrency::MainActor final public func addBankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, holderType: Swift::String?, secCode: Swift::String?, deviceId: Swift::String?, achValidation: Swift::Bool, createAnonymous: Swift::Bool, forceCustomerCreation: Swift::Bool, temporary: Swift::Bool, source: Swift::String?, completion: @escaping (PayabliSDKPayIn::PayabliPayInStoredPaymentMethodObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func readTransaction(transId: Swift::String, completion: @escaping (PayabliSDKPayIn::PayabliPayInTransactionObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func capture(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
   @objc @_Concurrency::MainActor final public func authorize(_ request: PayabliSDKPayIn::PayabliPayInRequestObjC, completion: @escaping (PayabliSDKPayIn::PayabliPayInResultObjC?, Foundation::NSError?) -> Swift::Void)
@@ -294,10 +294,11 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
 }
 public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::CustomReflectable, Swift::Sendable {
-  public var expiry: Swift::String
+  public var expiryMonth: Swift::Int
+  public var expiryYear: Swift::Int
   public var holderName: Swift::String
   public var postalCode: Swift::String
-  public init(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String)
+  public init(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String)
   public var description: Swift::String {
     get
   }
@@ -309,13 +310,13 @@ public struct PayabliPayInCardData : Swift::CustomStringConvertible, Swift::Cust
   }
 }
 public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swift::CustomDebugStringConvertible, Swift::CustomReflectable, Swift::Sendable {
+  public var routingNumber: Swift::String
   public var accountType: PayabliSDKPayIn::PayabliPayInAccountType
   public var holderName: Swift::String
-  public var routingNumber: Swift::String
-  public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
   public var holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
-  public var device: Swift::String?
-  public init(accountNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, routingNumber: Swift::String, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, device: Swift::String? = nil)
+  public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
+  public var deviceId: Swift::String?
+  public init(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = nil, deviceId: Swift::String? = nil)
   public var description: Swift::String {
     get
   }
@@ -578,8 +579,8 @@ extension PayabliSDKPayIn::PayabliPayInMethodInput {
   @objc final public var validatesRoutingNumberChecksum: Swift::Bool
   @objc deinit
   @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
-  @objc public static func card(cardNumber: Swift::String, expiry: Swift::String, holderName: Swift::String, securityCode: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
-  @objc public static func bankAccount(accountNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, routingNumber: Swift::String, secCode: Swift::String?, holderType: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
+  @objc public static func card(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
+  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, holderType: Swift::String?, secCode: Swift::String?, deviceId: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC

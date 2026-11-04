@@ -422,9 +422,10 @@ final class PayInIdempotencyTests: XCTestCase {
             _ = try await flow.addCard(
                 PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiry: "02/27",
-                    holderName: "John Cassian",
+                    expiryMonth: 2,
+                    expiryYear: 2037,
                     securityCode: "999",
+                    holderName: "John Cassian",
                     postalCode: "12345"
                 ),
                 options: PayabliPayInTokenStorageOptions()

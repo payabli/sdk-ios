@@ -28,9 +28,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
         let card = PayabliPayInRequestObjC.card(
             cardNumber: "4111111111111111",
-            expiry: "02/30",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2030,
             securityCode: "999",
+            holderName: "Jane Doe",
             postalCode: "12345",
             saveIfSuccess: false,
             totalAmount: 10
@@ -234,11 +235,12 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "wallet", totalAmount: 1))
         XCTAssertNil(PayabliPayInRequestObjC.bankAccount(
             accountNumber: "1",
+            routingNumber: "021000021",
             accountType: "Brokerage",
             holderName: "Jane Doe",
-            routingNumber: "021000021",
-            secCode: nil,
             holderType: nil,
+            secCode: nil,
+            deviceId: nil,
             totalAmount: 1
         ))
         XCTAssertNotNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "bankAccount", totalAmount: 1))
@@ -251,9 +253,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let digits = autoreleasepool {
             let wrapper = PayabliPayInRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiry: "02/30",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2030,
                 securityCode: "999",
+                holderName: "Jane Doe",
                 postalCode: "12345",
                 saveIfSuccess: false,
                 totalAmount: 10
@@ -278,11 +281,12 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let digits: [SensitiveDigits] = autoreleasepool {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
+                routingNumber: "021000021",
                 accountType: "Checking",
                 holderName: "Jane Doe",
-                routingNumber: "021000021",
-                secCode: nil,
                 holderType: nil,
+                secCode: nil,
+                deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
             return wrapper.paymentMethod.sensitiveDigits
@@ -300,9 +304,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let cardDigits: [SensitiveDigits] = autoreleasepool {
             let wrapper = PayabliPayInRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiry: "02/30",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2030,
                 securityCode: "999",
+                holderName: "Jane Doe",
                 postalCode: "12345",
                 saveIfSuccess: false,
                 totalAmount: 10
@@ -312,11 +317,12 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let bankDigits: [SensitiveDigits] = autoreleasepool {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
+                routingNumber: "021000021",
                 accountType: "Checking",
                 holderName: "Jane Doe",
-                routingNumber: "021000021",
-                secCode: nil,
                 holderType: nil,
+                secCode: nil,
+                deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
             return wrapper.toSwift().paymentMethod.sensitiveDigits
@@ -378,9 +384,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
         let wrapper = PayabliPayInRequestObjC.card(
             cardNumber: "4111111111111111",
-            expiry: "02/30",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2030,
             securityCode: "999",
+            holderName: "Jane Doe",
             postalCode: "12345",
             saveIfSuccess: false,
             totalAmount: 10

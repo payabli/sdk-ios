@@ -71,9 +71,10 @@ data:
 ```swift
 let stored = try await paymentFlow.addCard(PayabliPayInCardData(
     cardNumber: "4111111111111111",
-    expiry: "02/28",
-    holderName: "Jane Doe",
+    expiryMonth: 2,
+    expiryYear: 2028,
     securityCode: "123",
+    holderName: "Jane Doe",
     postalCode: "33139"
 ))
 ```
@@ -149,9 +150,10 @@ Direct stored card:
 let storedCard = try await paymentFlow.addCard(
     PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/28",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2028,
         securityCode: "123",
+        holderName: "Jane Doe",
         postalCode: "33139"
     ),
     options: PayabliPayInOptions(
@@ -173,11 +175,11 @@ Direct stored bank account:
 let storedBankAccount = try await paymentFlow.addBankAccount(
     PayabliPayInBankAccountData(
         accountNumber: "111111111111",
+        routingNumber: "123456780",
         accountType: .checking,
         holderName: "Jane Doe",
-        routingNumber: "123456780",
-        secCode: .web,
-        holderType: .personal
+        holderType: .personal,
+        secCode: .web
     ),
     options: PayabliPayInOptions(
         achValidation: true,
@@ -230,9 +232,10 @@ Direct capture with card:
 ```swift
 let cardData = PayabliPayInCardData(
     cardNumber: "4111111111111111",
-    expiry: "02/28",
-    holderName: "Jane Doe",
+    expiryMonth: 2,
+    expiryYear: 2028,
     securityCode: "123",
+    holderName: "Jane Doe",
     postalCode: "33139"
 )
 

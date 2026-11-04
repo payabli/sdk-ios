@@ -53,17 +53,18 @@ final class PaymentMethodWireNameTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/28",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2028,
         securityCode: "123",
+        holderName: "Jane Doe",
         postalCode: "33139"
     )
 
     private static let bankAccount = PayabliPayInBankAccountData(
         accountNumber: "1111111111",
+        routingNumber: "123456780",
         accountType: .checking,
-        holderName: "Jane Doe",
-        routingNumber: "123456780"
+        holderName: "Jane Doe"
     )
 
     /// The method name in the bytes the body writer produced for the request.

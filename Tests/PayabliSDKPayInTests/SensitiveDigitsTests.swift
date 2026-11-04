@@ -91,9 +91,10 @@ final class SensitiveDigitsTests: XCTestCase {
     func testACardReflectsAsItsDescription() {
         let card = PayabliPayInCardData(
             cardNumber: pan,
-            expiry: "02/30",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2030,
             securityCode: "999",
+            holderName: "Jane Doe",
             postalCode: "12345"
         )
         var dumped = ""
@@ -108,9 +109,9 @@ final class SensitiveDigitsTests: XCTestCase {
     func testABankAccountReflectsItsAccountTypeAlone() {
         let account = PayabliPayInBankAccountData(
             accountNumber: "123456789012",
+            routingNumber: "021000021",
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: "021000021"
+            holderName: "Jane Doe"
         )
         var dumped = ""
         dump(account, to: &dumped)

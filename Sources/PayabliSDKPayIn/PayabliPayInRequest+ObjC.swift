@@ -62,27 +62,30 @@ public final class PayabliPayInRequestObjC: NSObject {
     }
 
     /// - Parameter cardNumber: the card number the payer entered.
-    /// - Parameter expiry: the expiry, as `MM/YY`.
-    /// - Parameter holderName: the name on the card.
+    /// - Parameter expiryMonth: the expiry month, 1 to 12.
+    /// - Parameter expiryYear: the expiry year, four digits.
     /// - Parameter securityCode: the card's security code.
+    /// - Parameter holderName: the name on the card.
     /// - Parameter postalCode: the billing postal code.
     /// - Parameter saveIfSuccess: whether to store the card when the payment succeeds.
     /// - Parameter totalAmount: the amount to charge.
     /// - Returns: the request.
     @objc public static func card(
         cardNumber: String,
-        expiry: String,
-        holderName: String,
+        expiryMonth: Int,
+        expiryYear: Int,
         securityCode: String,
+        holderName: String,
         postalCode: String,
         saveIfSuccess: Bool,
         totalAmount: Double
     ) -> PayabliPayInRequestObjC {
         let data = PayabliPayInCardData(
             cardNumber: cardNumber,
-            expiry: expiry,
-            holderName: holderName,
+            expiryMonth: expiryMonth,
+            expiryYear: expiryYear,
             securityCode: securityCode,
+            holderName: holderName,
             postalCode: postalCode
         )
         let card = PayabliPayInPaymentMethod.Card(data: data, saveIfSuccess: saveIfSuccess)
@@ -90,29 +93,29 @@ public final class PayabliPayInRequestObjC: NSObject {
     }
 
     /// - Parameter accountNumber: the number of the bank account to debit.
+    /// - Parameter routingNumber: the routing number of the bank holding the account.
     /// - Parameter accountType: `Checking` or `Savings`.
     /// - Parameter holderName: the account holder's name.
-    /// - Parameter routingNumber: the routing number of the bank holding the account.
-    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil for `WEB`.
     /// - Parameter holderType: `personal` or `business`, or nil.
+    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil sends `WEB`.
+    /// - Parameter deviceId: the device identifier, or nil.
     /// - Parameter totalAmount: the amount to debit.
     /// - Returns: the request, or nil when a named value is none of those listed.
     @objc public static func bankAccount(
         accountNumber: String,
+        routingNumber: String,
         accountType: String,
         holderName: String,
-        routingNumber: String,
-        secCode: String?,
         holderType: String?,
+        secCode: String?,
+        deviceId: String?,
         totalAmount: Double
     ) -> PayabliPayInRequestObjC? {
         guard let type = PayabliPayInAccountType(rawValue: accountType) else { return nil }
-        let code: PayabliPayInSecCode
+        var code: PayabliPayInSecCode?
         if let secCode {
             guard let named = PayabliPayInSecCode(rawValue: secCode) else { return nil }
             code = named
-        } else {
-            code = .web
         }
         var holder: PayabliPayInAccountHolderType?
         if let holderType {
@@ -121,11 +124,12 @@ public final class PayabliPayInRequestObjC: NSObject {
         }
         let data = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
+            routingNumber: routingNumber,
             accountType: type,
             holderName: holderName,
-            routingNumber: routingNumber,
+            holderType: holder,
             secCode: code,
-            holderType: holder
+            deviceId: deviceId
         )
         let account = PayabliPayInPaymentMethod.BankAccount(data: data)
         return PayabliPayInRequestObjC(paymentMethod: .bankAccount(account), totalAmount: totalAmount)

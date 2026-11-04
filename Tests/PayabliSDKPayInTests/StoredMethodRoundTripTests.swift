@@ -18,7 +18,7 @@ final class StoredMethodRoundTripTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
         )
         viewModel.cardNumber = "4111 1111 1111 1111"
-        viewModel.cardExpiration = "02/25"
+        viewModel.cardExpiration = "02/35"
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardCvv = "321"
         viewModel.cardZip = "33139"

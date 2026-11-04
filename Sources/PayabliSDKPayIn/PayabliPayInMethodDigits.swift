@@ -76,9 +76,10 @@ private extension PayabliPayInCardData {
     func withCopiedDigitBuffers(using copy: (SensitiveDigits) -> SensitiveDigits) -> PayabliPayInCardData {
         PayabliPayInCardData(
             cardNumber: copy(cardNumber),
-            expiry: expiry,
-            holderName: holderName,
+            expiryMonth: expiryMonth,
+            expiryYear: expiryYear,
             securityCode: copy(securityCode),
+            holderName: holderName,
             postalCode: postalCode
         )
     }
@@ -88,12 +89,12 @@ private extension PayabliPayInBankAccountData {
     func withCopiedDigitBuffers(using copy: (SensitiveDigits) -> SensitiveDigits) -> PayabliPayInBankAccountData {
         PayabliPayInBankAccountData(
             accountNumber: copy(accountNumber),
+            routingNumber: routingNumber,
             accountType: accountType,
             holderName: holderName,
-            routingNumber: routingNumber,
-            secCode: secCode,
             holderType: holderType,
-            device: device
+            secCode: secCode,
+            deviceId: deviceId
         )
     }
 }

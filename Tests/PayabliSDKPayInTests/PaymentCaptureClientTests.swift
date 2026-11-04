@@ -54,7 +54,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let paymentMethod = try XCTUnwrap(body["paymentMethod"] as? [String: Any])
         XCTAssertEqual(paymentMethod["method"] as? String, "card")
         XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
-        XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/27")
+        XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/37")
         XCTAssertEqual(paymentMethod["cardHolder"] as? String, "John Cassian")
         XCTAssertEqual(paymentMethod["cardcvv"] as? String, "999")
         XCTAssertEqual(paymentMethod["cardzip"] as? String, "12345")
@@ -315,7 +315,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             bodyText,
             #"{"customerData":{"customerId":4440},"entryPoint":"entry","ipaddress":"255.255.255.255","orderDescription":"SDK test transaction","orderId":"order-123","#
                 + #""paymentDetails":{"currency":"USD","serviceFee":5.00,"totalAmount":100.00},"#
-                + #""source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/27","#
+                + #""source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/37","#
                 + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card","saveIfSuccess":true}}"#
         )
     }
@@ -332,9 +332,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiry: "02/27",
-                    holderName: "John Cassian",
+                    expiryMonth: 2,
+                    expiryYear: 2037,
                     securityCode: "999",
+                    holderName: "John Cassian",
                     postalCode: "12345"
                 ),
                 saveIfSuccess: true

@@ -645,23 +645,6 @@ extension PayabliPayInPaymentDetails {
     }
 }
 
-extension PayabliPayInCardData {
-    func normalizedCaptureExpiration() throws -> String {
-        guard let digits = expiry.payabliInstrumentDigits else {
-            throw PayabliPayInError.invalidInput("Expiration contains unsupported characters.")
-        }
-        guard digits.count == 4 else {
-            throw PayabliPayInError.invalidInput("Expiration must be in MMYY or MM/YY format.")
-        }
-        let monthPrefix = String(digits.prefix(2))
-        guard let month = Int(monthPrefix), (1 ... 12).contains(month) else {
-            throw PayabliPayInError.invalidInput("Expiration month must be between 01 and 12.")
-        }
-        let year = String(digits.suffix(2))
-        return "\(monthPrefix)/\(year)"
-    }
-}
-
 extension String {
     var payabliCaptureTrimmed: String {
         trimmingCharacters(in: .whitespacesAndNewlines)

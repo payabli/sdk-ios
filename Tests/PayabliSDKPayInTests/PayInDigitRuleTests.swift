@@ -31,10 +31,6 @@ final class PayInDigitRuleTests: XCTestCase {
         await assertRefusedUnsent(.card(Self.card(securityCode: "99" + Self.fullwidthOne)))
     }
 
-    func testAnExpiryWithAFullwidthDigitIsRefusedUnsent() async {
-        await assertRefusedUnsent(.card(Self.card(expiry: "02/3" + Self.fullwidthOne)))
-    }
-
     func testAnAccountNumberWithAFullwidthDigitIsRefusedUnsent() async {
         await assertRefusedUnsent(.bankAccount(Self.bank(account: "12345678901" + Self.fullwidthOne)))
     }
@@ -136,14 +132,14 @@ final class PayInDigitRuleTests: XCTestCase {
 
     private static func card(
         number: String = "4111111111111111",
-        expiry: String = "02/30",
         securityCode: String = "999"
     ) -> PayabliPayInPaymentMethod.Card {
         PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
             cardNumber: number,
-            expiry: expiry,
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2030,
             securityCode: securityCode,
+            holderName: "Jane Doe",
             postalCode: "12345"
         ))
     }
@@ -154,9 +150,9 @@ final class PayInDigitRuleTests: XCTestCase {
     ) -> PayabliPayInPaymentMethod.BankAccount {
         PayabliPayInPaymentMethod.BankAccount(data: PayabliPayInBankAccountData(
             accountNumber: account,
+            routingNumber: routing,
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: routing
+            holderName: "Jane Doe"
         ))
     }
 

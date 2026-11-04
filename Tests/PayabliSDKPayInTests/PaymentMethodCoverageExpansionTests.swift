@@ -24,16 +24,17 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     func testPaymentMethodInputReportsMethod() {
         let card = PayabliPayInMethodInput.card(PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiry: "02/28",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2028,
             securityCode: "123",
+            holderName: "Jane Doe",
             postalCode: "33139"
         ))
         let ach = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456780",
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: "123456780"
+            holderName: "Jane Doe"
         ))
 
         XCTAssertEqual(card.method, .card)
@@ -58,24 +59,25 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         XCTAssertThrowsError(try PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiry: "13/28",
-            holderName: "Jane Doe",
+            expiryMonth: 13,
+            expiryYear: 2028,
             securityCode: "123",
+            holderName: "Jane Doe",
             postalCode: "33139"
         ).validate(PayabliPayInValidation(requiresLuhnCheck: false)))
 
         try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456789",
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: "123456789"
+            holderName: "Jane Doe"
         ).validate(PayabliPayInValidation(validatesRoutingNumberChecksum: false))
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456789",
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: "123456789"
+            holderName: "Jane Doe"
         ).validate(.default)) { error in
             guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
                 XCTFail("Expected invalid input error")
@@ -86,9 +88,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456789",
             accountType: .checking,
-            holderName: " ",
-            routingNumber: "123456789"
+            holderName: " "
         ).validate(PayabliPayInValidation(validatesRoutingNumberChecksum: false))) { error in
             guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
                 XCTFail("Expected invalid input error")
@@ -99,19 +101,19 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456780",
             accountType: .checking,
-            holderName: "Jane 🚀",
-            routingNumber: "123456780"
+            holderName: "Jane 🚀"
         ).validate(.default))
     }
 
     func testTheStoreBodyTrimsTheOptionalACHDevice() throws {
         let input = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456780",
             accountType: .checking,
             holderName: "Jane Doe",
-            routingNumber: "123456780",
-            device: " terminal-1 "
+            deviceId: " terminal-1 "
         ))
 
         let data = try Data(PayInBodyWriter.storeFragment(input).rawCopy())
@@ -461,16 +463,17 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 
         let cardResult = try await component.addCard(PayabliPayInCardData(
             cardNumber: "4111111111111111",
-            expiry: "02/28",
-            holderName: "Jane Doe",
+            expiryMonth: 2,
+            expiryYear: 2028,
             securityCode: "123",
+            holderName: "Jane Doe",
             postalCode: "33139"
         ))
         let achResult = try await component.addBankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
+            routingNumber: "123456780",
             accountType: .checking,
-            holderName: "Jane Doe",
-            routingNumber: "123456780"
+            holderName: "Jane Doe"
         ))
 
         XCTAssertEqual(cardResult.storedMethodId, "stored-123")

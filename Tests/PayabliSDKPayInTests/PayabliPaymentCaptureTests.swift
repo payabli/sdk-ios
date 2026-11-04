@@ -153,9 +153,10 @@ final class PayabliPayInTests: XCTestCase {
         let request = try XCTUnwrap(component.requestConfiguration?.request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/27",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2037,
                 securityCode: "999",
+                holderName: "Jane Doe",
                 postalCode: "12345"
             )))
         ))
@@ -293,7 +294,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -339,7 +340,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -384,7 +385,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -436,7 +437,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
 
@@ -516,9 +517,10 @@ final class PayabliPayInTests: XCTestCase {
 extension PayabliPayInTests {
     private static let janeDoeCard = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/27",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2037,
         securityCode: "999",
+        holderName: "Jane Doe",
         postalCode: "12345"
     )
 
@@ -553,7 +555,7 @@ extension PayabliPayInTests {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         _ = try await viewModel.submit()

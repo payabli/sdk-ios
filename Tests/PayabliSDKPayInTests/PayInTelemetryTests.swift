@@ -96,9 +96,9 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(PayInReports.method(of: .bankAccount(PayabliPayInPaymentMethod.BankAccount(
             data: PayabliPayInBankAccountData(
                 accountNumber: "1111111111",
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "Jane",
-                routingNumber: "123456780"
+                holderName: "Jane"
             )
         ))), "bank")
         XCTAssertEqual(PayInReports.method(of: .check(PayabliPayInPaymentMethod.Check(holderName: "Jane"))), "check")
@@ -433,7 +433,7 @@ final class PayInTelemetryTests: XCTestCase {
 
         let event = try await onlyEvent(of: flow)
         let values = event.properties.values.joined(separator: " ")
-        for forbidden in ["4111", "John", "Cassian", "999", "12345", "02/27"] {
+        for forbidden in ["4111", "John", "Cassian", "999", "12345", "02/37"] {
             XCTAssertFalse(values.contains(forbidden), forbidden)
         }
     }
@@ -479,9 +479,10 @@ final class PayInTelemetryTests: XCTestCase {
         PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "12/30",
-                holderName: "Jane",
+                expiryMonth: 12,
+                expiryYear: 2030,
                 securityCode: cvv,
+                holderName: "Jane",
                 postalCode: "12345"
             ))),
             options: PayabliPayInRequestConfiguration(
@@ -494,9 +495,10 @@ final class PayInTelemetryTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "12/30",
-        holderName: "Jane",
+        expiryMonth: 12,
+        expiryYear: 2030,
         securityCode: "123",
+        holderName: "Jane",
         postalCode: "12345"
     )
 

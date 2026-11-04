@@ -16,7 +16,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
         viewModel.selectedMethod = .card
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
 
@@ -59,7 +59,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
         viewModel.selectedMethod = .card
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
 

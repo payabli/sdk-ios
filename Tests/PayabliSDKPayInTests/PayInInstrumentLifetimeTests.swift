@@ -215,9 +215,10 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
         .card(PayabliPayInPaymentMethod.Card(
             data: PayabliPayInCardData(
                 cardNumber: "4111 1111 1111 1111",
-                expiry: "02/30",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2030,
                 securityCode: "999",
+                holderName: "Jane Doe",
                 postalCode: "12345"
             ),
             saveIfSuccess: false
@@ -228,9 +229,9 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
         .bankAccount(PayabliPayInPaymentMethod.BankAccount(
             data: PayabliPayInBankAccountData(
                 accountNumber: "123456789012",
+                routingNumber: "021000021",
                 accountType: .checking,
-                holderName: "Jane Doe",
-                routingNumber: "021000021"
+                holderName: "Jane Doe"
             )
         ))
     }

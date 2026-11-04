@@ -17,7 +17,7 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
     /// The separator is the form's own display choice, so one outside ASCII still lets the form submit, and the
     /// expiry it sends reads `MM/YY`.
     @MainActor
-    func testANonAsciiExpirationSeparatorStillSubmitsAsMonthSlashYear() async throws {
+    func testANonAsciiExpirationSeparatorStillSubmitsAsMonthSlashYear() async {
         let viewModel = enDashSeparatedForm()
         viewModel.cardExpiration = viewModel.formatExpiration("0230")
         XCTAssertEqual(viewModel.cardExpiration, "02\u{2013}30")
@@ -27,14 +27,14 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method")
         }
-        XCTAssertEqual(card.data.expiry, "02/30")
-        XCTAssertEqual(try card.data.normalizedExpiration(), "02/30")
+        XCTAssertEqual(card.data.wireExpiry, "02/30")
+        XCTAssertEqual(card.data.expiryYear, 2030)
 
         let input = await viewModel.withFormBuffers { viewModel.methodInput(with: $0) }
         guard case let .card(data) = input else {
             return XCTFail("The card tab builds a card input")
         }
-        XCTAssertEqual(data.expiry, "02/30")
+        XCTAssertEqual(data.wireExpiry, "02/30")
     }
 
     /// Only the separator the form wrote is translated: a digit from another script is still not an expiry.
@@ -58,7 +58,7 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method")
         }
-        XCTAssertEqual(card.data.expiry, "02/30")
+        XCTAssertEqual(card.data.wireExpiry, "02/30")
     }
 
     /// A new separator rewrites the expiry the payer already picked, so the form still submits it.
@@ -115,12 +115,12 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method", file: file, line: line)
         }
-        XCTAssertEqual(card.data.expiry, expiry, file: file, line: line)
+        XCTAssertEqual(card.data.wireExpiry, expiry, file: file, line: line)
         let input = await viewModel.withFormBuffers { viewModel.methodInput(with: $0) }
         guard case let .card(data) = input else {
             return XCTFail("The card tab builds a card input", file: file, line: line)
         }
-        XCTAssertEqual(data.expiry, expiry, file: file, line: line)
+        XCTAssertEqual(data.wireExpiry, expiry, file: file, line: line)
     }
 
     @MainActor

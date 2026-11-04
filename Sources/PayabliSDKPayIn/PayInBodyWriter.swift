@@ -27,7 +27,7 @@ enum PayInBodyWriter {
             case let .card(method):
                 try writer.string(CaptureKeys.cardHolder.stringValue, method.data.holderName.payabliCaptureTrimmed)
                 try writer.digits(CaptureKeys.cardcvv.stringValue, field: "CVV", method.data.securityCode)
-                try writer.string(CaptureKeys.cardexp.stringValue, method.data.normalizedCaptureExpiration())
+                try writer.string(CaptureKeys.cardexp.stringValue, method.data.wireExpiry)
                 try writer.digits(
                     CaptureKeys.cardnumber.stringValue, field: "Card number", method.data.cardNumber
                 )
@@ -52,7 +52,7 @@ enum PayInBodyWriter {
                 )
                 try writer.optionalString(
                     CaptureKeys.device.stringValue,
-                    method.data.device?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+                    method.data.deviceId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
                 )
                 try writer.string(CaptureKeys.method.stringValue, "ach")
 
@@ -85,7 +85,7 @@ enum PayInBodyWriter {
             switch input {
             case let .card(data):
                 try writer.string(StoreKeys.method.stringValue, PayabliPayInMethodType.card.rawValue)
-                try writer.string(StoreKeys.cardexp.stringValue, data.normalizedExpiration())
+                try writer.string(StoreKeys.cardexp.stringValue, data.wireExpiry)
                 try writer.string(StoreKeys.cardHolder.stringValue, data.holderName.trimmed)
                 try writer.digits(StoreKeys.cardnumber.stringValue, field: "Card number", data.cardNumber)
                 try writer.digits(StoreKeys.cardcvv.stringValue, field: "CVV", data.securityCode)
@@ -99,7 +99,7 @@ enum PayInBodyWriter {
                 try writer.string(StoreKeys.achRouting.stringValue, data.routingNumber.digitsOnly)
                 try writer.string(StoreKeys.achCode.stringValue, (data.secCode ?? .web).rawValue)
                 try writer.optionalString(StoreKeys.achHolderType.stringValue, data.holderType?.rawValue)
-                try writer.optionalString(StoreKeys.device.stringValue, data.device.map(\.trimmed)?.nilIfEmpty)
+                try writer.optionalString(StoreKeys.device.stringValue, data.deviceId.map(\.trimmed)?.nilIfEmpty)
             }
         }
     }

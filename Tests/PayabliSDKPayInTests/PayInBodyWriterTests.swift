@@ -9,14 +9,16 @@ final class PayInBodyWriterTests: XCTestCase {
         number: String = "4111 1111 1111 1111",
         holder: String = "John Doe",
         cvv: String = "123",
-        expiry: String = "02/25",
+        expiryMonth: Int = 2,
+        expiryYear: Int = 2035,
         zip: String = "12345"
     ) -> PayabliPayInCardData {
         PayabliPayInCardData(
             cardNumber: SensitiveDigits.ofString(number),
-            expiry: expiry,
-            holderName: holder,
+            expiryMonth: expiryMonth,
+            expiryYear: expiryYear,
             securityCode: SensitiveDigits.ofString(cvv),
+            holderName: holder,
             postalCode: zip
         )
     }
@@ -31,12 +33,12 @@ final class PayInBodyWriterTests: XCTestCase {
     ) -> PayabliPayInBankAccountData {
         PayabliPayInBankAccountData(
             accountNumber: SensitiveDigits.ofString(account),
+            routingNumber: routing,
             accountType: accountType,
             holderName: holder,
-            routingNumber: routing,
-            secCode: .web,
             holderType: holderType,
-            device: device
+            secCode: .web,
+            deviceId: device
         )
     }
 
@@ -61,7 +63,7 @@ final class PayInBodyWriterTests: XCTestCase {
         )))
         XCTAssertEqual(
             try text(full.rawCopy()),
-            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","#
+            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/35","cardnumber":"4111111111111111","#
                 + #""cardzip":"12345","initiator":"Jane","method":"card","saveIfSuccess":true}"#
         )
 
@@ -72,7 +74,7 @@ final class PayInBodyWriterTests: XCTestCase {
         )))
         XCTAssertEqual(
             try text(bare.rawCopy()),
-            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","cardnumber":"4111111111111111","cardzip":"12345","method":"card"}"#
+            #"{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/35","cardnumber":"4111111111111111","cardzip":"12345","method":"card"}"#
         )
     }
 
@@ -151,7 +153,7 @@ final class PayInBodyWriterTests: XCTestCase {
         let fragment = try PayInBodyWriter.storeFragment(.card(cardData()))
         XCTAssertEqual(
             try text(fragment.rawCopy()),
-            #"{"method":"card","cardexp":"02\/25","cardHolder":"John Doe","cardnumber":"4111111111111111","cardcvv":"123","cardzip":"12345"}"#
+            #"{"method":"card","cardexp":"02\/35","cardHolder":"John Doe","cardnumber":"4111111111111111","cardcvv":"123","cardzip":"12345"}"#
         )
     }
 
@@ -190,7 +192,7 @@ final class PayInBodyWriterTests: XCTestCase {
             )
             XCTAssertEqual(holder, object["cardHolder"] as? String, "fragment \(index)")
             XCTAssertEqual(zip, object["cardzip"] as? String, "fragment \(index)")
-            XCTAssertEqual("02/25", object["cardexp"] as? String, "fragment \(index)")
+            XCTAssertEqual("02/35", object["cardexp"] as? String, "fragment \(index)")
         }
     }
 
@@ -232,7 +234,7 @@ final class PayInBodyWriterTests: XCTestCase {
 
         XCTAssertEqual(
             try text(body),
-            #"{"entryPoint":"entry","paymentMethod":{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/25","#
+            #"{"entryPoint":"entry","paymentMethod":{"cardHolder":"John Doe","cardcvv":"123","cardexp":"02\/35","#
                 + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card"}}"#
         )
         XCTAssertEqual(fragment.rawCopy(), zeros(length), "the splice overwrites the fragment once copied")

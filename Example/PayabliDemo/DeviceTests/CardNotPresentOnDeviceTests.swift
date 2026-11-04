@@ -64,11 +64,15 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// The test card, from the file the app prefills its form from.
     private func card() throws -> PayabliPayInCardData {
         let values = try XCTUnwrap(DebugPrefill.values, "DebugPrefill.json is not in the bundle")
+        let expiry = try XCTUnwrap(values.cardExpiration).split(separator: "/")
+        let month = try XCTUnwrap(expiry.first.flatMap { Int($0) }, "cardExpiration is not MM/YY")
+        let year = try XCTUnwrap(expiry.last.flatMap { Int($0) }, "cardExpiration is not MM/YY")
         return PayabliPayInCardData(
             cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
-            expiry: try XCTUnwrap(values.cardExpiration),
-            holderName: QAIdentity.current.holderName,
+            expiryMonth: month,
+            expiryYear: 2000 + year,
             securityCode: try XCTUnwrap(values.cardCvv),
+            holderName: QAIdentity.current.holderName,
             postalCode: try XCTUnwrap(values.cardZip)
         )
     }
