@@ -126,8 +126,8 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
     /// `type` is the classification to branch on. `underlying` names the failing type and carries none
     /// of its message, because that message can quote a response body or name a host's own endpoint,
     /// and an error's properties are rendered wherever the chain is walked, a crash reporter included.
-    /// `detail` is the failure's reason when the SDK raised it, and `httpStatus` and `rawCode` are the
-    /// failure's when it was an answer.
+    /// `detail` is the failure's `reason` when it is a ``PayabliError``, which for an answer is the service's own
+    /// text, and `nil` for a platform error. `httpStatus` and `rawCode` are the failure's when it was an answer.
     public final class Unsettled: PayabliPayInError, @unchecked Sendable {
         /// The failure that left the outcome unknown, redacted to its type: it carries no message.
         public var underlying: any Error {

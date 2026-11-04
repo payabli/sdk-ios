@@ -164,6 +164,16 @@ public final class PayabliPayInObjC: NSObject {
         source: String?,
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
+        // Objective-C passes an enum as a plain integer, and a switch over one that names no case traps.
+        guard let accountType = PayabliPayInAccountTypeCode(rawValue: accountType.rawValue) else {
+            return refuse(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: .achAccountType, completion)
+        }
+        guard let secCode = PayabliPayInSecCodeCode(rawValue: secCode.rawValue) else {
+            return refuse(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: .achCode, completion)
+        }
+        guard let holderType = PayabliPayInAccountHolderTypeCode(rawValue: holderType.rawValue) else {
+            return refuse(holderType.rawValue, of: PayabliPayInAccountHolderTypeCode.self, field: .achHolderType, completion)
+        }
         let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             routingNumber: routingNumber,
@@ -334,6 +344,27 @@ public final class PayabliPayInObjC: NSObject {
             } catch {
                 completion(nil, error.toPayabliPayInNSError())
             }
+        }
+    }
+
+    /// Refuses a bank value that names no case of its enum, through `completion` as every other failure arrives.
+    ///
+    /// - Parameter value: the number the host passed.
+    /// - Parameter type: the enum it should have named a case of.
+    /// - Parameter field: the request member it fills.
+    /// - Parameter completion: the host's completion, called on the main actor with the refusal.
+    private func refuse(
+        _ value: Int,
+        of type: (some Any).Type,
+        field: PayabliPayInMethodInput.CodingKeys,
+        _ completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
+    ) {
+        let refusal = PayabliPayInError.InvalidInput(
+            field: PayInFieldPath.storedMethod(field),
+            reason: "\(value) is not a \(type) value."
+        )
+        Task { @MainActor in
+            completion(nil, refusal.toPayabliPayInNSError())
         }
     }
 }
