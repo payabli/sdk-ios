@@ -619,12 +619,16 @@ extension PayabliPayInCardData {
         guard expiryYear <= 2099 else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be 2099 or earlier.")
         }
-        let today = Calendar.current.dateComponents([.year, .month], from: Date())
+        let today = Self.expiryCalendar.dateComponents([.year, .month], from: Date())
         guard let year = today.year, let month = today.month else { return }
         guard (expiryYear, expiryMonth) >= (year, month) else {
             throw PayabliPayInTokenStorageError.invalidInput("Card is expired.")
         }
     }
+
+    /// The calendar the current month is read on. A card's expiry is a Gregorian month, and `Calendar.current`
+    /// follows the device's setting: on the Buddhist calendar the year reads 2569.
+    static let expiryCalendar = Calendar(identifier: .gregorian)
 
     /// The expiry as the request carries it, `MM/YY`. Written only after ``validateExpiry()``.
     var wireExpiry: String {

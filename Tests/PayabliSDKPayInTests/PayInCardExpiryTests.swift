@@ -51,6 +51,11 @@ final class PayInCardExpiryTests: XCTestCase {
         }
     }
 
+    func testTodayIsReadOnTheGregorianCalendarWhateverTheDeviceIsSetTo() {
+        // On a device set to the Buddhist calendar the year reads 2569, and every card would be refused as expired.
+        XCTAssertEqual(PayabliPayInCardData.expiryCalendar.identifier, .gregorian)
+    }
+
     // MARK: - Accepted
 
     func testThisMonthsExpiryIsSentOnEveryRoute() async {
@@ -163,8 +168,9 @@ final class PayInCardExpiryTests: XCTestCase {
 
     /// The month `offset` months from the current one, read from the clock the SDK reads.
     private static func monthOffset(_ offset: Int) -> (month: Int, year: Int) {
-        let date = Calendar.current.date(byAdding: .month, value: offset, to: Date()) ?? Date()
-        let parts = Calendar.current.dateComponents([.year, .month], from: date)
+        let calendar = PayabliPayInCardData.expiryCalendar
+        let date = calendar.date(byAdding: .month, value: offset, to: Date()) ?? Date()
+        let parts = calendar.dateComponents([.year, .month], from: date)
         return (parts.month ?? 0, parts.year ?? 0)
     }
 
