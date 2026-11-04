@@ -164,23 +164,20 @@ public final class PayabliPayInObjC: NSObject {
         source: String?,
         completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
     ) {
-        // Objective-C passes an enum as a plain integer, and a switch over one that names no case traps.
-        guard let accountType = PayabliPayInAccountTypeCode(rawValue: accountType.rawValue) else {
-            return refuse(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: .achAccountType, completion)
-        }
-        guard let secCode = PayabliPayInSecCodeCode(rawValue: secCode.rawValue) else {
-            return refuse(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: .achCode, completion)
-        }
-        guard let holderType = PayabliPayInAccountHolderTypeCode(rawValue: holderType.rawValue) else {
-            return refuse(holderType.rawValue, of: PayabliPayInAccountHolderTypeCode.self, field: .achHolderType, completion)
+        let values: BankValues
+        do {
+            values = try Self.validated(accountType: accountType, secCode: secCode, holderType: holderType)
+        } catch {
+            Task { @MainActor in completion(nil, error.toPayabliPayInNSError()) }
+            return
         }
         let ach = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             routingNumber: routingNumber,
-            accountType: accountType.accountType,
+            accountType: values.accountType,
             holderName: holderName,
-            holderType: holderType.holderType,
-            secCode: secCode.secCode ?? .web,
+            holderType: values.holderType,
+            secCode: values.secCode ?? .web,
             deviceId: deviceId
         )
         let options = PayabliPayInOptions(
@@ -347,25 +344,48 @@ public final class PayabliPayInObjC: NSObject {
         }
     }
 
-    /// Refuses a bank value that names no case of its enum, through `completion` as every other failure arrives.
+    /// The bank values in their Swift types, `nil` where the host passed `unspecified`.
+    struct BankValues {
+        let accountType: PayabliPayInAccountType
+        let secCode: PayabliPayInSecCode?
+        let holderType: PayabliPayInAccountHolderType?
+    }
+
+    /// Reads the bank values an Objective-C host passed. Objective-C passes an enum as a plain integer, so a number
+    /// that names no case can arrive, and a switch over it traps.
     ///
+    /// - Parameter accountType: the account type the host passed.
+    /// - Parameter secCode: the SEC code the host passed.
+    /// - Parameter holderType: the holder type the host passed.
+    /// - Returns: the values in their Swift types.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` naming the request member, for a number that names no case.
+    static func validated(
+        accountType: PayabliPayInAccountTypeCode,
+        secCode: PayabliPayInSecCodeCode,
+        holderType: PayabliPayInAccountHolderTypeCode
+    ) throws -> BankValues {
+        guard let account = PayabliPayInAccountTypeCode(rawValue: accountType.rawValue) else {
+            throw refusal(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: .achAccountType)
+        }
+        guard let sec = PayabliPayInSecCodeCode(rawValue: secCode.rawValue) else {
+            throw refusal(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: .achCode)
+        }
+        guard let holder = PayabliPayInAccountHolderTypeCode(rawValue: holderType.rawValue) else {
+            throw refusal(holderType.rawValue, of: PayabliPayInAccountHolderTypeCode.self, field: .achHolderType)
+        }
+        return BankValues(accountType: account.accountType, secCode: sec.secCode, holderType: holder.holderType)
+    }
+
     /// - Parameter value: the number the host passed.
-    /// - Parameter type: the enum it should have named a case of.
+    /// - Parameter type: the enum it names no case of.
     /// - Parameter field: the request member it fills.
-    /// - Parameter completion: the host's completion, called on the main actor with the refusal.
-    private func refuse(
+    /// - Returns: the refusal, naming that member.
+    private static func refusal(
         _ value: Int,
         of type: (some Any).Type,
-        field: PayabliPayInMethodInput.CodingKeys,
-        _ completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
-    ) {
-        let refusal = PayabliPayInError.InvalidInput(
-            field: PayInFieldPath.storedMethod(field),
-            reason: "\(value) is not a \(type) value."
-        )
-        Task { @MainActor in
-            completion(nil, refusal.toPayabliPayInNSError())
-        }
+        field: PayabliPayInMethodInput.CodingKeys
+    ) -> PayabliPayInError.InvalidInput {
+        PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(field), reason: "\(value) is not a \(type) value.")
     }
 }
 

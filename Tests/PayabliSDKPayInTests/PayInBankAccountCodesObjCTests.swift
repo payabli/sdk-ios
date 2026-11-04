@@ -50,17 +50,23 @@ final class PayInBankAccountCodesObjCTests: XCTestCase {
     func testAnAccountTypeThatNamesNoCaseIsRefusedAndNothingIsSent() async throws {
         try await assertRefused(
             naming: "PayabliPayInAccountTypeCode",
+            field: "paymentMethod.achAccountType",
             accountType: unsafeBitCast(7, to: PayabliPayInAccountTypeCode.self)
         )
     }
 
     func testASecCodeThatNamesNoCaseIsRefusedAndNothingIsSent() async throws {
-        try await assertRefused(naming: "PayabliPayInSecCodeCode", secCode: unsafeBitCast(7, to: PayabliPayInSecCodeCode.self))
+        try await assertRefused(
+            naming: "PayabliPayInSecCodeCode",
+            field: "paymentMethod.achCode",
+            secCode: unsafeBitCast(7, to: PayabliPayInSecCodeCode.self)
+        )
     }
 
     func testAHolderTypeThatNamesNoCaseIsRefusedAndNothingIsSent() async throws {
         try await assertRefused(
             naming: "PayabliPayInAccountHolderTypeCode",
+            field: "paymentMethod.achHolderType",
             holderType: unsafeBitCast(-1, to: PayabliPayInAccountHolderTypeCode.self)
         )
     }
@@ -69,10 +75,17 @@ final class PayInBankAccountCodesObjCTests: XCTestCase {
 
     private func assertRefused(
         naming type: String,
+        field: String,
         accountType: PayabliPayInAccountTypeCode = .checking,
         secCode: PayabliPayInSecCodeCode = .unspecified,
         holderType: PayabliPayInAccountHolderTypeCode = .unspecified
     ) async throws {
+        XCTAssertThrowsError(
+            try PayabliPayInObjC.validated(accountType: accountType, secCode: secCode, holderType: holderType)
+        ) { error in
+            XCTAssertEqual((error as? PayabliPayInError.InvalidInput)?.field, field)
+        }
+
         let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.stored)
         let bridge = PayabliPayInObjC(component: PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport))
 
@@ -95,6 +108,7 @@ final class PayInBankAccountCodesObjCTests: XCTestCase {
 
         let refusal = try XCTUnwrap(error)
         XCTAssertEqual(refusal.domain, "com.payabli.payIn")
+        XCTAssertEqual(refusal.code, 1016)
         XCTAssertEqual(refusal.userInfo["PayabliErrorType"] as? String, PayabliErrorType.validation.rawValue)
         XCTAssertTrue(refusal.localizedDescription.contains(type), refusal.localizedDescription)
         let sent = await transport.requests
