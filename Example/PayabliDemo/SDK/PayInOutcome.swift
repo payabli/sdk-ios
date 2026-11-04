@@ -232,6 +232,8 @@ extension PayInFailure {
             "This payment method couldn't be saved. Try another one."
         case (.storedMethod, .retryLater):
             "The payment method couldn't be saved. Please try again."
+        case (.storedMethod, .outcomeUnknown):
+            "We couldn't confirm the payment method was saved."
         case (.storedMethod, _):
             "The payment method couldn't be saved."
         case (.void, .retryLater):

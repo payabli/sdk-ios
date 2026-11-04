@@ -767,7 +767,7 @@ final class TokenStorageClientTests: XCTestCase {
             XCTFail("Expected payment method failure")
         } catch let error as PayabliPaymentError {
             guard case .server = error else { return XCTFail("Wrong error: \(error)") }
-            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "We couldn't confirm the payment method was saved.")
             XCTAssertEqual(viewModel.accountHolder, "Jane Business")
             XCTAssertEqual(viewModel.routingNumber, "")
             XCTAssertEqual(viewModel.accountNumber, "")

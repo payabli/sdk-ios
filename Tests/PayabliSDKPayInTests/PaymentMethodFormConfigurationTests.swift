@@ -468,7 +468,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             XCTFail("Expected transport error")
         } catch let error as PayabliGenericError {
             XCTAssertEqual(error.type, .unknown)
-            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "We couldn't confirm the payment method was saved.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

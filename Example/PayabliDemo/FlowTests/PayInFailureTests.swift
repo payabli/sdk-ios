@@ -123,6 +123,15 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
     }
 
+    func testASaveWhoseAnswerWasLostSaysItCouldNotBeConfirmed() {
+        let failure = PayInFailure(
+            BareReason(reason: "The network connection was lost.", type: .networkError),
+            operation: .storedMethod
+        )
+
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
+    }
+
     func testABareConflictOnAStoredMethodShowsTheStoreMessage() {
         let failure = PayInFailure(
             BareReason(reason: "Conflict (409)", type: .conflict),
@@ -130,7 +139,7 @@ final class PayInFailureTests: XCTestCase {
         )
 
         XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertEqual(failure.message, "The payment method couldn't be saved.")
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
     }
 
     /// A validation failure's reason is the server's own title, which can carry
@@ -193,7 +202,7 @@ final class PayInFailureTests: XCTestCase {
         let failure = PayInFailure(ActionableDecline(), operation: .storedMethod)
 
         XCTAssertFalse(failure.message.contains("Ask for another card"), failure.message)
-        XCTAssertEqual(failure.message, "The payment method couldn't be saved.")
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
     }
 
     // MARK: -

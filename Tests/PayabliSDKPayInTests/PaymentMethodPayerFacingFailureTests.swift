@@ -325,7 +325,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
             XCTAssertEqual(error.category, .outcomeUnknown)
             XCTAssertEqual(
                 viewModel.failureMessage,
-                "The payment method couldn't be saved.",
+                "We couldn't confirm the payment method was saved.",
                 "a save moves no money, so its failure never says a payment may have gone through"
             )
         } catch {
