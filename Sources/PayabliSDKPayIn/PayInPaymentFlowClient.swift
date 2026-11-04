@@ -200,7 +200,8 @@ final class PayInPaymentFlowClient: Sendable {
                 path: path,
                 query: request.queryItems(allowsACHValidation: allowsACHValidation),
                 idempotencyKey: idempotencyKey,
-                body: body
+                body: body,
+                isCallerRefusal: Self.isFraudBlockAnswered401
             )
             result = try await perform(
                 payabliRequest,
@@ -253,14 +254,16 @@ final class PayInPaymentFlowClient: Sendable {
         path: String,
         query: [URLQueryItem],
         idempotencyKey: String?,
-        body: Data
+        body: Data,
+        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false }
     ) throws -> PayabliRequest {
         try PayabliRequest(
             method: .post,
             path: path,
             query: query,
             headers: Self.headers(idempotencyKey: idempotencyKey),
-            body: body
+            body: body,
+            isCallerRefusal: isCallerRefusal
         )
     }
 
@@ -392,6 +395,10 @@ final class PayInPaymentFlowClient: Sendable {
         if response.statusCode == 409, !Self.isJSONObject(response.body) {
             throw IdempotencyCheckRefusal()
         }
+        // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
+        if let code = serviceCode(of: response), Self.fraudBlockCodes.contains(code) {
+            throw PayabliPayInError.Refused(failure: Self.fraudBlock(code, answeredBy: response))
+        }
         // First, because the envelope decodes this body too and keeps none of the fields it names.
         if response.statusCode == 400 {
             try mapPayabliHTTPError(response: response)
@@ -421,6 +428,31 @@ final class PayInPaymentFlowClient: Sendable {
         failure.code?.hasPrefix(declinedFamily) == true
             ? PayabliPayInError.Refused(failure: failure)
             : PayabliPayInError.ServiceError(failure: failure)
+    }
+
+    /// Fraud control's blocks: `E9005` is the blacklist and `E9051` the risk workflow.
+    private static let fraudBlockCodes: Set<String> = ["E9005", "E9051"]
+
+    /// Whether a 401 is fraud control refusing the payer rather than the service refusing the token, which a refresh
+    /// cannot fix and a replay would send again.
+    ///
+    /// - Parameter response: the answered request.
+    /// - Returns: true for a 401 whose body names a fraud block; false otherwise.
+    @Sendable
+    private static func isFraudBlockAnswered401(_ response: PayabliResponse) -> Bool {
+        guard response.statusCode == 401, let code = serviceCode(of: response) else { return false }
+        return fraudBlockCodes.contains(code)
+    }
+
+    /// The refusal a fraud block describes.
+    ///
+    /// - Parameter code: the block's code, as the body named it.
+    /// - Parameter response: the answer carrying it.
+    /// - Returns: the failure as the envelope reads it, or one carrying only the code and status when it can't be read.
+    private static func fraudBlock(_ code: String, answeredBy response: PayabliResponse) -> PayabliPayInFailure {
+        let envelope = try? JSONDecoder().decode(PayInPaymentFlowFailureEnvelope.self, from: response.body)
+        return envelope?.failure(httpStatusCode: response.statusCode)
+            ?? PayabliPayInFailure(code: code, httpStatusCode: response.statusCode)
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {
