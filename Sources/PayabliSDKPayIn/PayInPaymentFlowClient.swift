@@ -425,14 +425,16 @@ final class PayInPaymentFlowClient: Sendable {
         throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
     }
 
-    /// The failure an unapproved answer is: a decline when it was answered 402, whatever the body says, or when it
-    /// classifies as one; otherwise the service's own failure, which therefore never classifies as a decline.
+    /// The failure an unapproved answer is: a decline when it was answered 402, unless its code leaves the outcome
+    /// open, or when it classifies as one; otherwise the service's own failure, which therefore never classifies
+    /// as a decline.
     ///
     /// - Parameter failure: the answer as the envelope read it.
     /// - Returns: the error a caller receives.
     private static func unapproved(_ failure: PayabliPayInFailure) -> PayabliPayInError {
-        failure.httpStatusCode == declinedStatus
-            || PayabliPayInError.ServiceError.classification(of: failure) == .paymentDeclined
+        let classification = PayabliPayInError.ServiceError.classification(of: failure)
+        let open = PayabliPayInError.ServiceError.openOutcome(of: failure) != nil
+        return !open && (failure.httpStatusCode == declinedStatus || classification == .paymentDeclined)
             ? PayabliPayInError.Refused(failure: failure)
             : PayabliPayInError.ServiceError(failure: failure)
     }
