@@ -58,4 +58,31 @@ final class PayabliErrorStatusTests: XCTestCase {
         XCTAssertNil(error.userInfo["httpStatus"])
         XCTAssertNil(error.userInfo["rawCode"])
     }
+
+    func testAnObjectiveCUnexpectedFailureCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let failure = try XCTUnwrap(HostFailure().payabliUnexpectedFailure)
+            .payabliNSError(domain: "com.payabli.session")
+
+        let cause = try XCTUnwrap(failure.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(failure.code, 1017)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostFailure.self))
+        XCTAssertFalse("\(cause)".contains(HostFailure.message))
+        XCTAssertFalse("\(failure)".contains(HostFailure.message))
+    }
+
+    func testAnObjectiveCErrorWhoseCauseIsNotRedactedCarriesNoUnderlyingError() {
+        let error = PayabliGenericError(type: .unknown, reason: "r", underlying: HostFailure())
+            .payabliNSError(domain: "com.payabli.session")
+
+        XCTAssertNil(error.userInfo[NSUnderlyingErrorKey])
+    }
+}
+
+/// A host's failure whose message names what the SDK must not repeat.
+struct HostFailure: LocalizedError {
+    static let message = "https://host.example/token?secret=1"
+
+    var errorDescription: String? {
+        Self.message
+    }
 }

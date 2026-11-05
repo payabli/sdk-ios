@@ -1,9 +1,9 @@
 import Foundation
 
 package extension Error {
-    /// The `NSError` an Objective-C caller receives: a `PayabliError` carries its catalog number as the
-    /// code, its wire name under `PayabliErrorType`, and ``PayabliError/answerUserInfo``, in `domain`. Anything else
-    /// bridges as Swift does.
+    /// The `NSError` an Objective-C caller receives: a `PayabliError` carries its catalog number as the code, its wire
+    /// name under `PayabliErrorType` and ``PayabliError/answerUserInfo``; a ``PayabliGenericError``'s redacted cause
+    /// goes under `NSUnderlyingErrorKey`, naming its type only. Anything else bridges as Swift does.
     ///
     /// - Parameter domain: the domain the error is reported in, one of the three an Objective-C host meets.
     /// - Returns: the `NSError` carrying the catalog number as the code; a non-`PayabliError` bridges as Swift does.
@@ -16,6 +16,9 @@ package extension Error {
             "PayabliErrorType": payabliError.type.rawValue
         ]
         userInfo.merge(payabliError.answerUserInfo) { _, answer in answer }
+        if let cause = (payabliError as? PayabliGenericError)?.underlying as? RedactedCause {
+            userInfo[NSUnderlyingErrorKey] = cause as NSError
+        }
         return NSError(domain: domain, code: payabliError.code, userInfo: userInfo)
     }
 }

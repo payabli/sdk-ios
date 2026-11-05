@@ -342,7 +342,10 @@ error.rawCode     // "D0329"              "D0583"
 ```
 
 From Objective-C the error is an `NSError`: `userInfo[@"httpStatus"]` is the status as an `NSNumber` and
-`userInfo[@"rawCode"]` is the code as an `NSString`, and each key is absent when its field is `nil`.
+`userInfo[@"rawCode"]` is the code as an `NSString`, and each key is absent when its field is `nil`. A refused
+input's `field` is `userInfo[@"field"]`, also absent when `nil`. Where Swift's `underlying` names the failing type,
+`userInfo[NSUnderlyingErrorKey]` is an `NSError` whose `localizedDescription` is that type's name; its message is
+never included.
 
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).

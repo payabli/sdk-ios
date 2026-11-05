@@ -422,7 +422,57 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
     func testAnObjectiveCPayInErrorWithNeitherCarriesNeitherKey() {
         let error = PayabliGenericError(type: .networkError, reason: "offline").toPayabliPayInNSError()
 
+        XCTAssertNil(error.userInfo["field"])
         XCTAssertNil(error.userInfo["httpStatus"])
         XCTAssertNil(error.userInfo["rawCode"])
+    }
+}
+
+/// What an Objective-C caller reads off a refused input and an unknown outcome beyond the code.
+final class PayInObjCErrorDetailTests: XCTestCase {
+    private struct HostFailure: LocalizedError {
+        static let message = "https://host.example/token?secret=1"
+
+        var errorDescription: String? {
+            Self.message
+        }
+    }
+
+    func testARefusedInputCarriesTheFieldUnderItsName() {
+        let error = PayabliPayInError.InvalidInput(field: "paymentMethod.achCode", reason: "r").toPayabliPayInNSError()
+
+        XCTAssertEqual(error.code, 1016)
+        XCTAssertEqual(error.userInfo["field"] as? NSString, "paymentMethod.achCode")
+    }
+
+    func testARefusedInputNamingNoFieldCarriesNoFieldKey() {
+        let error = PayabliPayInError.InvalidInput(field: nil, reason: "r").toPayabliPayInNSError()
+
+        XCTAssertEqual(error.code, 1016)
+        XCTAssertNil(error.userInfo["field"])
+    }
+
+    func testAnUnknownOutcomeCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let unsettled = PayabliPayInError.Unsettled(
+            type: .unknown,
+            cause: HostFailure(),
+            paymentTransId: nil,
+            paymentReference: nil
+        )
+
+        let error = unsettled.toPayabliPayInNSError(movesMoney: true)
+
+        let cause = try XCTUnwrap(error.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostFailure.self))
+        XCTAssertFalse("\(cause)".contains(HostFailure.message))
+        XCTAssertFalse("\(error)".contains(HostFailure.message))
+    }
+
+    func testAnUnexpectedFailureCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let error = try XCTUnwrap(HostFailure().payabliUnexpectedFailure).toPayabliPayInNSError()
+
+        let cause = try XCTUnwrap(error.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostFailure.self))
+        XCTAssertFalse("\(error)".contains(HostFailure.message))
     }
 }
