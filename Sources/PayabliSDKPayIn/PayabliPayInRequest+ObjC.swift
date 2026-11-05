@@ -214,6 +214,14 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
         super.init()
     }
 
+    /// The buffers the factories built from strings: no host can reach them, so the wrapper
+    /// overwrites them when it is released.
+    deinit {
+        for digits in instrument.sensitiveDigits {
+            digits.close()
+        }
+    }
+
     /// - Parameter cardNumber: the card number the payer entered.
     /// - Parameter expiryMonth: the expiry month, 1 to 12.
     /// - Parameter expiryYear: the expiry year, four digits.
@@ -289,7 +297,10 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
         options.forceCustomerCreation = forceCustomerCreation?.boolValue
         options.temporary = temporary?.boolValue
         options.source = source
-        return PayabliPayInStoreRequest(instrument: instrument, options: options)
+        return PayabliPayInStoreRequest(
+            instrument: instrument.withCopiedDigitBuffers(using: SensitiveDigits.copy(of:)),
+            options: options
+        )
     }
 }
 
