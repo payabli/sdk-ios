@@ -64,6 +64,57 @@ final class PayInErrorStatusTests: XCTestCase {
         }
     }
 
+    func testARefusalNamesTheTransactionItsAnswerNamed() async throws {
+        let answers: [(status: Int, body: String)] = [
+            (402, #"{"code":"D0200","reason":"Insufficient Funds","data":{"paymentTransId":" trans-402 "}}"#),
+            (200, #"{"code":"D0329","reason":"Declined","data":{"paymentTransId":" trans-402 "}}"#),
+            (400, #"{"code":"E9005","reason":"Blocked","data":{"paymentTransId":" trans-402 "}}"#),
+            (402, #"{"reason":"Declined","data":{"paymentTransId":" trans-402 "}}"#)
+        ]
+        for (index, answer) in answers.enumerated() {
+            let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+                statusCode: answer.status,
+                responseBody: answer.body
+            ))
+
+            let error = await failure {
+                _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-tx-\(index)")
+            }
+
+            let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "\(answer.status): got \(error)")
+            XCTAssertEqual(refused.failure.paymentTransId, "trans-402", "\(answer.status)")
+        }
+    }
+
+    func testAServiceErrorNamesTheTransactionItsAnswerNamed() async throws {
+        let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+            statusCode: 403,
+            responseBody: #"{"code":"E4003","reason":"Forbidden","data":{"paymentTransId":"trans-403"}}"#
+        ))
+
+        let error = await failure { _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-tx-s") }
+
+        let service = try XCTUnwrap(error as? PayabliPayInError.ServiceError, "got \(error)")
+        XCTAssertEqual(service.failure.paymentTransId, "trans-403")
+    }
+
+    func testARefusalNamingNoTransactionOrABlankOneCarriesNone() async throws {
+        let bodies = [
+            #"{"code":"D0200","reason":"Insufficient Funds","data":null}"#,
+            #"{"code":"D0200","reason":"Insufficient Funds","data":{"paymentTransId":"  "}}"#
+        ]
+        for (index, body) in bodies.enumerated() {
+            let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 402, responseBody: body))
+
+            let error = await failure {
+                _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-tx-n\(index)")
+            }
+
+            let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "body \(body): got \(error)")
+            XCTAssertNil(refused.failure.paymentTransId, "body \(body)")
+        }
+    }
+
     func testAnAuthorizationAnswered402WithNoDeclineCodeIsRefused() async throws {
         let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
             statusCode: 402,

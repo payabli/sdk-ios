@@ -396,9 +396,10 @@ final class PayInPaymentFlowClient: Sendable {
         if response.statusCode == 409, !Self.isJSONObject(response.body) {
             throw IdempotencyCheckRefusal()
         }
+        let transaction = Self.namedTransaction(in: response)
         // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
         if let code = fraudBlockCode(of: response) {
-            throw PayabliPayInError.Refused(failure: Self.fraudBlock(code, answeredBy: response))
+            throw PayabliPayInError.Refused(failure: Self.fraudBlock(code, answeredBy: response).naming(transaction))
         }
         // First, because the envelope decodes this body too and keeps none of the fields it names.
         if response.statusCode == 400 {
@@ -407,13 +408,13 @@ final class PayInPaymentFlowClient: Sendable {
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
             guard decoded.isApproved, response.statusCode != 409, response.statusCode != declinedStatus else {
-                throw Self.unapproved(decoded.failure(httpStatusCode: response.statusCode))
+                throw Self.unapproved(decoded.failure(httpStatusCode: response.statusCode).naming(transaction))
             }
             return PayabliPayInResult(apiResponse: decoded)
         }
 
         if let failure = decodeFailure(from: response, decoder: decoder) {
-            throw Self.unapproved(failure)
+            throw Self.unapproved(failure.naming(transaction))
         }
 
         // A 402 is a decline whatever its body, so it never reaches the mapper's core decline.
@@ -463,6 +464,25 @@ final class PayInPaymentFlowClient: Sendable {
         }
 
         return envelope.failure(httpStatusCode: response.statusCode)
+    }
+}
+
+private extension PayabliPayInFailure {
+    /// This failure, naming the transaction its answer named.
+    ///
+    /// - Parameter paymentTransId: the transaction the answer named, nil when it named none.
+    /// - Returns: a copy carrying it.
+    func naming(_ paymentTransId: String?) -> PayabliPayInFailure {
+        PayabliPayInFailure(
+            code: code,
+            reason: reason,
+            explanation: explanation,
+            action: action,
+            status: status,
+            detail: detail,
+            httpStatusCode: httpStatusCode,
+            paymentTransId: paymentTransId
+        )
     }
 }
 
