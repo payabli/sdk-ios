@@ -377,9 +377,10 @@ final class PayInHeldKeyTests: XCTestCase {
         let invalidCard = PayabliPayInRequest(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/30",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2030,
                 securityCode: "",
+                holderName: "Jane Doe",
                 postalCode: "12345"
             ))),
             options: request(.retry).options

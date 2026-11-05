@@ -47,8 +47,8 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .accountNumber) }
     }
 
-    /// A pick clears its mark even when the value is unchanged, because the menu reports every tap,
-    /// including the one on the standing option, and the mark answers the tap rather than the change.
+    /// A pick clears its mark even when the value is unchanged: the menu reports every tap, the standing
+    /// option's included.
     @Published var accountType: PayabliPayInAccountType = .checking {
         didSet { acceptEdit(of: .accountType) }
     }
@@ -147,9 +147,17 @@ final class PayabliPayInViewModel: ObservableObject {
         objectWillChange.send()
         // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
         let replacesFlow = component !== self.component
+        // Before the swap: a combining-mark separator cannot be stripped back to digits.
+        let expiry = submittedExpiration
+        // By scalar, as the expiry is read: two spellings of one separator compare equal as strings.
+        let separatorChanges = !configuration.formatting.expirationSeparator.unicodeScalars
+            .elementsEqual(self.configuration.formatting.expirationSeparator.unicodeScalars)
         self.component = component
         self.configuration = configuration
         self.labels = labels
+        if separatorChanges, !cardExpiration.isEmpty {
+            cardExpiration = formatExpiration(expiry)
+        }
         lifecycleSignature = nextSignature
         if replacesFlow {
             clearMarks()
@@ -292,7 +300,7 @@ final class PayabliPayInViewModel: ObservableObject {
             return fieldHasRequiredValue(.cardholderName)
                 && fieldHasRequiredValue(.cardNumber)
                 && cardNumberValidationMessage == nil
-                && cardExpiration.payabliCaptureDigitsOnly.count >= 4
+                && submittedExpiration.payabliCaptureDigitsOnly.count >= 4
                 && fieldHasRequiredValue(.cardSecurityCode)
                 && fieldHasRequiredValue(.cardPostalCode)
                 && requiredFieldsAreSatisfied
@@ -372,34 +380,43 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
     ///
+    /// The submission runs inside `withFormBuffers`, so the buffers it built are closed once it ends,
+    /// whatever it ends in.
+    ///
     /// - Parameter operation: the operation the submission sends.
     /// - Returns: what the flow returned.
     private func submitToFlow(_ operation: PayabliPayInOperation) async throws -> PayabliPayInResult {
-        let request: PayabliPayInRequest?
-        do {
-            request = try configuredRequest(for: operation)
-        } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
-            throw error
+        try await withFormBuffers { buffers in
+            let request: PayabliPayInRequest?
+            do {
+                request = try configuredRequest(for: operation, with: buffers)
+            } catch {
+                component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+                throw error
+            }
+            if let request {
+                return try await component.submitConfigured(request, for: operation, origin: .form)
+            }
+            return try await component.submitConfigured(
+                PayabliPayInStoreRequest(instrument: methodInput(with: buffers), options: mergedStoreOptions()),
+                for: operation,
+                origin: .form
+            )
         }
-        if let request {
-            return try await component.submitConfigured(request, for: operation, origin: .form)
-        }
-        return try await component.submitConfigured(
-            PayabliPayInStoreRequest(instrument: methodInput(), options: mergedStoreOptions()),
-            for: operation,
-            origin: .form
-        )
     }
 
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
     /// - Parameter operation: the operation whose configuration the request is built from.
+    /// - Parameter buffers: the registry the submission's sensitive buffers are built through.
     /// - Returns: the request built from the configuration and the fields.
-    private func configuredRequest(for operation: PayabliPayInOperation) throws -> PayabliPayInRequest? {
+    private func configuredRequest(
+        for operation: PayabliPayInOperation,
+        with buffers: FormBufferRegistry
+    ) throws -> PayabliPayInRequest? {
         guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
-            paymentMethod: paymentMethod(),
+            paymentMethod: paymentMethod(with: buffers),
             customerData: mergedCustomerData(),
             orderDescription: mergedOrderDescription()
         )
@@ -465,13 +482,22 @@ final class PayabliPayInViewModel: ObservableObject {
         acceptEdit(of: .cardExpiration)
     }
 
+    /// The years the expiry picker offers: the current year, held to 2000 to 2099, and the 20 after it, up to 2099.
+    ///
+    /// - Parameter now: the moment read as the current year.
+    /// - Returns: the years, earliest first.
+    func expirationYearChoices(now: Date = Date()) -> [Int] {
+        let first = PayabliPayInCardData.currentExpiryMonth(at: now).year
+        return Array(first ... min(first + 20, PayabliPayInCardData.expiryYears.upperBound))
+    }
+
     func ensureExpirationSelection(defaultDate: Date = Date()) {
-        let calendar = Calendar.current
+        let current = PayabliPayInCardData.currentExpiryMonth(at: defaultDate)
         if cardExpirationMonth == nil {
-            cardExpirationMonth = selectedExpirationMonth ?? calendar.component(.month, from: defaultDate)
+            cardExpirationMonth = selectedExpirationMonth ?? current.month
         }
         if cardExpirationYear == nil {
-            cardExpirationYear = selectedExpirationYear ?? calendar.component(.year, from: defaultDate)
+            cardExpirationYear = selectedExpirationYear ?? current.year
         }
         synchronizeExpirationText()
     }
@@ -520,7 +546,7 @@ final class PayabliPayInViewModel: ObservableObject {
         if let cardExpirationMonth {
             return cardExpirationMonth
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
+        let digits = submittedExpiration.payabliCaptureDigitsOnly
         guard digits.count >= 2 else { return nil }
         let monthText = String(digits.prefix(2))
         guard let month = Int(monthText), (1 ... 12).contains(month) else { return nil }
@@ -531,7 +557,7 @@ final class PayabliPayInViewModel: ObservableObject {
         if let cardExpirationYear {
             return cardExpirationYear
         }
-        let digits = cardExpiration.payabliCaptureDigitsOnly
+        let digits = submittedExpiration.payabliCaptureDigitsOnly
         guard digits.count >= 4 else { return nil }
         let yearSuffix = String(digits.suffix(2))
         guard let year = Int(yearSuffix) else { return nil }

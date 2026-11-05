@@ -54,7 +54,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         let paymentMethod = try XCTUnwrap(body["paymentMethod"] as? [String: Any])
         XCTAssertEqual(paymentMethod["method"] as? String, "card")
         XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
-        XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/27")
+        XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/37")
         XCTAssertEqual(paymentMethod["cardHolder"] as? String, "John Cassian")
         XCTAssertEqual(paymentMethod["cardcvv"] as? String, "999")
         XCTAssertEqual(paymentMethod["cardzip"] as? String, "12345")
@@ -264,18 +264,15 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             _ = try await component.capture(cardRequest())
             XCTFail("Expected the provider failure to surface")
         } catch let error as PayabliGenericError {
-            // The holder owns the provider now, so a host failure arrives as this SDK's own
-            // `.tokenProviderFailed` with the cause redacted, rather than as the host's error verbatim.
             XCTAssertEqual(error.type, .tokenProviderFailed)
             XCTAssertFalse(error.reason.contains("SENTINEL-BACKEND"), error.reason)
         }
     }
 
-    /// A blank token is refused where it is installed, which is the session's holder.
+    /// A blank token is refused where it is installed, the session's holder.
     ///
-    /// Driven through the facade's own transport, because injecting a double never reads a
-    /// credential. Nothing reaches the network: the read runs before the request is built, pinned in
-    /// Core by `testAFailingTokenReadStopsTheRequestBeforeItIsSent`.
+    /// Driven through the facade's own transport, since a double never reads a credential. The read
+    /// runs before the request is built, so nothing reaches the network.
     @MainActor
     func testMissingAccessTokenIsRefusedBeforeAnythingIsSent() async throws {
         let component = flowOnSession(token: "   ")
@@ -304,6 +301,25 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertTrue(body.contains(#""serviceFee":5.00"#))
     }
 
+    /// The card's own bytes: one object, the payment method as its last member, and the card number
+    /// and security code as digits with the entry's separators dropped.
+    func testTheCardMethodIsWrittenAsBytesAsTheBodyLastMember() async throws {
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let client = PayInPaymentFlowClient(transport: transport)
+
+        _ = try await client.capture(entryPoint: "entry", request: cardRequest())
+
+        let request = try await firstRequest(from: transport)
+        let bodyText = try XCTUnwrap(String(data: XCTUnwrap(request.body), encoding: .utf8))
+        XCTAssertEqual(
+            bodyText,
+            #"{"customerData":{"customerId":4440},"entryPoint":"entry","ipaddress":"255.255.255.255","orderDescription":"SDK test transaction","orderId":"order-123","#
+                + #""paymentDetails":{"currency":"USD","serviceFee":5.00,"totalAmount":100.00},"#
+                + #""source":"ios-sdk","paymentMethod":{"cardHolder":"John Cassian","cardcvv":"999","cardexp":"02\/37","#
+                + #""cardnumber":"4111111111111111","cardzip":"12345","initiator":"payor","method":"card","saveIfSuccess":true}}"#
+        )
+    }
+
     private func cardRequest(
         totalAmount: Double = 100,
         serviceFee: Double? = 5,
@@ -316,9 +332,10 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiry: "02/27",
-                    holderName: "John Cassian",
+                    expiryMonth: 2,
+                    expiryYear: 2037,
                     securityCode: "999",
+                    holderName: "John Cassian",
                     postalCode: "12345"
                 ),
                 saveIfSuccess: true
@@ -445,13 +462,8 @@ private func parseBody(_ request: PayabliRequest) throws -> [String: Any] {
     return try XCTUnwrap(object as? [String: Any])
 }
 
-/// Reserves the key the way the facade does, so these cases can exercise the client alone.
-///
-/// The client takes the key as a parameter rather than reading it off the request, and the parameter is
-/// mandatory, which is the whole of the point: a money-moving call cannot be written that omits it.
-/// Nothing reports the key. These
-/// overloads apply the same rule the facade applies, so a case that supplies a key still asserts on
-/// its own key.
+/// Reserves the key the way the facade does, so these cases exercise the client alone. The client's
+/// key parameter is mandatory, so no money-moving call can omit one.
 private extension PayInPaymentFlowClient {
     func capture(
         entryPoint: String,

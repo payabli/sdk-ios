@@ -555,47 +555,6 @@ public struct PayabliPayInStoredMethod: Sendable, Equatable {
     }
 }
 
-extension PayabliPayInMethodInput: Encodable {
-    enum CodingKeys: String, CodingKey {
-        case method
-        case cardcvv
-        case cardexp
-        case cardHolder
-        case cardnumber
-        case cardzip
-        case achAccount
-        case achAccountType
-        case achCode
-        case achHolder
-        case achHolderType
-        case achRouting
-        case device
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        switch self {
-        case let .card(data):
-            try c.encode(PayabliPayInMethodType.card.rawValue, forKey: .method)
-            try c.encode(data.normalizedExpiration(), forKey: .cardexp)
-            try c.encode(data.holderName.trimmed, forKey: .cardHolder)
-            try c.encode(data.cardNumber.digitsOnly, forKey: .cardnumber)
-            try c.encode(data.securityCode.digitsOnly, forKey: .cardcvv)
-            try c.encode(data.postalCode.trimmed, forKey: .cardzip)
-
-        case let .bankAccount(data):
-            try c.encode(PayabliPayInMethodType.bankAccount.rawValue, forKey: .method)
-            try c.encode(data.accountNumber.digitsOnly, forKey: .achAccount)
-            try c.encode(data.accountType.rawValue, forKey: .achAccountType)
-            try c.encode(data.holderName.trimmed, forKey: .achHolder)
-            try c.encode(data.routingNumber.digitsOnly, forKey: .achRouting)
-            try c.encode((data.secCode ?? .web).rawValue, forKey: .achCode)
-            try c.encodeIfPresent(data.holderType?.rawValue, forKey: .achHolderType)
-            try c.encodeIfPresent(data.device.map(\.trimmed)?.nilIfEmpty, forKey: .device)
-        }
-    }
-}
-
 public extension PayabliPayInMethodInput {
     func validate(_ validation: PayabliPayInValidation = .default) throws {
         switch self {
@@ -609,16 +568,17 @@ public extension PayabliPayInMethodInput {
 
 extension PayabliPayInCardData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let digits = cardNumber.digitsOnly
-        guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
-            .contains(digits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
+        try cardNumber.useDigitBytes(field: "Card number") { pan in
+            guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
+                .contains(pan.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
+            }
+            if validation.requiresLuhnCheck, !Self.passesLuhn(pan) {
+                throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+            }
         }
-        if validation.requiresLuhnCheck, !Self.passesLuhn(digits) {
-            throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
-        }
-        _ = try normalizedExpiration()
+        try validateExpiry()
         let trimmedCardholderName = holderName.trimmed
         guard !trimmedCardholderName.isEmpty else {
             throw PayabliPayInTokenStorageError.invalidInput("Cardholder name is required.")
@@ -633,37 +593,69 @@ extension PayabliPayInCardData {
         guard trimmedBillingZip.count <= PayabliPayInInputLimits.maximumPostalCodeCharacters else {
             throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code must be 12 characters or fewer.")
         }
-        let cvvDigits = securityCode.digitsOnly
-        guard !cvvDigits.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
-        }
-        guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-            .contains(cvvDigits.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+        try securityCode.useDigitBytes(field: "CVV") { cvv in
+            guard !cvv.isEmpty else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
+            }
+            guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
+                .contains(cvv.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+            }
         }
     }
 
-    func normalizedExpiration() throws -> String {
-        let digits = expiry.digitsOnly
-        guard digits.count == 4 else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiration must be in MMYY or MM/YY format.")
+    /// Refuses a month outside 1 to 12, a year that isn't four digits or is outside 2000 to 2099, or an expiry
+    /// before the current month. A card is good through the last day of its expiry month.
+    ///
+    /// - Parameter now: the moment the current month is read at.
+    func validateExpiry(at now: Date = Date()) throws {
+        guard (1 ... 12).contains(expiryMonth) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry month must be between 1 and 12.")
         }
-        let monthPrefix = String(digits.prefix(2))
-        guard let month = Int(monthPrefix), (1 ... 12).contains(month) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiration month must be between 01 and 12.")
+        guard (1000 ... 9999).contains(expiryYear) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be four digits.")
         }
-        let year = String(digits.suffix(2))
-        return "\(monthPrefix)/\(year)"
+        // The request carries two digits of the year, so only 2000 to 2099 can be sent as given.
+        guard Self.expiryYears.contains(expiryYear) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be between 2000 and 2099.")
+        }
+        let today = Self.expiryCalendar.dateComponents([.year, .month], from: now)
+        guard let year = today.year, let month = today.month else { return }
+        guard (expiryYear, expiryMonth) >= (year, month) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Card is expired.")
+        }
     }
 
-    static func passesLuhn(_ digits: String) -> Bool {
-        let reversed = digits.reversed().compactMap { Int(String($0)) }
-        guard reversed.count == digits.count else { return false }
+    /// The calendar the current month is read on. A card's expiry is a Gregorian month, and `Calendar.current`
+    /// follows the device's setting: on the Buddhist calendar the year reads 2569.
+    static let expiryCalendar = Calendar(identifier: .gregorian)
 
-        let sum = reversed.enumerated().reduce(0) { partial, pair in
-            let (index, digit) = pair
-            guard index % 2 == 1 else { return partial + digit }
+    /// The years a two-digit expiry can name.
+    static let expiryYears = 2000 ... 2099
+
+    /// The month and year at `date` on ``expiryCalendar``, the year held to ``expiryYears``, so a device clock
+    /// outside them never offers a year the request would carry as another.
+    ///
+    /// - Parameter date: the moment to read.
+    /// - Returns: the month, 1 to 12, and the year.
+    static func currentExpiryMonth(at date: Date) -> (month: Int, year: Int) {
+        let parts = expiryCalendar.dateComponents([.year, .month], from: date)
+        let year = min(max(parts.year ?? expiryYears.lowerBound, expiryYears.lowerBound), expiryYears.upperBound)
+        return (parts.month ?? 1, year)
+    }
+
+    /// The expiry as the request carries it, `MM/YY`. Written only after ``validateExpiry()``.
+    var wireExpiry: String {
+        String(format: "%02d/%02d", expiryMonth, expiryYear % 100)
+    }
+
+    static func passesLuhn(_ digits: [UInt8]) -> Bool {
+        guard !digits.isEmpty, digits.allSatisfy({ (0x30 ... 0x39).contains($0) }) else { return false }
+        let sum = digits.reversed().enumerated().reduce(0) { partial, pair in
+            let (offset, byte) = pair
+            let digit = Int(byte - 0x30)
+            guard offset % 2 == 1 else { return partial + digit }
             let doubled = digit * 2
             return partial + (doubled > 9 ? doubled - 9 : doubled)
         }
@@ -673,14 +665,17 @@ extension PayabliPayInCardData {
 
 extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        let account = accountNumber.digitsOnly
-        let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
-        let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
-        guard (minimumDigits ... maximumDigits).contains(account.count)
-        else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+        try accountNumber.useDigitBytes(field: "Account number") { account in
+            let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
+            let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
+            guard (minimumDigits ... maximumDigits).contains(account.count)
+            else {
+                throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+            }
         }
-        let routing = routingNumber.digitsOnly
+        guard let routing = routingNumber.payabliInstrumentDigits else {
+            throw PayabliPayInTokenStorageError.invalidInput("Routing number contains unsupported characters.")
+        }
         guard routing.count == PayabliPayInInputLimits.routingNumberDigits else {
             throw PayabliPayInTokenStorageError.invalidInput("Routing number must be 9 digits.")
         }
@@ -718,7 +713,7 @@ extension String {
     }
 
     var digitsOnly: String {
-        filter(\.isNumber)
+        payabliCaptureDigitsOnly
     }
 
     var nilIfEmpty: String? {
@@ -745,5 +740,24 @@ private extension KeyedDecodingContainer {
             return Int64(string)
         }
         return nil
+    }
+}
+
+extension PayabliPayInMethodInput {
+    /// The service's member names for a method, read by the body writer and the rejected-field mapping.
+    enum CodingKeys: String, CodingKey {
+        case method
+        case cardcvv
+        case cardexp
+        case cardHolder
+        case cardnumber
+        case cardzip
+        case achAccount
+        case achAccountType
+        case achCode
+        case achHolder
+        case achHolderType
+        case achRouting
+        case device
     }
 }

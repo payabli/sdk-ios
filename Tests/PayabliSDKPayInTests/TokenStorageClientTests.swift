@@ -26,9 +26,9 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111 1111 1111 1111",
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: "John Doe",
                 postalCode: "12345"
             )),
             options: PayabliPayInStoreOptions(
@@ -68,9 +68,9 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: "John Doe",
                 postalCode: "12345"
             ))
         )
@@ -102,11 +102,11 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
+                routingNumber: "123456780",
                 accountType: .checking,
                 holderName: "John Doe",
-                routingNumber: "123456780",
-                secCode: .web,
-                holderType: .personal
+                holderType: .personal,
+                secCode: .web
             )),
             options: PayabliPayInStoreOptions(
                 achValidation: true,
@@ -153,9 +153,9 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "John Doe",
-                routingNumber: "123456780"
+                holderName: "John Doe"
             ))
         )
 
@@ -176,9 +176,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111112",
-                    expiry: "02/25",
-                    holderName: "John Doe",
+                    expiryMonth: 2, expiryYear: 2035,
                     securityCode: "123",
+                    holderName: "John Doe",
                     postalCode: "12345"
                 ))
             )
@@ -202,9 +202,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/25",
-                    holderName: "John Doe",
+                    expiryMonth: 2, expiryYear: 2035,
                     securityCode: "123",
+                    holderName: "John Doe",
                     postalCode: ""
                 ))
             )
@@ -229,9 +229,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/25",
-                    holderName: "John Doe",
+                    expiryMonth: 2, expiryYear: 2035,
                     securityCode: "",
+                    holderName: "John Doe",
                     postalCode: "12345"
                 ))
             )
@@ -249,30 +249,30 @@ final class TokenStorageClientTests: XCTestCase {
         let scenarios: [(PayabliPayInCardData, String)] = [
             (PayabliPayInCardData(
                 cardNumber: String(repeating: "4", count: 20),
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: "John Doe",
                 postalCode: "12345"
             ), "Card number must be 12 to 19 digits."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/25",
-                holderName: String(repeating: "A", count: 61),
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: String(repeating: "A", count: 61),
                 postalCode: "12345"
             ), "Cardholder name must be 60 characters or fewer."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "12345",
+                holderName: "John Doe",
                 postalCode: "12345"
             ), "CVV must be 3 or 4 digits."),
             (PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: "John Doe",
                 postalCode: String(repeating: "A", count: 13)
             ), "Card Postal Code must be 12 characters or fewer.")
         ]
@@ -299,7 +299,7 @@ final class TokenStorageClientTests: XCTestCase {
         }
     }
 
-    func testSixDigitExpirationDoesNotReachTransport() async throws {
+    func testAThreeDigitExpiryYearDoesNotReachTransport() async throws {
         let transport = MockTransport(responseBody: "{}")
         let client = PayInPaymentFlowTokenStorageClient(
             transport: transport
@@ -310,15 +310,15 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "022028",
-                    holderName: "John Doe",
+                    expiryMonth: 2, expiryYear: 202,
                     securityCode: "123",
+                    holderName: "John Doe",
                     postalCode: "12345"
                 ))
             )
             XCTFail("Expected validation error")
         } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Expiration must be in MMYY or MM/YY format.")
+            XCTAssertEqual(message, "Expiry year must be four digits.")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -330,21 +330,21 @@ final class TokenStorageClientTests: XCTestCase {
         let scenarios: [(PayabliPayInBankAccountData, String)] = [
             (PayabliPayInBankAccountData(
                 accountNumber: String(repeating: "1", count: 18),
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "John Doe",
-                routingNumber: "123456780"
+                holderName: "John Doe"
             ), "Account number must be 4 to 17 digits."),
             (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
+                routingNumber: "1234567800",
                 accountType: .checking,
-                holderName: "John Doe",
-                routingNumber: "1234567800"
+                holderName: "John Doe"
             ), "Routing number must be 9 digits."),
             (PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: String(repeating: "A", count: 61),
-                routingNumber: "123456780"
+                holderName: String(repeating: "A", count: 61)
             ), "Account holder must be 60 characters or fewer.")
         ]
 
@@ -390,9 +390,9 @@ final class TokenStorageClientTests: XCTestCase {
             entryPoint: "f743aed24a",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/25",
-                holderName: "Jane Doe",
+                expiryMonth: 2, expiryYear: 2035,
                 securityCode: "123",
+                holderName: "Jane Doe",
                 postalCode: "33139"
             )),
             options: PayabliPayInStoreOptions(
@@ -440,9 +440,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .bankAccount(PayabliPayInBankAccountData(
                     accountNumber: "1111111111111",
+                    routingNumber: "123456780",
                     accountType: .checking,
-                    holderName: "John Doe",
-                    routingNumber: "123456780"
+                    holderName: "John Doe"
                 ))
             )
             XCTFail("Expected payment method failure")
@@ -478,9 +478,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2, expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -509,9 +509,9 @@ final class TokenStorageClientTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2, expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -560,7 +560,7 @@ final class TokenStorageClientTests: XCTestCase {
             )
         )
         viewModel.cardNumber = "4111 1111 1111 1111"
-        viewModel.cardExpiration = "02/25"
+        viewModel.cardExpiration = "02/35"
         viewModel.cardholderName = "Jane Doe"
         XCTAssertFalse(viewModel.canSubmit)
         viewModel.cardCvv = "321"
@@ -824,7 +824,7 @@ private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {
     let paymentMethod = try XCTUnwrap(body["paymentMethod"] as? [String: Any])
     XCTAssertEqual(paymentMethod["method"] as? String, "card")
     XCTAssertEqual(paymentMethod["cardnumber"] as? String, "4111111111111111")
-    XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/25")
+    XCTAssertEqual(paymentMethod["cardexp"] as? String, "02/35")
     XCTAssertEqual(paymentMethod["cardHolder"] as? String, "John Doe")
     XCTAssertEqual(paymentMethod["cardcvv"] as? String, "123")
     XCTAssertEqual(paymentMethod["cardzip"] as? String, "12345")
