@@ -248,15 +248,17 @@ extension PayInFailure {
         }
     }
 
+    /// Only the shapes the service's own answer arrives in. A refusal made on the device can carry the same
+    /// error type, so the type alone does not tell them apart.
     private static func answersThePayment(_ error: Error) -> Bool {
         switch error {
-        // Refused on the device, or possibly never answered, whatever type they carry.
-        case PayabliPayInError.invalidInput, PayabliPayInError.submissionInProgress,
-             PayabliPayInError.submissionInterrupted:
-            return false
-        default:
+        case PayabliPaymentError.decline, PayabliPaymentError.validation:
+            return true
+        case PayabliPayInError.transactionFailed:
             let type = (error as? any PayabliError)?.type
             return type == .paymentDeclined || type == .validation
+        default:
+            return false
         }
     }
 

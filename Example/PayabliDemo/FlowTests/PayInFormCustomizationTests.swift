@@ -225,13 +225,19 @@ final class PayInFormCustomizationTests: XCTestCase {
     }
 
     /// The service answered the retry, so the next charge is a payment of its own and may use any method.
-    func testADeclineOrARefusalOfWhatWasSentEndsTheHold() {
+    func testADeclineOrARefusalOfWhatWasSentEndsTheHold() throws {
         var shown = ShownFormMethod()
         shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture, holding: .bankAccount))
+        let body = Data(#"{"reason":"Declined"}"#.utf8)
+        let answers: [Error] = try [
+            PayabliPaymentError.decline(JSONDecoder().decode(PayabliDeclineError.self, from: body)),
+            PayabliPaymentError.validation(JSONDecoder().decode(PayabliValidationError.self, from: body)),
+            PayabliPayInError.transactionFailed(PayabliPayInFailure(code: "D0001", reason: "Declined", httpStatusCode: 402))
+        ]
 
-        for type in [PayabliErrorType.paymentDeclined, .validation] {
-            let answer = PayInFailure(Reason(type: type), operation: .capture)
-            XCTAssertNil(shown.heldMethod(after: answer, holding: .bankAccount), "\(type)")
+        for error in answers {
+            let answer = PayInFailure(error, operation: .capture)
+            XCTAssertNil(shown.heldMethod(after: answer, holding: .bankAccount), "\(error)")
         }
     }
 
@@ -242,7 +248,9 @@ final class PayInFormCustomizationTests: XCTestCase {
         let failures: [Error] = [
             Reason(type: .retryNotSamePayment),
             Reason(type: .serverError),
-            PayabliPayInError.invalidInput("amount")
+            Reason(type: .paymentReferenceOpen),
+            PayabliPayInError.invalidInput("amount"),
+            PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
         ]
 
         for error in failures {
