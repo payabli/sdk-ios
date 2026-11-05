@@ -307,7 +307,7 @@ try await paymentFlow.authorize(PayabliPayInRequest(
 
 An app written in another technology, such as React Native, Flutter or .NET MAUI, reaches the SDK through its
 Objective-C surface. [Language support](../README.md#language-support) lists the Objective-C types, and
-[Other technologies](../README.md#other-technologies) shows how to write the native module.
+[Other technologies](OtherTechnologies.md) shows how to write the native module.
 
 ## Reference Docs
 
