@@ -298,7 +298,9 @@ struct SimpleCaptureView: View {
         ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
             if failure.outcomeIsUnresolved {
-                heldMethods[operation] = drawnMethod ?? customization.configuration(for: operation).defaultMethod
+                heldMethods[operation] = customization.methodSent(
+                    drawn: drawnMethod, for: operation, holding: heldMethod
+                )
             }
             flow(for: operation).chargeFailed(failure)
         }

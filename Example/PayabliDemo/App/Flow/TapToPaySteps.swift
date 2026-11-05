@@ -11,8 +11,8 @@ enum TapToPayActivationOutcome {
     /// cold attestation, which is the enable step's job.
     case deviceSetupRequired
     case enableFailed
-    /// The service said this device is not waiting for a code, so the way on is
-    /// the enable step, not another code. The session still reads
+    /// This device is not waiting for a code, so the way on is the enable step,
+    /// not another code. When the service said so, the session still reads
     /// `.pendingActivation` until an enable finishes.
     case setupAskedAgain
     case succeeded

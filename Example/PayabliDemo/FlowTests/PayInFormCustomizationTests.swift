@@ -192,6 +192,16 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(settled.defaultMethod, .card)
     }
 
+    /// A form built again while a retry is held opens on the held method and reports no change, so a second
+    /// unknown outcome has to hold that method rather than the default.
+    func testAFormBuiltAgainOnAHeldRetryReportsTheHeldMethodAsSent() {
+        let customization = PayInFormCustomization()
+
+        XCTAssertEqual(customization.methodSent(drawn: nil, for: .capture, holding: .bankAccount), .bankAccount)
+        XCTAssertEqual(customization.methodSent(drawn: nil, for: .capture, holding: nil), .card)
+        XCTAssertEqual(customization.methodSent(drawn: .bankAccount, for: .capture, holding: nil), .bankAccount)
+    }
+
     /// A save moves no money and sends no retry, so a held payment's method does not bind it.
     func testASaveWhileAPaymentsRetryIsOpenKeepsEveryMethod() {
         let save = PayInFormCustomization().configuration(for: .storedMethod, holding: .bankAccount)

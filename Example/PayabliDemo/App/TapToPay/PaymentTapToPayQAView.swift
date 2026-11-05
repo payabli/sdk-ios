@@ -528,8 +528,9 @@ struct PaymentTapToPayQAView: View {
                     enableMessage = "✗ \(failure.message)"
                     activationMessage = "✗ This device must be set up again — re-enable the terminal, see step 2."
                 } else if failure.isDeviceNotPending {
-                    // The session still reads `.pendingActivation`, so only the
-                    // outcome sends the sequence back to the enable step.
+                    // A refusal from the service leaves the session reading
+                    // `.pendingActivation`, so only the outcome sends the
+                    // sequence back to the enable step.
                     activationOutcome = .setupAskedAgain
                     enableMessage = "✗ \(failure.message)"
                 } else {

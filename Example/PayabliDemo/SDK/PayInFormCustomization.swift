@@ -105,6 +105,20 @@ struct PayInFormCustomization: Hashable {
 
     // MARK: - What the SDK is handed
 
+    /// The method a charge was sent with.
+    ///
+    /// - Parameter drawn: the method the form reported moving to, nil when it reported none.
+    /// - Parameter operation: what the form is for.
+    /// - Parameter held: the method the form was held on when it was built, if any.
+    /// - Returns: `drawn`, or the method the form opened on, which is the held one while a retry is open.
+    func methodSent(
+        drawn: PayabliPayInMethodType?,
+        for operation: PayInOperation,
+        holding held: PayabliPayInMethodType?
+    ) -> PayabliPayInMethodType {
+        drawn ?? configuration(for: operation, holding: held).defaultMethod
+    }
+
     /// The form's configuration for `operation`.
     ///
     /// - Parameter operation: what the form is for.
