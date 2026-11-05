@@ -95,6 +95,30 @@ final class PayInFraudBlockTests: XCTestCase {
         XCTAssertGreaterThan(issued, 0, "the provider is asked for a new token")
     }
 
+    func testARetryBlockedByFraudControlAt401IsADeclineAndReleasesTheKey() async throws {
+        for code in ["E9005", "E9051"] {
+            PayInKeyStore.process.forgetHeld()
+            let transport = ScriptedTransport()
+            transport.script = [.lost, .fraudBlocked401(code), .approved]
+            let flow = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+            var minted = 0
+            flow.newIdempotencyKey = {
+                minted += 1
+                return "k\(minted)"
+            }
+
+            _ = await failure { _ = try await flow.capture(Self.payment(.newPayment)) }
+            let blocked = await failure { _ = try await flow.capture(Self.payment(.retry)) }
+            _ = try await flow.capture(Self.payment(.retry))
+
+            let refused = try XCTUnwrap(blocked as? PayabliPayInError.Refused, "\(code): got \(blocked)")
+            XCTAssertEqual(refused.type, .paymentDeclined, code)
+            XCTAssertEqual(refused.httpStatus, 401, code)
+            XCTAssertEqual(refused.rawCode, code)
+            XCTAssertEqual(transport.sentKeys, ["k1", "k1", "k2"], "\(code): the decline released the held key")
+        }
+    }
+
     func testOnlyAPaymentOrAnAuthorizationNamesA401FraudBlockAsTheCallers() async throws {
         let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.approved)
         let client = PayInPaymentFlowClient(transport: transport)
@@ -117,6 +141,17 @@ final class PayInFraudBlockTests: XCTestCase {
     // MARK: - Fixtures
 
     private static let request = PayInFixture.request(cardOnly: true)
+
+    private static func payment(_ attempt: PayabliAttempt) -> PayabliPayInRequest {
+        PayabliPayInRequest(
+            paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(method: .card, storedMethodId: "stored-1")),
+            options: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                paymentReference: "p1",
+                attempt: attempt
+            )
+        )
+    }
 
     private static let approved =
         #"{"code":"A0000","reason":"Approved","data":{"paymentTransId":"101-abc","authCode":"A1","referenceId":"r-1"}}"#
