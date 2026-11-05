@@ -51,6 +51,14 @@ final class PayInErrorTypesTests: XCTestCase {
         XCTAssertEqual(error?.reason, "Declined by the issuer.")
     }
 
+    func testAFailureNamesItsTransactionAndDefaultsToNone() {
+        let named = PayabliPayInFailure(code: "D0329", httpStatusCode: 402, paymentTransId: "trans-1")
+
+        XCTAssertEqual(PayabliPayInError.Refused(failure: named).failure.paymentTransId, "trans-1")
+        XCTAssertEqual(PayabliPayInError.ServiceError(failure: named).failure.paymentTransId, "trans-1")
+        XCTAssertNil(PayabliPayInFailure(code: "D0329", httpStatusCode: 402).paymentTransId)
+    }
+
     func testAnUnsettledFailureCarriesItsCausesTypeStatusAndCode() {
         let cause = PayabliGenericError(type: .serverError, reason: "Bad gateway", httpStatus: 502, rawCode: "E9999")
 

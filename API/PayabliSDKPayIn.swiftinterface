@@ -1007,7 +1007,8 @@ public struct PayabliPayInFailure : Swift::Codable, Swift::Sendable, Swift::Equa
   public let status: Swift::Int?
   public let detail: Swift::String?
   public let httpStatusCode: Swift::Int?
-  public init(code: Swift::String? = nil, reason: Swift::String? = nil, explanation: Swift::String? = nil, action: Swift::String? = nil, status: Swift::Int? = nil, detail: Swift::String? = nil, httpStatusCode: Swift::Int? = nil)
+  public let paymentTransId: Swift::String?
+  public init(code: Swift::String? = nil, reason: Swift::String? = nil, explanation: Swift::String? = nil, action: Swift::String? = nil, status: Swift::Int? = nil, detail: Swift::String? = nil, httpStatusCode: Swift::Int? = nil, paymentTransId: Swift::String? = nil)
   public var reasonText: Swift::String {
     get
   }

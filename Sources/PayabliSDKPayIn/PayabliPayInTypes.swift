@@ -325,6 +325,9 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
     public let status: Int?
     public let detail: String?
     public let httpStatusCode: Int?
+    /// The transaction the service recorded for this failure, which a host reconciles a decline by; nil when the
+    /// answer named none.
+    public let paymentTransId: String?
 
     public init(
         code: String? = nil,
@@ -333,7 +336,8 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
         action: String? = nil,
         status: Int? = nil,
         detail: String? = nil,
-        httpStatusCode: Int? = nil
+        httpStatusCode: Int? = nil,
+        paymentTransId: String? = nil
     ) {
         self.code = code
         self.reason = reason
@@ -342,6 +346,7 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
         self.status = status
         self.detail = detail
         self.httpStatusCode = httpStatusCode
+        self.paymentTransId = paymentTransId
     }
 
     public var reasonText: String {
