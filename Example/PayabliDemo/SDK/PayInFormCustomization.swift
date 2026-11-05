@@ -105,20 +105,6 @@ struct PayInFormCustomization: Hashable {
 
     // MARK: - What the SDK is handed
 
-    /// The method a charge was sent with.
-    ///
-    /// - Parameter drawn: the method the form reported moving to, nil when it reported none.
-    /// - Parameter operation: what the form is for.
-    /// - Parameter held: the method the form was held on when it was built, if any.
-    /// - Returns: `drawn`, or the method the form opened on, which is the held one while a retry is open.
-    func methodSent(
-        drawn: PayabliPayInMethodType?,
-        for operation: PayInOperation,
-        holding held: PayabliPayInMethodType?
-    ) -> PayabliPayInMethodType {
-        drawn ?? configuration(for: operation, holding: held).defaultMethod
-    }
-
     /// The form's configuration for `operation`.
     ///
     /// - Parameter operation: what the form is for.
@@ -380,5 +366,40 @@ struct PayInFormCustomization: Hashable {
         case .sdkDefault, .compact:
             PayabliPayInPaymentSummaryConfiguration()
         }
+    }
+}
+
+/// The method on the form a screen shows, which is the method a charge from it is sent with.
+///
+/// Set when a form is built and when it reports a move. A configuration handed to a form already built moves
+/// the method only through that report, so it is never worked out again from the latest configuration.
+struct ShownFormMethod: Equatable {
+    private(set) var method: PayabliPayInMethodType?
+
+    /// A form was built, and opens on its configuration's default without reporting it.
+    ///
+    /// - Parameter configuration: the configuration the form was built with.
+    mutating func formBuilt(with configuration: PayabliPayInFormConfiguration) {
+        method = configuration.defaultMethod
+    }
+
+    /// The form reported drawing `method`.
+    ///
+    /// - Parameter method: the method it moved to.
+    mutating func moved(to method: PayabliPayInMethodType) {
+        self.method = method
+    }
+
+    /// The method an open retry must send once a charge from this form has failed.
+    ///
+    /// - Parameter failure: how the charge ended.
+    /// - Parameter held: the method held before it, if a retry was open.
+    /// - Returns: the method sent while the outcome is unknown, the one held while a retry refused as another
+    ///   payment left it open, and otherwise nil, so the next charge may use any method.
+    func heldMethod(after failure: PayInFailure, holding held: PayabliPayInMethodType?) -> PayabliPayInMethodType? {
+        if failure.outcomeIsUnresolved {
+            return method
+        }
+        return failure.refusedAsAnotherPayment ? held : nil
     }
 }

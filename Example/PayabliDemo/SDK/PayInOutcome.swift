@@ -86,6 +86,10 @@ struct PayInFailure {
     /// That refusal lapses after a while, so submitting again later can take a second
     /// payment. What settles the earlier attempt is reading the transaction back.
     let isDuplicateSubmission: Bool
+
+    /// Whether the SDK refused a retry for describing another payment. Nothing was sent, so the payment the
+    /// retry names is still open.
+    let refusedAsAnotherPayment: Bool
 }
 
 extension PayInOutcome {
@@ -185,6 +189,7 @@ extension PayInFailure {
         isDuplicateSubmission = duplicate
         outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
         refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
+        refusedAsAnotherPayment = (error as? any PayabliError)?.type == .retryNotSamePayment
         logLabel = LoggableError.label(for: error)
         message = Self.message(for: error, operation: operation, duplicate: duplicate)
     }

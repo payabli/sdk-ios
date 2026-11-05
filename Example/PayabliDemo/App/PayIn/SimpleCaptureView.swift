@@ -19,8 +19,7 @@ struct SimpleCaptureView: View {
     @State private var attempts = PayInAttempts()
     @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
-    /// The method the payer moved to, or nil while the form is on the one it opened with.
-    @State private var drawnMethod: PayabliPayInMethodType?
+    @State private var shownMethod = ShownFormMethod()
     /// The method each charging flow's open retry was sent with.
     @State private var heldMethods: [PayInOperation: PayabliPayInMethodType] = [:]
 
@@ -32,8 +31,7 @@ struct SimpleCaptureView: View {
                         appControls
                     }
 
-                    // A capture or an authorization needs an amount, so without a valid one there is no form to submit.
-                    if !charges || enteredAmount != nil {
+                    if showsForm {
                         OwnerFrame(title: "Payabli SDK", dashed: true) {
                             PaymentFormHost(
                                 flow: flow(for: operation),
@@ -42,7 +40,7 @@ struct SimpleCaptureView: View {
                                 // lands after the picker has moved still names.
                                 onCompleted: { [operation] outcome in handleCompleted(outcome, for: operation) },
                                 onFailed: handleFailed,
-                                onMethodChanged: { drawnMethod = $0 }
+                                onMethodChanged: { shownMethod.moved(to: $0) }
                             )
                             // The form keeps part of its configuration from when it was built, so each
                             // change of setting or of flow builds a new one.
@@ -71,12 +69,21 @@ struct SimpleCaptureView: View {
         .onAppear {
             applyCustomer(demoCustomer.suppliesPayInCustomer)
             applyAmount()
+            if shownMethod.method == nil, showsForm {
+                shownMethod.formBuilt(with: form.configuration)
+            }
         }
         .onChange(of: demoCustomer.suppliesPayInCustomer, perform: applyCustomer)
         .onChange(of: amountText) { _ in applyAmount() }
         .onChange(of: operation) { _ in applyAmount() }
-        // A form built again opens on its default method and reports no change for it.
-        .onChange(of: FormIdentity(operation: operation, customization: customization)) { _ in drawnMethod = nil }
+        .onChange(of: FormIdentity(operation: operation, customization: customization)) { _ in
+            shownMethod.formBuilt(with: form.configuration)
+        }
+        .onChange(of: showsForm) { shows in
+            if shows {
+                shownMethod.formBuilt(with: form.configuration)
+            }
+        }
     }
 
     private var appControls: some View {
@@ -115,6 +122,11 @@ struct SimpleCaptureView: View {
 
     private var enteredAmount: Double? {
         AmountEntry.amount(from: amountText)
+    }
+
+    /// A capture or an authorization needs an amount, so without a valid one there is no form to submit.
+    private var showsForm: Bool {
+        !charges || enteredAmount != nil
     }
 
     private var charges: Bool {
@@ -246,6 +258,8 @@ struct SimpleCaptureView: View {
             Image(systemName: "ellipsis.circle")
                 .accessibilityLabel("Form settings")
         }
+        // A setting builds the form again, which a submission in flight would report against.
+        .disabled(flow(for: operation).isSubmitting)
         .accessibilityIdentifier("simpleCapture.menu")
     }
 
@@ -297,11 +311,7 @@ struct SimpleCaptureView: View {
             category: "SimpleCaptureDiagnostics"
         ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
-            if failure.outcomeIsUnresolved {
-                heldMethods[operation] = customization.methodSent(
-                    drawn: drawnMethod, for: operation, holding: heldMethod
-                )
-            }
+            heldMethods[operation] = shownMethod.heldMethod(after: failure, holding: heldMethod)
             flow(for: operation).chargeFailed(failure)
         }
     }
