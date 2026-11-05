@@ -69,7 +69,12 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         viewModel.selectExpirationYear(2030)
         XCTAssertEqual(viewModel.cardExpiration, "02\u{2013}30")
 
-        viewModel.update(component: viewModel.component, configuration: configuration(separator: "/"))
+        viewModel.update(
+            component: viewModel.component,
+            operation: viewModel.operation,
+            configuration: configuration(separator: "/"),
+            labels: viewModel.labels
+        )
 
         XCTAssertEqual(viewModel.cardExpiration, "02/30")
         await assertSubmits("02/30", from: viewModel)
@@ -81,7 +86,12 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         let viewModel = form(separator: "\u{301}")
         viewModel.cardExpiration = viewModel.formatExpiration("0230")
 
-        viewModel.update(component: viewModel.component, configuration: configuration(separator: "/"))
+        viewModel.update(
+            component: viewModel.component,
+            operation: viewModel.operation,
+            configuration: configuration(separator: "/"),
+            labels: viewModel.labels
+        )
 
         XCTAssertEqual(viewModel.cardExpiration, "02/30")
         await assertSubmits("02/30", from: viewModel)
@@ -96,7 +106,9 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
 
         viewModel.update(
             component: viewModel.component,
-            configuration: configuration(separator: "e\u{301}", insertsCardNumberSpaces: false)
+            operation: viewModel.operation,
+            configuration: configuration(separator: "e\u{301}", insertsCardNumberSpaces: false),
+            labels: viewModel.labels
         )
 
         XCTAssertEqual(Array(viewModel.cardExpiration.unicodeScalars), Array("02e\u{301}30".unicodeScalars))
@@ -132,6 +144,7 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
     private func form(separator: String) -> PayabliPayInViewModel {
         PayabliPayInViewModel(
             component: flowOnSession(token: "access-token", entryPoint: "entry", environment: .sandbox),
+            operation: .storePaymentMethod(),
             configuration: configuration(separator: separator)
         )
     }

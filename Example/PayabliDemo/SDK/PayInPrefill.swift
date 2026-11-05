@@ -12,8 +12,8 @@ import PayabliSDKPayIn
 enum PayInPrefillField: CaseIterable {
     case cardholderName
     case cardNumber
-    case cardCvv
-    case cardZip
+    case cardSecurityCode
+    case cardPostalCode
     case firstName
     case lastName
     case billingEmail
@@ -31,8 +31,8 @@ enum PayInPrefillField: CaseIterable {
         switch self {
         case .cardholderName: return .cardholderName
         case .cardNumber: return .cardNumber
-        case .cardCvv: return .cardCvv
-        case .cardZip: return .cardZip
+        case .cardSecurityCode: return .cardSecurityCode
+        case .cardPostalCode: return .cardPostalCode
         case .firstName: return .firstName
         case .lastName: return .lastName
         case .billingEmail: return .billingEmail

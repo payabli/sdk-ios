@@ -160,8 +160,8 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
             return XCTFail("fixture shapes changed")
         }
 
-        _ = try await flow.addCard(card.data)
-        _ = try await flow.addBankAccount(bank.data)
+        _ = try await flow.storeMethod(PayabliPayInStoreRequest(instrument: .card(card.data), options: PayabliPayInStoreOptions()))
+        _ = try await flow.storeMethod(PayabliPayInStoreRequest(instrument: .bankAccount(bank.data), options: PayabliPayInStoreOptions()))
 
         XCTAssertEqual(transport.count, 2, "both calls reached the service")
         for body in transport.sentBodies {
@@ -182,8 +182,14 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
             return XCTFail("fixture shapes changed")
         }
 
-        _ = await PayInFixture.failure { _ = try await flow.addCard(card.data) }
-        _ = await PayInFixture.failure { _ = try await flow.addBankAccount(bank.data) }
+        _ = await PayInFixture.failure { _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(card.data),
+            options: PayabliPayInStoreOptions()
+        )) }
+        _ = await PayInFixture.failure { _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .bankAccount(bank.data),
+            options: PayabliPayInStoreOptions()
+        )) }
 
         XCTAssertEqual(transport.count, 0, "the refusal came before sending")
         copies.assertAllOverwritten(expected: 3)
@@ -198,8 +204,14 @@ final class PayInInstrumentLifetimeTests: XCTestCase {
             return XCTFail("fixture shapes changed")
         }
 
-        _ = await PayInFixture.failure { _ = try await flow.addCard(card.data) }
-        _ = await PayInFixture.failure { _ = try await flow.addBankAccount(bank.data) }
+        _ = await PayInFixture.failure { _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(card.data),
+            options: PayabliPayInStoreOptions()
+        )) }
+        _ = await PayInFixture.failure { _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .bankAccount(bank.data),
+            options: PayabliPayInStoreOptions()
+        )) }
 
         XCTAssertEqual(transport.count, 2, "both calls reached the transport and failed there")
         copies.assertAllOverwritten(expected: 3)

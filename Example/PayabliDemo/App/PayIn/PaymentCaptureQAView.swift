@@ -363,7 +363,7 @@ struct PaymentCaptureQAView: View {
 
 #Preview {
     WithDemoSession { session, _ in
-        PaymentCaptureQAView(paymentFlow: PayInSessions.preview(session: session, operation: .capture))
+        PaymentCaptureQAView(paymentFlow: PayInSessions.preview(session: session))
             .environmentObject(TokenProbeResults.inert())
             .environmentObject(DemoCustomerSetting())
     }

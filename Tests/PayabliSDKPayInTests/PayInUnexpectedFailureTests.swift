@@ -41,26 +41,26 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         try await convertsThroughTheEntryPoint { _ = try await $0.readTransaction("trans-1") }
     }
 
-    func testAStoreConvertsAnErrorItDoesNotKnow() async throws {
-        try await convertsThroughTheEntryPoint { _ = try await $0.addPaymentMethod(.card(Self.card)) }
-    }
-
     func testACardStoreConvertsAnErrorItDoesNotKnow() async throws {
-        try await convertsThroughTheEntryPoint { _ = try await $0.addCard(Self.card) }
-    }
-
-    func testABankAccountStoreConvertsAnErrorItDoesNotKnow() async throws {
-        try await convertsThroughTheEntryPoint { _ = try await $0.addBankAccount(Self.bankAccount) }
-    }
-
-    func testASubmittedRequestConvertsAnErrorItDoesNotKnow() async throws {
-        try await convertsThroughTheEntryPoint(operation: .capture) {
-            _ = try await $0.submitConfigured(PayInFixture.request(cardOnly: true))
+        try await convertsThroughTheEntryPoint {
+            _ = try await $0.storeMethod(PayabliPayInStoreRequest(instrument: .card(Self.card), options: PayabliPayInStoreOptions()))
         }
     }
 
-    func testASubmittedMethodConvertsAnErrorItDoesNotKnow() async throws {
-        try await convertsThroughTheEntryPoint { _ = try await $0.submitConfigured(.card(Self.card)) }
+    func testABankAccountStoreConvertsAnErrorItDoesNotKnow() async throws {
+        try await convertsThroughTheEntryPoint {
+            _ = try await $0.storeMethod(PayabliPayInStoreRequest(
+                instrument: .bankAccount(Self.bankAccount),
+                options: PayabliPayInStoreOptions()
+            ))
+        }
+    }
+
+    func testAFormCaptureConvertsAnErrorItDoesNotKnow() async throws {
+        let request = PayInFixture.request(cardOnly: true)
+        try await convertsThroughTheEntryPoint {
+            _ = try await $0.submitConfigured(request, for: .capture(request.options), origin: .form)
+        }
     }
 
     // MARK: - What passes through
@@ -85,7 +85,9 @@ final class PayInUnexpectedFailureTests: XCTestCase {
     func testAPlatformCancellationOfASaveReachesTheHostAsACancellation() async {
         let flow = makeFlow(RecordingIdempotencyTransport(failure: URLError(.cancelled)))
 
-        let told = await PayInFixture.failure { _ = try await flow.addCard(Self.card) }
+        let told = await PayInFixture.failure {
+            _ = try await flow.storeMethod(PayabliPayInStoreRequest(instrument: .card(Self.card), options: PayabliPayInStoreOptions()))
+        }
 
         XCTAssertTrue(told is CancellationError, "\(String(describing: told))")
     }
@@ -154,6 +156,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         let flow = makeFlow(ForeignErrorTransport(failure: HostThrew()))
         let viewModel = PayabliPayInViewModel(
             component: flow,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         viewModel.cardNumber = "4111111111111111"
@@ -176,10 +179,9 @@ final class PayInUnexpectedFailureTests: XCTestCase {
     // MARK: - Helpers
 
     private func convertsThroughTheEntryPoint(
-        operation: PayabliPayInOperation = .storePaymentMethod,
         _ run: (PayabliPayIn) async throws -> Void
     ) async throws {
-        let flow = makeFlow(ForeignErrorTransport(failure: HostThrew()), operation: operation)
+        let flow = makeFlow(ForeignErrorTransport(failure: HostThrew()))
 
         let told = await PayInFixture.failure { try await run(flow) }
 
@@ -192,10 +194,7 @@ final class PayInUnexpectedFailureTests: XCTestCase {
         XCTAssertFalse(converted.reason.contains(HostThrew().message))
     }
 
-    private func makeFlow(
-        _ transport: any PayabliTransport,
-        operation: PayabliPayInOperation = .storePaymentMethod
-    ) -> PayabliPayIn {
+    private func makeFlow(_ transport: any PayabliTransport) -> PayabliPayIn {
         let telemetry = TelemetryClient(
             configuration: .init(entry: "entry", environment: "sandbox"),
             transport: recorder,
@@ -209,7 +208,6 @@ final class PayInUnexpectedFailureTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox,
             transport: transport,
-            operation: operation,
             telemetry: telemetry
         )
     }

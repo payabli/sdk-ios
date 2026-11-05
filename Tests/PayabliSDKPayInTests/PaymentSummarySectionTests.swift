@@ -3,14 +3,14 @@ import XCTest
 
 final class PaymentSummarySectionTests: XCTestCase {
     func testPaymentMethodLabelsLeaveTheTotalLabelUnsetByDefault() {
-        XCTAssertNil(PayabliPayInLabels().total)
-        XCTAssertEqual(PayabliPayInLabels(total: "Amount due").total, "Amount due")
+        XCTAssertNil(PayabliPayInFormLabels().total)
+        XCTAssertEqual(PayabliPayInFormLabels(total: "Amount due").total, "Amount due")
     }
 
     func testTheTotalRowTakesTheHostLabelOrTotal() {
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels()), "Total")
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "  ")), "Total")
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "Amount due")), "Amount due")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels()), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: "  ")), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: "Amount due")), "Amount due")
     }
 
     func testASectionTakesInputUnlessMarkedAsTheSummary() {
@@ -32,7 +32,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode])
             ]
         )
 
@@ -52,7 +52,7 @@ final class PaymentSummarySectionTests: XCTestCase {
     }
 
     func testAHostSummaryWithNoFieldsKeepsItsPlaceAndTitle() {
-        let card = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip])
+        let card = PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode])
         let customer = PayabliPayInFieldSection(title: "Customer", fields: [.firstName])
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
@@ -67,24 +67,31 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardExpiration, .cardCvv, .cardZip]),
-                PayabliPayInFieldSection(title: "Due today", fields: [.amount, .cardNumber, .billingZip], style: .summary)
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
+                PayabliPayInFieldSection(title: "Due today", fields: [.amount, .cardNumber, .billingPostalCode], style: .summary)
             ]
         )
 
         let inputs = configuration.cardSections.filter { $0.style == .inputs }.flatMap(\.fields)
         let summary = configuration.cardSections.filter { $0.style == .summary }.flatMap(\.fields)
         XCTAssertTrue(inputs.contains(.cardNumber))
-        XCTAssertTrue(inputs.contains(.billingZip))
+        XCTAssertTrue(inputs.contains(.billingPostalCode))
         XCTAssertFalse(summary.contains(.cardNumber))
-        XCTAssertFalse(summary.contains(.billingZip))
+        XCTAssertFalse(summary.contains(.billingPostalCode))
     }
 
     func testTheSummaryListingDecidesTheRowOrderOverAnEarlierInputsSection() {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip, .serviceFee]),
+                PayabliPayInFieldSection(fields: [
+                    .cardholderName,
+                    .cardNumber,
+                    .cardExpiration,
+                    .cardSecurityCode,
+                    .cardPostalCode,
+                    .serviceFee
+                ]),
                 PayabliPayInFieldSection(title: "Due today", fields: [.serviceFee, .amount], style: .summary)
             ]
         )
@@ -101,7 +108,14 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip, .serviceFee]),
+                PayabliPayInFieldSection(fields: [
+                    .cardholderName,
+                    .cardNumber,
+                    .cardExpiration,
+                    .cardSecurityCode,
+                    .cardPostalCode,
+                    .serviceFee
+                ]),
                 PayabliPayInFieldSection(title: "Due today", fields: [.amount], style: .summary)
             ]
         )
@@ -118,7 +132,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
                 PayabliPayInFieldSection(title: "Due today", fields: [.amount], style: .summary),
                 PayabliPayInFieldSection(title: "Fees", fields: [.serviceFee], style: .summary)
             ]
@@ -137,7 +151,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
                 PayabliPayInFieldSection(title: "Payment", fields: [.amount], style: .summary),
                 PayabliPayInFieldSection(title: "Payment", fields: [.serviceFee], style: .summary)
             ]
@@ -175,7 +189,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
                 PayabliPayInFieldSection(fields: [.amount, .billingEmail], style: .summary),
                 PayabliPayInFieldSection(title: "Due today", fields: [], style: .summary)
             ]
@@ -189,7 +203,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
                 PayabliPayInFieldSection(fields: [], style: .summary),
                 PayabliPayInFieldSection(title: "Due today", fields: [.serviceFee], style: .summary)
             ]
@@ -203,7 +217,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: [
-                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]),
+                PayabliPayInFieldSection(fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]),
                 PayabliPayInFieldSection(title: "Due today", fields: [.amount], style: .summary)
             ]
         )

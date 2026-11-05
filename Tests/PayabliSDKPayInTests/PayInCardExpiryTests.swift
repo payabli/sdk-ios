@@ -2,7 +2,7 @@ import PayabliSDKCore
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// A card's expiry is a month and a four-digit year. `capture`, `authorize` and `addPaymentMethod` refuse one the
+/// A card's expiry is a month and a four-digit year. `capture`, `authorize` and `storeMethod` refuse one the
 /// wire can't carry or that has passed, with `VALIDATION_ERROR`, before anything is sent. The wire carries `MM/YY`.
 @MainActor
 final class PayInCardExpiryTests: XCTestCase {
@@ -151,7 +151,7 @@ final class PayInCardExpiryTests: XCTestCase {
         switch route {
         case .capture: _ = try await flow.capture(request)
         case .authorize: _ = try await flow.authorize(request)
-        case .store: _ = try await flow.addPaymentMethod(.card(card))
+        case .store: _ = try await flow.storeMethod(PayabliPayInStoreRequest(instrument: .card(card), options: PayabliPayInStoreOptions()))
         }
     }
 

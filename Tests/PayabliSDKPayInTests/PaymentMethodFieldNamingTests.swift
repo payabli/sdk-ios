@@ -27,10 +27,10 @@ final class PaymentMethodFieldNamingTests: XCTestCase {
 
     func testEveryFieldHasADefaultLabelAndTheSurchargeIsNamedForItsField() {
         XCTAssertEqual(
-            Set(PayabliPayInLabels.defaultFieldLabels.keys),
+            Set(PayabliPayInFormLabels.defaultFieldLabels.keys),
             Set(PayabliPayInField.allCases)
         )
-        XCTAssertEqual(PayabliPayInLabels.defaultFieldLabels[.surchargeFee], "Surcharge")
+        XCTAssertEqual(PayabliPayInFormLabels.defaultFieldLabels[.surchargeFee], "Surcharge")
     }
 
     func testAccessibilityIdentifiersTakeTheFinalPrefix() {

@@ -50,7 +50,7 @@ final class PayInDigitRuleTests: XCTestCase {
     func testTheFormsSecurityCodeIsNotCompleteOnAFullwidthDigit() {
         let viewModel = Self.form()
         viewModel.cardCvv = "99" + Self.fullwidthOne
-        XCTAssertFalse(viewModel.fieldHasRequiredValue(.cardCvv), "two digits and a fullwidth one read as a code")
+        XCTAssertFalse(viewModel.fieldHasRequiredValue(.cardSecurityCode), "two digits and a fullwidth one read as a code")
     }
 
     func testTheFormsExpiryIsNotCompleteOnAFullwidthDigit() {
@@ -90,7 +90,7 @@ final class PayInDigitRuleTests: XCTestCase {
     func testTheFormsSecurityCodeIsNotCompleteOnAnAccentedDigit() {
         let viewModel = Self.form()
         viewModel.cardCvv = "99" + Self.accentedOne
-        XCTAssertFalse(viewModel.fieldHasRequiredValue(.cardCvv), "two digits and an accented one read as a code")
+        XCTAssertFalse(viewModel.fieldHasRequiredValue(.cardSecurityCode), "two digits and an accented one read as a code")
     }
 
     func testTheFormsExpiryIsNotCompleteOnAKeycapDigit() {
@@ -162,6 +162,7 @@ final class PayInDigitRuleTests: XCTestCase {
                 transport: RecordingIdempotencyTransport(body: PayInFixture.approved),
                 key: "k1"
             ),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
     }

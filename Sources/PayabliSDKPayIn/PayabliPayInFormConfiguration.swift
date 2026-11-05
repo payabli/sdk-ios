@@ -5,8 +5,8 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case cardholderName
     case cardNumber
     case cardExpiration
-    case cardCvv
-    case cardZip
+    case cardSecurityCode
+    case cardPostalCode
     case accountHolder
     case routingNumber
     case accountNumber
@@ -19,7 +19,7 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case lastName
     case customerNumber
     case billingEmail
-    case billingZip
+    case billingPostalCode
     case amount
     case serviceFee
     case surchargeFee
@@ -49,7 +49,7 @@ public enum PayabliPayInCardBrandIconPlacement: Sendable, Equatable {
     case hidden
 }
 
-public enum PayabliPayInErrorMessagePlacement: Sendable, Equatable {
+public enum PayabliPayInFailureMessagePlacement: Sendable, Equatable {
     case top
     case aboveSubmitButton
 }
@@ -92,8 +92,6 @@ public struct PayabliPayInHiddenValues: Sendable {
     }
 }
 
-public typealias PayabliPayInOptions = PayabliPayInTokenStorageOptions
-
 public struct PayabliPayInInputSize: Sendable, Equatable {
     public let width: CGFloat?
     public let height: CGFloat
@@ -108,115 +106,6 @@ public struct PayabliPayInInputSize: Sendable, Equatable {
         self.height = max(PayabliPayInAccessibility.minimumTouchTarget, height)
         self.horizontalPadding = max(0, horizontalPadding)
     }
-}
-
-public struct PayabliPayInLabels: Sendable {
-    /// The form's heading; nil or blank draws none.
-    public let title: String?
-    public let subtitle: String?
-    /// The submit button's wording; nil or blank reads the operation's own.
-    public let submitButton: String?
-    public let fieldLabels: [PayabliPayInField: String]
-    public let fieldPlaceholders: [PayabliPayInField: String]
-    /// The label on the summary's Total row; nil or blank reads "Total".
-    public let total: String?
-
-    public init(
-        title: String? = nil,
-        subtitle: String? = nil,
-        submitButton: String? = nil,
-        fieldLabels: [PayabliPayInField: String] = Self.defaultFieldLabels,
-        fieldPlaceholders: [PayabliPayInField: String] = [:],
-        total: String? = nil
-    ) {
-        self.title = title
-        self.subtitle = subtitle
-        self.submitButton = submitButton
-        self.fieldLabels = fieldLabels
-        self.fieldPlaceholders = fieldPlaceholders
-        self.total = total
-    }
-
-    /// The host's label for `field`, or the default when the host's is absent or blank.
-    ///
-    /// - Parameter field: the field whose label the form draws.
-    /// - Returns: the label to draw: the host's, the default's, or the field's own name.
-    public func label(for field: PayabliPayInField) -> String {
-        Self.nonBlank(fieldLabels[field])
-            ?? Self.defaultFieldLabels[field]
-            ?? field.rawValue
-    }
-
-    /// The heading to draw as given, or nil when the host's is absent or blank.
-    var drawnTitle: String? {
-        Self.nonBlank(title)
-    }
-
-    /// The line under the heading as given, or nil when the host's is absent or blank.
-    var drawnSubtitle: String? {
-        Self.nonBlank(subtitle)
-    }
-
-    /// The host's button wording as given, or nil when it is absent or blank.
-    var hostSubmitButton: String? {
-        Self.nonBlank(submitButton)
-    }
-
-    /// Blank when every scalar is a space, line or paragraph separator, or a control in U+0009–U+000D or
-    /// U+001C–U+001F.
-    ///
-    /// - Parameter text: the label or heading to test.
-    /// - Returns: whether the text is blank.
-    static func isBlank(_ text: String) -> Bool {
-        text.unicodeScalars.allSatisfy { scalar in
-            switch scalar.properties.generalCategory {
-            case .spaceSeparator, .lineSeparator, .paragraphSeparator:
-                return true
-            default:
-                return (0x09 ... 0x0D).contains(scalar.value) || (0x1C ... 0x1F).contains(scalar.value)
-            }
-        }
-    }
-
-    /// The text as given, or nil when it is absent or blank.
-    ///
-    /// - Parameter text: the host's string.
-    /// - Returns: the text, or nil when there is none to draw.
-    static func nonBlank(_ text: String?) -> String? {
-        text.flatMap { isBlank($0) ? nil : $0 }
-    }
-
-    /// The host's placeholder for `field` as given, or nil when it is absent or blank.
-    ///
-    /// - Parameter field: the field whose placeholder the form draws.
-    /// - Returns: the placeholder, or nil for none.
-    public func placeholder(for field: PayabliPayInField) -> String? {
-        Self.nonBlank(fieldPlaceholders[field])
-    }
-
-    public static let defaultFieldLabels: [PayabliPayInField: String] = [
-        .cardholderName: "Name on card",
-        .cardNumber: "Card number",
-        .cardExpiration: "Expiration",
-        .cardCvv: "CVV",
-        .cardZip: "Postal code",
-        .accountHolder: "Account holder",
-        .routingNumber: "Routing number",
-        .accountNumber: "Account number",
-        .accountType: "Account type",
-        .accountHolderType: "Holder type",
-        .secCode: "SEC code",
-        .deviceId: "Device",
-        .methodDescription: "Description",
-        .firstName: "First name",
-        .lastName: "Last name",
-        .customerNumber: "Customer number",
-        .billingEmail: "Billing email",
-        .billingZip: "Billing postal code",
-        .amount: "Amount",
-        .serviceFee: "Fee",
-        .surchargeFee: "Surcharge"
-    ]
 }
 
 public struct PayabliPayInFieldSection: Identifiable, Sendable {
@@ -240,7 +129,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
         style: PayabliPayInSectionStyle = .inputs
     ) {
         self.id = id?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? PayabliPayInLabels.nonBlank(title)?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
+            ?? PayabliPayInFormLabels.nonBlank(title)?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
             ?? fields.map(\.rawValue).joined(separator: "-")
         self.title = title
         self.titleStyle = titleStyle
@@ -254,7 +143,7 @@ public struct PayabliPayInFieldSection: Identifiable, Sendable {
     /// The heading drawn over the section: the host's title as given unless blank, else "Payment" on a summary.
     /// An inputs section without one has no heading.
     var heading: String? {
-        PayabliPayInLabels.nonBlank(title) ?? (style == .summary ? "Payment" : nil)
+        PayabliPayInFormLabels.nonBlank(title) ?? (style == .summary ? "Payment" : nil)
     }
 
     func replacingFields(_ fields: [PayabliPayInField]) -> PayabliPayInFieldSection {
@@ -329,20 +218,21 @@ public struct PayabliPayInFormConfiguration: Sendable {
     public let cardFieldOrder: [PayabliPayInField]
     public let bankFieldOrder: [PayabliPayInField]
     public let hiddenValues: PayabliPayInHiddenValues
-    public let options: PayabliPayInOptions
-    public let labels: PayabliPayInLabels
     public let labelLayout: PayabliPayInLabelLayout
     public let showsFieldLabels: Bool
     public let hiddenFieldLabels: Set<PayabliPayInField>
     public let formatting: PayabliPayInFormatting
     public let inputSizing: PayabliPayInInputSizing
     public let cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement
-    public let errorMessagePlacement: PayabliPayInErrorMessagePlacement
+    public let failureMessagePlacement: PayabliPayInFailureMessagePlacement
     public let requiredFields: Set<PayabliPayInField>
     public let cardSections: [PayabliPayInFieldSection]
     public let bankSections: [PayabliPayInFieldSection]
     public let paymentSummary: PayabliPayInPaymentSummaryConfiguration
     public let showsBaseAmount: Bool
+    /// Whether the form draws its failure message; the marks a failure puts on fields stay whatever
+    /// this holds.
+    public let showsFailureMessage: Bool
 
     public init(
         allowedMethods: [PayabliPayInMethodType] = [.card, .bankAccount],
@@ -352,18 +242,17 @@ public struct PayabliPayInFormConfiguration: Sendable {
         cardSections: [PayabliPayInFieldSection]? = nil,
         bankSections: [PayabliPayInFieldSection]? = nil,
         hiddenValues: PayabliPayInHiddenValues = PayabliPayInHiddenValues(),
-        options: PayabliPayInOptions = PayabliPayInOptions(),
-        labels: PayabliPayInLabels = PayabliPayInLabels(),
         labelLayout: PayabliPayInLabelLayout = .external,
         showsFieldLabels: Bool? = nil,
         hiddenFieldLabels: Set<PayabliPayInField> = [],
         formatting: PayabliPayInFormatting = PayabliPayInFormatting(),
         inputSizing: PayabliPayInInputSizing = PayabliPayInInputSizing(),
         cardBrandIconPlacement: PayabliPayInCardBrandIconPlacement = .trailing,
-        errorMessagePlacement: PayabliPayInErrorMessagePlacement = .aboveSubmitButton,
+        failureMessagePlacement: PayabliPayInFailureMessagePlacement = .aboveSubmitButton,
         requiredFields: Set<PayabliPayInField> = [],
         paymentSummary: PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(),
-        showsBaseAmount: Bool = true
+        showsBaseAmount: Bool = true,
+        showsFailureMessage: Bool = true
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
@@ -389,26 +278,25 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.cardSections = normalizedCardSections
         self.bankSections = normalizedBankSections
         self.hiddenValues = hiddenValues
-        self.options = options
-        self.labels = labels
         self.labelLayout = labelLayout
         self.showsFieldLabels = showsFieldLabels ?? (labelLayout == .external)
         self.hiddenFieldLabels = hiddenFieldLabels
         self.formatting = formatting
         self.inputSizing = inputSizing
         self.cardBrandIconPlacement = cardBrandIconPlacement
-        self.errorMessagePlacement = errorMessagePlacement
+        self.failureMessagePlacement = failureMessagePlacement
         self.requiredFields = visibleRequiredFields.union(Self.requiredPaymentFields)
         self.paymentSummary = paymentSummary
         self.showsBaseAmount = showsBaseAmount
+        self.showsFailureMessage = showsFailureMessage
     }
 
     public static let defaultCardFieldOrder: [PayabliPayInField] = [
         .cardholderName,
         .cardNumber,
         .cardExpiration,
-        .cardCvv,
-        .cardZip
+        .cardSecurityCode,
+        .cardPostalCode
     ]
 
     public static let defaultBankFieldOrder: [PayabliPayInField] = [
@@ -423,8 +311,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         .cardNumber,
         .cardExpiration,
         .cardholderName,
-        .cardCvv,
-        .cardZip,
+        .cardSecurityCode,
+        .cardPostalCode,
         .amount
     ]
 
@@ -593,30 +481,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         .lastName,
         .customerNumber,
         .billingEmail,
-        .billingZip
+        .billingPostalCode
     ]
-
-    func replacingLabels(_ labels: PayabliPayInLabels) -> PayabliPayInFormConfiguration {
-        PayabliPayInFormConfiguration(
-            allowedMethods: allowedMethods,
-            defaultMethod: defaultMethod,
-            cardFieldOrder: cardFieldOrder,
-            bankFieldOrder: bankFieldOrder,
-            cardSections: cardSections,
-            bankSections: bankSections,
-            hiddenValues: hiddenValues,
-            options: options,
-            labels: labels,
-            labelLayout: labelLayout,
-            showsFieldLabels: showsFieldLabels,
-            hiddenFieldLabels: hiddenFieldLabels,
-            formatting: formatting,
-            inputSizing: inputSizing,
-            cardBrandIconPlacement: cardBrandIconPlacement,
-            errorMessagePlacement: errorMessagePlacement,
-            requiredFields: requiredFields,
-            paymentSummary: paymentSummary,
-            showsBaseAmount: showsBaseAmount
-        )
-    }
 }

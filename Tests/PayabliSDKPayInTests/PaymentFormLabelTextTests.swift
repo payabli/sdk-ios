@@ -7,8 +7,8 @@ final class PaymentFormLabelTextTests: XCTestCase {
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
-        .cardCvv: "CVV",
-        .cardZip: "Postal code",
+        .cardSecurityCode: "CVV",
+        .cardPostalCode: "Postal code",
         .accountHolder: "Account holder",
         .routingNumber: "Routing number",
         .accountNumber: "Account number",
@@ -21,14 +21,14 @@ final class PaymentFormLabelTextTests: XCTestCase {
         .lastName: "Last name",
         .customerNumber: "Customer number",
         .billingEmail: "Billing email",
-        .billingZip: "Billing postal code",
+        .billingPostalCode: "Billing postal code",
         .amount: "Amount",
         .serviceFee: "Fee",
         .surchargeFee: "Surcharge"
     ]
 
     func testTheDefaultLabelsAreTheSharedText() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
 
         for field in PayabliPayInField.allCases {
             XCTAssertEqual(labels.label(for: field), Self.defaultLabelText[field], field.rawValue)
@@ -36,7 +36,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
     }
 
     func testEverySummaryRowIsLabelledWithTheBareLabel() {
-        let labels = PayabliPayInLabels()
+        let labels = PayabliPayInFormLabels()
 
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .amount, labels: labels), "Amount")
         XCTAssertEqual(PayabliPayInSummaryRows.labelText(for: .serviceFee, labels: labels), "Fee")
@@ -44,8 +44,19 @@ final class PaymentFormLabelTextTests: XCTestCase {
         XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: labels), "Total")
     }
 
+    func testFailureWordingBlankByTheFormsRuleFallsBackToTheSDKs() {
+        let labels = PayabliPayInFormLabels(declinedMessage: "\u{1C}\u{1F}", otherMessage: " \u{1D} ")
+
+        XCTAssertNil(labels.failureMessage(for: .declined))
+        XCTAssertNil(labels.failureMessage(for: .internal))
+        XCTAssertEqual(
+            PayabliPayInFormLabels(declinedMessage: "  Card declined  ").failureMessage(for: .declined),
+            "Card declined"
+        )
+    }
+
     func testABlankHostLabelFallsBackToTheDefault() {
-        let labels = PayabliPayInLabels(fieldLabels: [.amount: "", .serviceFee: "   ", .surchargeFee: "Extra"])
+        let labels = PayabliPayInFormLabels(fieldLabels: [.amount: "", .serviceFee: "   ", .surchargeFee: "Extra"])
 
         XCTAssertEqual(labels.label(for: .amount), "Amount")
         XCTAssertEqual(labels.label(for: .serviceFee), "Fee")
@@ -54,28 +65,28 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
     func testBlankIsSeparatorsAndWhitespaceControlsOnly() {
         for blank in ["", " ", "\t\n", "\u{1C}", "\u{1F}", "\u{00A0}", "\u{2028}", "\u{3000}"] {
-            XCTAssertTrue(PayabliPayInLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+            XCTAssertTrue(PayabliPayInFormLabels.isBlank(blank), blank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
         }
         for notBlank in ["\u{85}", "\u{200B}", " a "] {
-            XCTAssertFalse(PayabliPayInLabels.isBlank(notBlank), notBlank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
+            XCTAssertFalse(PayabliPayInFormLabels.isBlank(notBlank), notBlank.unicodeScalars.map { String($0.value, radix: 16) }.joined())
         }
     }
 
     func testAHostLabelIsUsedAsGiven() {
-        let labels = PayabliPayInLabels(fieldLabels: [.cardNumber: " Card # "])
+        let labels = PayabliPayInFormLabels(fieldLabels: [.cardNumber: " Card # "])
 
         XCTAssertEqual(labels.label(for: .cardNumber), " Card # ")
     }
 
     func testAnAbsentOrBlankTitleDrawsNoHeading() {
         for title in [nil, "", "   ", "\u{3000}", "\u{1C}"] {
-            XCTAssertNil(PayabliPayInLabels(title: title).drawnTitle, String(describing: title))
+            XCTAssertNil(PayabliPayInFormLabels(title: title).drawnTitle, String(describing: title))
         }
     }
 
     func testAnAbsentOrBlankButtonWordingIsNotTheHosts() {
         for wording in [nil, "", "\t\n", "\u{1C}"] {
-            XCTAssertNil(PayabliPayInLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
+            XCTAssertNil(PayabliPayInFormLabels(submitButton: wording).hostSubmitButton, String(describing: wording))
         }
     }
 
@@ -83,11 +94,11 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
     /// Each host string the form draws, read the way the form reads it.
     private static let drawnStrings: [(name: String, read: (String) -> String?)] = [
-        ("title", { PayabliPayInLabels(title: $0).drawnTitle }),
-        ("subtitle", { PayabliPayInLabels(subtitle: $0).drawnSubtitle }),
-        ("submit button", { PayabliPayInLabels(submitButton: $0).hostSubmitButton }),
-        ("placeholder", { PayabliPayInLabels(fieldPlaceholders: [.cardNumber: $0]).placeholder(for: .cardNumber) }),
-        ("total", { PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: $0)) }),
+        ("title", { PayabliPayInFormLabels(title: $0).drawnTitle }),
+        ("subtitle", { PayabliPayInFormLabels(subtitle: $0).drawnSubtitle }),
+        ("submit button", { PayabliPayInFormLabels(submitButton: $0).hostSubmitButton }),
+        ("placeholder", { PayabliPayInFormLabels(fieldPlaceholders: [.cardNumber: $0]).placeholder(for: .cardNumber) }),
+        ("total", { PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: $0)) }),
         ("section heading", { PayabliPayInFieldSection(title: $0, fields: [.firstName]).heading })
     ]
 
@@ -95,7 +106,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
         for drawn in Self.drawnStrings where drawn.name != "total" {
             XCTAssertNil(drawn.read("\u{1C}"), drawn.name)
         }
-        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInLabels(total: "\u{1C}")), "Total")
+        XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: PayabliPayInFormLabels(total: "\u{1C}")), "Total")
     }
 
     func testAZeroWidthSpaceIsDrawn() {
@@ -111,14 +122,14 @@ final class PaymentFormLabelTextTests: XCTestCase {
     }
 
     func testABlankStringDrawsItsDefault() {
-        let blank = PayabliPayInLabels(title: "  ", subtitle: "  ", submitButton: "  ", total: "  ")
+        let blank = PayabliPayInFormLabels(title: "  ", subtitle: "  ", submitButton: "  ", total: "  ")
 
         XCTAssertNil(blank.drawnTitle)
         XCTAssertNil(blank.drawnSubtitle)
         XCTAssertNil(PayabliPayInFieldSection(title: "  ", fields: [.firstName]).heading)
         XCTAssertEqual(PayabliPayInFieldSection(title: "  ", fields: [.amount], style: .summary).heading, "Payment")
         XCTAssertEqual(PayabliPayInSummaryRows.totalLabelText(labels: blank), "Total")
-        for operation in [PayabliPayInOperation.capture, .authorize, .storePaymentMethod] {
+        for operation in [PayabliPayInOperation.Kind.capture, .authorize, .storePaymentMethod] {
             XCTAssertEqual(
                 PayInSubmitWording.text(showing: operation, submitting: nil, hostWording: blank.hostSubmitButton),
                 PayInSubmitWording(operation).idle
@@ -146,16 +157,19 @@ final class PaymentFormLabelTextTests: XCTestCase {
     @MainActor
     private func sheet(
         _ sheetConfiguration: PayabliPayInSheetConfiguration,
-        labels: PayabliPayInLabels = PayabliPayInLabels()
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels()
     ) -> PayabliPayInSheetContent {
         PayabliPayInSheetContent(
             isPresented: .constant(true),
-            component: flowOnSession(),
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], labels: labels),
+            payIn: flowOnSession(),
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: labels,
             sheetConfiguration: sheetConfiguration,
             style: nil,
             onCompleted: { _ in },
-            onError: { _ in }
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
     }
 
@@ -176,7 +190,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
     func testABlankSheetHeaderTakesTheFormsAsGiven() {
         let content = sheet(
             PayabliPayInSheetConfiguration(title: "\u{1C}", subtitle: "  ", movesFormHeaderToSheetHeader: true),
-            labels: PayabliPayInLabels(title: " Checkout ", subtitle: "\u{200B}")
+            labels: PayabliPayInFormLabels(title: " Checkout ", subtitle: "\u{200B}")
         )
 
         XCTAssertEqual(content.sheetTitle, " Checkout ")

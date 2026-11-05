@@ -11,6 +11,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
     func testTheFormsCardBuffersCloseOnceTheSubmissionEnds() async throws {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         viewModel.selectedMethod = .card
@@ -54,6 +55,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
     func testTheFormsCardBuffersCloseWhenTheSubmissionThrows() async throws {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         viewModel.selectedMethod = .card
@@ -94,6 +96,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
     func testTheFormsAccountNumberClosesWithTheFormsBuffers() async throws {
         let viewModel = PayabliPayInViewModel(
             component: component(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         viewModel.selectedMethod = .bankAccount

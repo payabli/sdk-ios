@@ -4,8 +4,10 @@ import PayabliSDKCore
 /// The `NSError` domain every error this facade hands to an ObjC caller carries, whatever it wraps.
 private let payInObjCErrorDomain = "com.payabli.payIn"
 
-@objc(PayabliPayInStoredPaymentMethodObjC)
-public final class PayabliPayInStoredPaymentMethodObjC: NSObject {
+/// A payment method the service stored, for an Objective-C caller. Each field is
+/// ``PayabliPayInStoredMethod``'s.
+@objc(PayabliPayInStoredMethodObjC)
+public final class PayabliPayInStoredMethodObjC: NSObject {
     @objc public let storedMethodId: String?
     @objc public let method: String
     @objc public let methodReferenceId: String?
@@ -15,7 +17,7 @@ public final class PayabliPayInStoredPaymentMethodObjC: NSObject {
     @objc public let responseText: String
     @objc public let apiResponse: NSDictionary
 
-    init(_ method: PayabliPayInStoredPaymentMethod) {
+    init(_ method: PayabliPayInStoredMethod) {
         storedMethodId = method.storedMethodId
         self.method = Self.name(of: method.method)
         methodReferenceId = method.methodReferenceId
@@ -117,95 +119,40 @@ public final class PayabliPayInObjC: NSObject {
         return PayabliPayInObjC(component: PayabliPayIn(session: session))
     }
 
-    // swiftlint:disable:next function_parameter_count
-    @objc public func addCard(
-        cardNumber: String,
-        expiryMonth: Int,
-        expiryYear: Int,
-        securityCode: String,
-        holderName: String,
-        postalCode: String,
-        createAnonymous: Bool,
-        forceCustomerCreation: Bool,
-        temporary: Bool,
-        source: String?,
-        completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
+    /// Stores a payment method, as ``PayabliPayIn/storeMethod(_:)`` does.
+    ///
+    /// - Parameter request: the payment method to store, and what the request carries besides it.
+    /// - Parameter completion: the method the service stored, or the error the store failed with.
+    @objc(storeMethodWithRequest:completion:)
+    public func storeMethod(
+        _ request: PayabliPayInStoreRequestObjC,
+        completion: @escaping (PayabliPayInStoredMethodObjC?, NSError?) -> Void
     ) {
-        let card = PayabliPayInCardData(
-            cardNumber: cardNumber,
-            expiryMonth: expiryMonth,
-            expiryYear: expiryYear,
-            securityCode: securityCode,
-            holderName: holderName,
-            postalCode: postalCode
-        )
-        let options = PayabliPayInOptions(
-            createAnonymous: createAnonymous,
-            forceCustomerCreation: forceCustomerCreation,
-            temporary: temporary,
-            source: source
-        )
-        addPaymentMethod(.card(card), options: options, completion: completion)
+        storeMethod(request.toSwift(), completion: completion)
     }
 
-    // swiftlint:disable:next function_parameter_count
-    @objc public func addBankAccount(
-        accountNumber: String,
-        routingNumber: String,
-        accountType: String,
-        holderName: String,
-        holderType: String?,
-        secCode: String?,
-        deviceId: String?,
-        achValidation: Bool,
-        createAnonymous: Bool,
-        forceCustomerCreation: Bool,
-        temporary: Bool,
-        source: String?,
-        completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
+    /// Stores the payment method the request carries, closing its digit buffers at the task's end,
+    /// on a result and a refusal alike: no host can reach them to close them itself.
+    ///
+    /// - Parameter request: the payment method to store, and what the request carries besides it.
+    /// - Parameter completion: the method the service stored, or the error the store failed with.
+    func storeMethod(
+        _ request: PayabliPayInStoreRequest,
+        completion: @escaping (PayabliPayInStoredMethodObjC?, NSError?) -> Void
     ) {
-        guard let resolvedAccountType = PayabliPayInAccountType(rawValue: accountType) else {
-            completion(nil, invalidArgument("accountType must be Checking or Savings"))
-            return
-        }
-        let resolvedSecCode: PayabliPayInSecCode
-        if let secCode {
-            guard let secCode = PayabliPayInSecCode(rawValue: secCode) else {
-                completion(nil, invalidArgument("secCode must be PPD, WEB, TEL, CCD, or BOC"))
-                return
+        Task { @MainActor in
+            defer {
+                for digits in request.instrument.sensitiveDigits {
+                    digits.close()
+                }
             }
-            resolvedSecCode = secCode
-        } else {
-            resolvedSecCode = .web
-        }
-        let resolvedHolderType: PayabliPayInAccountHolderType?
-        if let holderType {
-            guard let holderType = PayabliPayInAccountHolderType(rawValue: holderType) else {
-                completion(nil, invalidArgument("holderType must be personal or business"))
-                return
+            do {
+                let method = try await component.storeMethod(request)
+                completion(PayabliPayInStoredMethodObjC(method), nil)
+            } catch {
+                completion(nil, error.toPayabliPayInNSError())
             }
-            resolvedHolderType = holderType
-        } else {
-            resolvedHolderType = nil
         }
-
-        let ach = PayabliPayInBankAccountData(
-            accountNumber: accountNumber,
-            routingNumber: routingNumber,
-            accountType: resolvedAccountType,
-            holderName: holderName,
-            holderType: resolvedHolderType,
-            secCode: resolvedSecCode,
-            deviceId: deviceId
-        )
-        let options = PayabliPayInOptions(
-            achValidation: achValidation,
-            createAnonymous: createAnonymous,
-            forceCustomerCreation: forceCustomerCreation,
-            temporary: temporary,
-            source: source
-        )
-        addPaymentMethod(.bankAccount(ach), options: options, completion: completion)
     }
 
     /// Reads a transaction back by its identifier, as ``PayabliPayIn/readTransaction(_:)`` does.
@@ -331,43 +278,6 @@ public final class PayabliPayInObjC: NSObject {
                 completion(nil, error.toPayabliPayInNSError(movesMoney: true))
             }
         }
-    }
-
-    /// Stores a payment method the adapter built from strings, closing the buffers it built for
-    /// them at the task's end: a host cannot reach those buffers to close them itself.
-    ///
-    /// - Parameter paymentMethod: the method to store.
-    /// - Parameter options: what the request carries besides the method.
-    /// - Parameter completion: the stored method, or the error the store failed with.
-    func addPaymentMethod(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInOptions,
-        completion: @escaping (PayabliPayInStoredPaymentMethodObjC?, NSError?) -> Void
-    ) {
-        Task { @MainActor in
-            defer {
-                for digits in paymentMethod.sensitiveDigits {
-                    digits.close()
-                }
-            }
-            do {
-                let result = try await component.addPaymentMethod(
-                    paymentMethod,
-                    options: options
-                )
-                completion(PayabliPayInStoredPaymentMethodObjC(result), nil)
-            } catch {
-                completion(nil, error.toPayabliPayInNSError())
-            }
-        }
-    }
-
-    private func invalidArgument(_ message: String) -> NSError {
-        NSError(
-            domain: payInObjCErrorDomain,
-            code: -2,
-            userInfo: [NSLocalizedDescriptionKey: message]
-        )
     }
 }
 
