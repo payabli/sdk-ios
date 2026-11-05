@@ -4,13 +4,13 @@ import Foundation
 public enum PayabliPayInSummaryRows {
     public static func labelText(
         for field: PayabliPayInField,
-        labels: PayabliPayInLabels
+        labels: PayabliPayInFormLabels
     ) -> String {
         labels.label(for: field)
     }
 
-    public static func totalLabelText(labels: PayabliPayInLabels) -> String {
-        PayabliPayInLabels.nonBlank(labels.total) ?? "Total"
+    public static func totalLabelText(labels: PayabliPayInFormLabels) -> String {
+        PayabliPayInFormLabels.nonBlank(labels.total) ?? "Total"
     }
 
     /// The figure a money row shows, at the two places it is sent, or nil when the form draws no row for it.

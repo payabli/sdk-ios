@@ -68,8 +68,8 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
             cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
             expiry: try XCTUnwrap(values.cardExpiration),
             holderName: QAIdentity.current.holderName,
-            securityCode: try XCTUnwrap(values.cardCvv),
-            postalCode: try XCTUnwrap(values.cardZip)
+            securityCode: try XCTUnwrap(values.cardSecurityCode),
+            postalCode: try XCTUnwrap(values.cardPostalCode)
         )
     }
 
@@ -104,13 +104,13 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// A card is stored and comes back with a token to charge later.
     func testAStoringACardReturnsAToken() async throws {
-        let stored = try await makeFlow().addCard(
-            try card(),
-            options: PayabliPayInTokenStorageOptions(
+        let stored = try await makeFlow().storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(try card()),
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
-        )
+        ))
 
         // The token itself is never printed. `PayabliLogger`'s rules put tokens
         // outside every privacy level, and a stored method is reusable, so a run's
@@ -239,13 +239,13 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// A card stored in this run, charged as the method and identifier the store returned.
     private func storedCard(on flow: PayabliPayIn) async throws -> PayabliPayInPaymentMethod {
-        let stored = try await flow.addCard(
-            try card(),
-            options: PayabliPayInTokenStorageOptions(
+        let stored = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(try card()),
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
-        )
+        ))
         let storedMethodId = try XCTUnwrap(stored.storedMethodId, "no stored method came back")
         return .stored(PayabliPayInPaymentMethod.Stored(method: stored.method, storedMethodId: storedMethodId))
     }

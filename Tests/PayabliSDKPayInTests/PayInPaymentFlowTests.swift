@@ -14,16 +14,18 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
 
-        let result = try await component.addCard(PayabliPayInCardData(
-            cardNumber: "4111 1111 1111 1111",
-            expiry: "02/25",
-            holderName: "John Doe",
-            securityCode: "123",
-            postalCode: "12345"
+        let result = try await component.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(PayabliPayInCardData(
+                cardNumber: "4111 1111 1111 1111",
+                expiry: "02/25",
+                holderName: "John Doe",
+                securityCode: "123",
+                postalCode: "12345"
+            )),
+            options: PayabliPayInStoreOptions()
         ))
 
         XCTAssertEqual(result.storedMethodId, "stored-123")
@@ -40,8 +42,7 @@ final class PayInPaymentFlowTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .capture
+            transport: transport
         )
 
         let result = try await component.capture(PayabliPayInRequest(

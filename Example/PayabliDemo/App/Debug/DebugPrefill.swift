@@ -24,8 +24,8 @@
         struct Values: Decodable {
             var cardholderName: String?
             var cardNumber: String?
-            var cardCvv: String?
-            var cardZip: String?
+            var cardSecurityCode: String?
+            var cardPostalCode: String?
             var cardExpiration: String?
             var firstName: String?
             var lastName: String?
@@ -66,8 +66,8 @@
             let mapping: [(PayInPrefillField, String?)] = [
                 (.cardholderName, identity.holderName),
                 (.cardNumber, values.cardNumber),
-                (.cardCvv, values.cardCvv),
-                (.cardZip, values.cardZip),
+                (.cardSecurityCode, values.cardSecurityCode),
+                (.cardPostalCode, values.cardPostalCode),
                 (.firstName, identity.firstName),
                 (.lastName, identity.lastName),
                 (.billingEmail, identity.billingEmail),

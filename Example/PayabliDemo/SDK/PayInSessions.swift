@@ -3,17 +3,13 @@ import PayabliSDKPayIn
 
 /// Where this app's card-not-present flows are built.
 ///
-/// One per operation, because a flow is fixed to the operation it was built for.
+/// One per operation, because each flow's handle holds the attempt for that operation alone.
 /// The app holds the handles these return and never the flow inside them.
 @MainActor
 enum PayInSessions {
     /// Storing an instrument for later.
     static func storedMethod(session: PayabliSession) -> PayInFlowHandle {
-        PayInFlowHandle(
-            PayabliPayIn(
-                session: session
-            )
-        )
+        PayInFlowHandle(PayabliPayIn(session: session))
     }
 
     /// Taking a payment now.
@@ -22,48 +18,24 @@ enum PayInSessions {
     /// this point, and its own default is the same answer, so the launch request
     /// states it rather than reading it.
     static func capture(session: PayabliSession) -> PayInFlowHandle {
-        PayInFlowHandle(
-            PayabliPayIn(
-                session: session,
-                operation: .capture,
-                requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: true)
-            )
-        )
+        PayInFlowHandle(PayabliPayIn(session: session), request: PayInRequests.freshCapture(suppliesCustomer: true))
     }
 
     /// Holding an amount on a card to capture later. Takes the amount, the fee and the key as a capture does.
     static func authorize(session: PayabliSession) -> PayInFlowHandle {
-        PayInFlowHandle(
-            PayabliPayIn(
-                session: session,
-                operation: .authorize,
-                requestConfiguration: PayInRequests.freshCapture(suppliesCustomer: true)
-            )
-        )
+        PayInFlowHandle(PayabliPayIn(session: session), request: PayInRequests.freshCapture(suppliesCustomer: true))
     }
 
     /// A flow for a canvas preview, which makes no network call.
-    static func preview(
-        session: PayabliSession,
-        operation: PayabliPayInOperation = .storePaymentMethod
-    ) -> PayInFlowHandle {
+    static func preview(session: PayabliSession) -> PayInFlowHandle {
         PayInFlowHandle(
-            PayabliPayIn(
-                session: session,
-                operation: operation,
-                requestConfiguration: operation != .storePaymentMethod
-                    ? PayabliPayInRequestConfiguration(
-                        paymentDetails: PayabliPayInPaymentDetails(
-                            totalAmount: 1,
-                            serviceFee: 0.10,
-                            currency: "USD"
-                        ),
-                        orderDescription: "Preview Payment",
-                        orderId: "preview-order",
-                        source: "preview",
-                        paymentReference: "preview-reference"
-                    )
-                    : nil
+            PayabliPayIn(session: session),
+            request: PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, serviceFee: 0.10, currency: "USD"),
+                orderDescription: "Preview Payment",
+                orderId: "preview-order",
+                source: "preview",
+                paymentReference: "preview-reference"
             )
         )
     }

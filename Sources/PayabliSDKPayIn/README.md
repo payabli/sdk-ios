@@ -22,7 +22,7 @@ OAuth2 credentials with a permission for each operation you use:
 | `capture(_:)`, `authorize(_:)`, `captureAuthorizedTransaction(_:)` | `inboundpayments_create` |
 | `voidTransaction(_:)` | `inboundpayments_void` |
 | `readTransaction(_:)` | `inboundpayments_read` |
-| `addCard`, `addBankAccount`, `addPaymentMethod` | `tokens_create` |
+| `storeMethod(_:)` | `tokens_create` |
 
 ## Before you start
 
@@ -46,24 +46,18 @@ let session = try await PayabliSession.initialize(config: PayabliConfig(
     environment: .sandbox,
     tokenProvider: { try await fetchPayabliAccessToken() }
 ))
-let payIn = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
-        orderId: order.id // your own reference, to find the payment if its outcome is unknown
-    )
-)
+let payIn = PayabliPayIn(session: session)
 ```
 
-A form that captures or authorizes needs this `PayabliPayInRequestConfiguration`. A direct call takes a
-`PayabliPayInRequest` instead.
+One `PayabliPayIn` serves every form and call on the session.
 
 ## Take a payment
 
 ### Use the SDK's form
 
-`PayabliPayInView` renders a card and bank account form and submits it with the operation you chose:
+`PayabliPayInForm` renders a card and bank account form and submits it with the operation you chose. A capture
+or an authorization carries the payment it sends, as a `PayabliPayInRequestConfiguration`; a direct call takes a
+`PayabliPayInRequest` instead.
 
 ```swift
 import SwiftUI
@@ -73,24 +67,35 @@ struct CheckoutView: View {
     let payIn: PayabliPayIn
 
     var body: some View {
-        PayabliPayInView(
-            component: payIn,
-            onCompleted: { result in
+        PayabliPayInForm(
+            payIn: payIn,
+            operation: .capture(PayabliPayInRequestConfiguration(
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34),
+                orderId: order.id // your own reference, to find the payment if its outcome is unknown
+            )),
+            configuration: PayabliPayInFormConfiguration(),
+            onCompleted: { success in
                 // Store the identifiers; don't log them.
-                if let stored = result.storedPaymentMethod {
-                    order.storedMethodId = stored.storedMethodId
-                } else {
+                switch success {
+                case let .payment(result):
                     order.paymentTransId = result.transaction?.paymentTransId
+                case let .method(stored):
+                    order.storedMethodId = stored.storedMethodId
                 }
             },
-            onError: { error in /* see Outcomes and errors */ }
+            onFailed: { error in /* see Outcomes and errors */ },
+            onMethodChanged: { method in /* the payer switched method, or the configuration withdrew one */ }
         )
     }
 }
 ```
 
-To show the form in a sheet, use `.payabliPayInSheet(isPresented:component:configuration:sheetConfiguration:style:onCompleted:onError:)`.
-It renders the same form and takes the same configuration and style.
+`onMethodChanged` fires when the payer switches between card and bank account, or the configuration
+withdraws the method the payer had chosen. It never fires for the method the form opens with.
+
+To show the form in a sheet, use
+`.payabliPayInSheet(isPresented:payIn:operation:configuration:labels:sheetConfiguration:style:onCompleted:onFailed:onMethodChanged:)`.
+It renders the same form and takes the same configuration, labels and style.
 
 ### Call the API from your own UI
 
@@ -117,10 +122,10 @@ In sandbox, use Payabli's [test cards](https://docs.payabli.com/guides/test-acco
 
 ### Store a payment method and charge it later
 
-`addCard(_:options:)`, `addBankAccount(_:options:)` and `addPaymentMethod(_:options:)` save a method and
-return a `PayabliPayInStoredPaymentMethod`. The form does the same with `.storePaymentMethod`. Its
-`storedMethodId` is optional, and is `nil` when the service's answer names no ID. To charge a saved
-method, pass `.stored(.init(method: .card, storedMethodId: id))` as the payment method.
+`storeMethod(_:)` saves a card or bank account and returns a `PayabliPayInStoredMethod`. The form does
+the same with `.storePaymentMethod(options)`, which sends those options with what the payer entered. Its `storedMethodId` is optional, and is `nil` when the service's
+answer names no ID. To charge a saved method, pass `.stored(.init(method: .card, storedMethodId: id))`
+as the payment method.
 
 ### Authorize, then capture
 
@@ -137,7 +142,8 @@ The reference stays on the device. Calling again is a new payment unless you say
 When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
 again, set `attempt: .retry` and that `paymentReference` on the options: the SDK sends that payment's key, so the
-service refuses a repeat while it still recognises the key. When it refuses one, the charge ends in
+service refuses a repeat while it still recognises the key. On the form, pass a new operation carrying the same
+configuration with `attempt: .retry`. When it refuses one, the charge ends in
 `submissionInterrupted` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.
@@ -185,7 +191,7 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | `PayabliPayInError.submissionInterrupted` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
 | `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service refusing it, typed `.paymentDeclined`. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
-| A core `PayabliError` from `addCard`, `addBankAccount` or `addPaymentMethod` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
+| A core `PayabliError` from `storeMethod(_:)` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
 
 Don't show `error.localizedDescription` to the payer or log it: it names what the service rejected and can
 quote what was submitted. Show the payer a message for the error's `category`, and log
@@ -198,9 +204,9 @@ retried payment refused for a rate limit or a credential is still one that may h
 
 | Operation | What a form submission does |
 |---|---|
-| `.storePaymentMethod` | Saves the card or bank account as a stored payment method. This is the default |
-| `.capture` | Charges the payment method |
-| `.authorize` | Authorizes a card without capturing it |
+| `.storePaymentMethod(options)` | Saves the card or bank account as a stored payment method, sent with `options` |
+| `.capture(configuration)` | Charges the payment method for the payment `configuration` describes |
+| `.authorize(configuration)` | Authorizes a card without capturing it |
 
 ### Methods
 
@@ -211,7 +217,7 @@ retried payment refused for a rate limit or a credential is still one that may h
 | `captureAuthorizedTransaction(_:)` | Captures an earlier authorization |
 | `voidTransaction(_:)` | Voids a transaction that hasn't settled |
 | `readTransaction(_:)` | Reads a transaction back and returns its `status`. A failure of type `TRANSACTION_NOT_FOUND` means nothing is visible under that ID yet, which isn't proof no payment was made: read again later rather than charging again |
-| `addCard(_:options:)`, `addBankAccount(_:options:)`, `addPaymentMethod(_:options:)` | Saves a payment method and returns its stored ID |
+| `storeMethod(_:)` | Saves a card or bank account and returns its stored ID |
 
 ### Form configuration
 
@@ -222,11 +228,16 @@ retried payment refused for a rate limit or a credential is still one that may h
 | `allowedMethods`, `defaultMethod` | Card, bank account, or both, and which opens first |
 | `cardFieldOrder`, `bankFieldOrder`, `cardSections`, `bankSections` | The fields, their order, and their sections |
 | `requiredFields`, `hiddenValues`, `options` | Fields the payer must fill, values sent without a field, and form options |
-| `labels`, `labelLayout`, `showsFieldLabels`, `hiddenFieldLabels` | Wording, and where labels sit or whether they show |
+| `labelLayout`, `showsFieldLabels`, `hiddenFieldLabels` | Where labels sit, and whether they show |
+| `failureMessagePlacement`, `showsFailureMessage` | Where the form's failure message sits, and whether the form draws it; the marks a failure puts on fields stay |
 | `formatting`, `inputSizing`, `cardBrandIconPlacement` | Formatting, field sizes, and the card brand icon |
 | `paymentSummary` | The amount and fee rows |
 
-`PayabliPayInLabels(fieldPlaceholders:)` sets placeholders per field. `labelLayout: .placeholder` or
+The wording is separate: the form takes `labels: PayabliPayInFormLabels`. Its
+`declinedMessage`, `retryLaterMessage`, `outcomeUnknownMessage` and `otherMessage` replace the payer's
+message for their failure category; left nil or blank, the SDK's own message is drawn.
+
+`PayabliPayInFormLabels(fieldPlaceholders:)` sets placeholders per field. `labelLayout: .placeholder` or
 `showsFieldLabels: false` hides the visible labels and keeps the accessible ones.
 
 Group fields with `PayabliPayInFieldSection`:
@@ -234,10 +245,10 @@ Group fields with `PayabliPayInFieldSection`:
 ```swift
 PayabliPayInFieldSection(
     title: "Card Information",
-    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+    fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
     inputVerticalSpacing: 4,
     inputHorizontalSpacing: 8,
-    fieldVerticalSpacings: [.cardNumber: 2, .cardCvv: 2]
+    fieldVerticalSpacings: [.cardNumber: 2, .cardSecurityCode: 2]
 )
 ```
 
@@ -247,7 +258,7 @@ heading.
 
 ### Styling
 
-`PayabliPayInStyle`, applied with `.payabliPayInStyle(_:)`, sets:
+`PayabliPayInFormStyle`, applied with `.payabliPayInStyle(_:)`, sets:
 
 - the title, subtitle, label, section title, error and submit button text styles;
 - the input font, with `input.uiFont` for the UIKit-backed text fields;

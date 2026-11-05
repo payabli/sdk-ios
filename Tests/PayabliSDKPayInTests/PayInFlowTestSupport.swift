@@ -9,9 +9,7 @@
 func flowOnSession(
     token: String = "access-token",
     entryPoint: String = "entry",
-    environment: PayabliEnvironment = .sandbox,
-    operation: PayabliPayInOperation = .storePaymentMethod,
-    requestConfiguration: PayabliPayInRequestConfiguration? = nil
+    environment: PayabliEnvironment = .sandbox
 ) -> PayabliPayIn {
     let config = try! PayabliConfig(
         entryPoint: entryPoint,
@@ -20,9 +18,7 @@ func flowOnSession(
         tokenProvider: { token }
     )
     return PayabliPayIn(
-        session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport()),
-        operation: operation,
-        requestConfiguration: requestConfiguration
+        session: PayabliSession(config: config, telemetryTransport: DiscardingTelemetryTransport())
     )
 }
 

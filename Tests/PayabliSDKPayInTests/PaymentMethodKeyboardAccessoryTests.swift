@@ -55,7 +55,7 @@ final class PaymentMethodKeyboardAccessoryTests: XCTestCase {
     /// The form's numeric fields, named, so a field moved off a number pad shows up
     /// here as well as in the sweep above.
     func testTheFormsNumericFieldsAreOnANumberPad() {
-        let numeric: [PayabliPayInField] = [.cardNumber, .cardCvv, .routingNumber, .accountNumber]
+        let numeric: [PayabliPayInField] = [.cardNumber, .cardSecurityCode, .routingNumber, .accountNumber]
         for field in numeric {
             XCTAssertEqual(field.keyboardType, .numberPad, field.rawValue)
         }

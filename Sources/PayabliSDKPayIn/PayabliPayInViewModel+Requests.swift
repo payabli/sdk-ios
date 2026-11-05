@@ -53,8 +53,8 @@ extension PayabliPayInViewModel {
     }
 
     func mergedCustomerData() -> PayabliPayInCustomerData? {
-        var customer = component.requestConfiguration?.customerData
-            ?? configuration.options.customerData
+        var customer = operation.requestConfiguration?.customerData
+            ?? operation.storeOptions?.customerData
             ?? PayabliPayInCustomerData()
         customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
         customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
@@ -70,10 +70,11 @@ extension PayabliPayInViewModel {
             ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    func mergedTokenStorageOptions() -> PayabliPayInTokenStorageOptions {
-        var options = configuration.options
+    func mergedStoreOptions() -> PayabliPayInStoreOptions {
+        var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
         options.methodDescription = mergedOrderDescription()
+            ?? options.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         return options
     }
 
@@ -142,10 +143,10 @@ extension PayabliPayInViewModel {
             cardExpirationMonth = nil
             cardExpirationYear = nil
         }
-        if dropped.contains(.cardCvv), !cardCvvStorage.isEmpty {
+        if dropped.contains(.cardSecurityCode), !cardCvvStorage.isEmpty {
             cardCvvStorage = ""
         }
-        if dropped.contains(.cardZip), !cardZipStorage.isEmpty {
+        if dropped.contains(.cardPostalCode), !cardZipStorage.isEmpty {
             cardZipStorage = ""
         }
     }
@@ -190,7 +191,7 @@ extension PayabliPayInViewModel {
         if dropped.contains(.billingEmail), !billingEmail.isEmpty {
             billingEmail = ""
         }
-        if dropped.contains(.billingZip), !billingZipStorage.isEmpty {
+        if dropped.contains(.billingPostalCode), !billingZipStorage.isEmpty {
             billingZipStorage = ""
         }
     }
@@ -199,22 +200,10 @@ extension PayabliPayInViewModel {
         activeRequiredFields.allSatisfy(fieldHasRequiredValue)
     }
 
-    var operationConfigurationIsValid: Bool {
-        if component.operation == .storePaymentMethod {
-            return true
-        }
-        return paymentDetailsArePresent
-    }
-
-    private var paymentDetailsArePresent: Bool {
-        // Present, not valid: an amount the request cannot send is refused at submission with its own message.
-        component.requestConfiguration?.paymentDetails != nil
-    }
-
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(configuration.labels.label(for: field)) is required.")
+                throw PayabliPayInError.invalidInput("\(labels.label(for: field)) is required.")
             }
         }
     }
@@ -225,11 +214,11 @@ extension PayabliPayInViewModel {
 
     func fieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
+        case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
+        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
         case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
@@ -247,10 +236,10 @@ extension PayabliPayInViewModel {
                 && cardNumberValidationMessage == nil
         case .cardExpiration:
             return cardExpiration.payabliCaptureDigitsOnly.count >= 4
-        case .cardCvv:
+        case .cardSecurityCode:
             return (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
                 .contains(cardCvv.payabliCaptureDigitsOnly.count)
-        case .cardZip:
+        case .cardPostalCode:
             return !cardZip.payabliCaptureTrimmed.isEmpty
         default:
             return true
@@ -294,7 +283,7 @@ extension PayabliPayInViewModel {
             return !customerNumber.payabliCaptureTrimmed.isEmpty
         case .billingEmail:
             return !billingEmail.payabliCaptureTrimmed.isEmpty
-        case .billingZip:
+        case .billingPostalCode:
             return !billingZip.payabliCaptureTrimmed.isEmpty
         default:
             return true
@@ -304,7 +293,8 @@ extension PayabliPayInViewModel {
     private func paymentFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
         case .amount, .serviceFee, .surchargeFee:
-            return paymentDetailsArePresent
+            // Present, not valid: an amount the request cannot send is refused at submission with its own message.
+            return operation.requestConfiguration != nil
         default:
             return true
         }
