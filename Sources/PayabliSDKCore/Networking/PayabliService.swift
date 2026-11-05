@@ -313,6 +313,26 @@ package func serviceCode(of response: PayabliResponse) -> String? {
     (try? JSONDecoder().decode(ErrorCodeBody.self, from: response.body))?.code
 }
 
+/// The fraud block a response names: `E9005` is the blacklist and `E9051` the risk workflow. The service answers
+/// either as a refusal of the request, but it refuses the payer, so the code decides and the status does not.
+///
+/// - Parameter response: the answer whose body is read.
+/// - Returns: the block's code, or nil when the body names neither.
+package func fraudBlockCode(of response: PayabliResponse) -> String? {
+    guard let code = serviceCode(of: response), ["E9005", "E9051"].contains(code) else { return nil }
+    return code
+}
+
+/// Whether a 401 is fraud control refusing the payer rather than the service refusing the token, which a refresh
+/// cannot fix and a replay would send again. A payment request declares it as its caller's refusal.
+///
+/// - Parameter response: the answered request.
+/// - Returns: true for a 401 whose body names a fraud block; false otherwise.
+@Sendable
+package func isFraudBlockAnswered401(_ response: PayabliResponse) -> Bool {
+    response.statusCode == 401 && fraudBlockCode(of: response) != nil
+}
+
 /// The service's code, read apart from the typed shapes: the body's `code`, else the older envelope's integer
 /// `responseCode`, quoted or not, as text. Each is read on its own, so one malformed field doesn't lose the other.
 private struct ErrorCodeBody: Decodable {
