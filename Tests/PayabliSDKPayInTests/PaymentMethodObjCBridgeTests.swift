@@ -120,11 +120,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
     private func storeRequest() throws -> PayabliPayInStoreRequestObjC {
         try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
             accountNumber: "123456789",
+            routingNumber: "021000021",
             accountType: "Checking",
             holderName: "Jane Doe",
-            routingNumber: "021000021",
+            holderType: nil,
             secCode: nil,
-            holderType: nil
+            deviceId: nil
         ))
     }
 
@@ -132,11 +133,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertNil(
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "123456789",
+                routingNumber: "021000021",
                 accountType: "Checking",
                 holderName: "Jane Doe",
-                routingNumber: "021000021",
+                holderType: "company",
                 secCode: "WEB",
-                holderType: "company"
+                deviceId: nil
             ),
             "a holder type that names none of the kinds is refused before a request exists"
         )
@@ -180,22 +182,24 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertNil(
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "111111111",
+                routingNumber: "123456780",
                 accountType: "Business",
                 holderName: "Jane Doe",
-                routingNumber: "123456780",
+                holderType: nil,
                 secCode: nil,
-                holderType: nil
+                deviceId: nil
             ),
             "an account type that names none of the kinds is refused before a request exists"
         )
         XCTAssertNil(
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "111111111",
+                routingNumber: "123456780",
                 accountType: PayabliPayInAccountType.checking.rawValue,
                 holderName: "Jane Doe",
-                routingNumber: "123456780",
+                holderType: nil,
                 secCode: "POP",
-                holderType: nil
+                deviceId: nil
             ),
             "an SEC code that names none of the kinds is refused before a request exists"
         )
@@ -210,9 +214,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.storeMethod(
             PayabliPayInStoreRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiry: "02/28",
-                holderName: "",
+                expiryMonth: 2,
+                expiryYear: 2028,
                 securityCode: "123",
+                holderName: "",
                 postalCode: "33139"
             )
         ) { result, error in
@@ -243,16 +248,14 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         component.storeMethod(
             PayabliPayInStoreRequestObjC.card(
                 cardNumber: "4111111111111111",
-                expiry: "02/28",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2028,
                 securityCode: "123",
+                holderName: "Jane Doe",
                 postalCode: "33139"
             )
         ) { result, error in
             XCTAssertNil(result)
-            // The session's holder owns the provider, so the host's own NSError is wrapped in this
-            // SDK's `.tokenProviderFailed` and reaches the bridge as a PayabliError rather than
-            // verbatim.
             XCTAssertEqual(error?.domain, "com.payabli.payIn")
             XCTAssertEqual(error?.code, PayabliErrorType.tokenProviderFailed.number)
             XCTAssertEqual(
@@ -263,6 +266,78 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         }
 
         await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
+    }
+
+    /// The buffers this facade builds from strings are the SDK's own: no host can reach them, so the
+    /// task that spends them overwrites them at its end, on a stored method and a refusal alike.
+    func testTheTaskClosesTheCardBuffersTheFacadeBuilt() async throws {
+        let component = try await makeBridge(
+            tokenHandler: { completion in completion(nil, nil) }
+        )
+        let cardNumber = SensitiveDigits.ofString("4111111111111111")
+        let securityCode = SensitiveDigits.ofString("123")
+        let completionExpectation = expectation(description: "closed card buffers completion")
+
+        component.storeMethod(
+            PayabliPayInStoreRequest(
+                instrument: .card(PayabliPayInCardData(
+                    cardNumber: cardNumber,
+                    expiryMonth: 2,
+                    expiryYear: 2028,
+                    securityCode: securityCode,
+                    holderName: "Jane Doe",
+                    postalCode: "33139"
+                )),
+                options: PayabliPayInStoreOptions()
+            )
+        ) { method, error in
+            XCTAssertNil(method)
+            XCTAssertNotNil(error)
+            completionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
+        XCTAssertTrue(cardNumber.isWiped, "the task closed the card number buffer")
+        XCTAssertTrue(securityCode.isWiped, "the task closed the security code buffer")
+        XCTAssertEqual(
+            cardNumber.rawCopy(), Array(repeating: 0, count: 16),
+            "the card number is overwritten, not just released"
+        )
+        XCTAssertEqual(
+            securityCode.rawCopy(), Array(repeating: 0, count: 3),
+            "the security code is overwritten, not just released"
+        )
+    }
+
+    func testTheTaskClosesTheAccountNumberTheFacadeBuilt() async throws {
+        let component = try await makeBridge(
+            tokenHandler: { completion in completion(nil, nil) }
+        )
+        let accountNumber = SensitiveDigits.ofString("1111111111")
+        let completionExpectation = expectation(description: "closed account number completion")
+
+        component.storeMethod(
+            PayabliPayInStoreRequest(
+                instrument: .bankAccount(PayabliPayInBankAccountData(
+                    accountNumber: accountNumber,
+                    routingNumber: "123456780",
+                    accountType: .checking,
+                    holderName: "Jane Doe"
+                )),
+                options: PayabliPayInStoreOptions()
+            )
+        ) { method, error in
+            XCTAssertNil(method)
+            XCTAssertNotNil(error)
+            completionExpectation.fulfill()
+        }
+
+        await fulfillment(of: [completionExpectation], timeout: mainActorCompletionTimeout)
+        XCTAssertTrue(accountNumber.isWiped, "the task closed the account number buffer")
+        XCTAssertEqual(
+            accountNumber.rawCopy(), Array(repeating: 0, count: 10),
+            "the account number is overwritten, not just released"
+        )
     }
 
     // Cancellation coverage for the bridge's token provider lives in
@@ -277,11 +352,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let request = try XCTUnwrap(
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "1111111111",
+                routingNumber: "123456780",
                 accountType: PayabliPayInAccountType.checking.rawValue,
                 holderName: "Jane Doe",
-                routingNumber: "123456780",
+                holderType: PayabliPayInAccountHolderType.personal.rawValue,
                 secCode: nil,
-                holderType: PayabliPayInAccountHolderType.personal.rawValue
+                deviceId: nil
             ),
             "a bank account request whose named values are all real is a request"
         )

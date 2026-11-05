@@ -25,11 +25,7 @@ final class PayabliPayInTests: XCTestCase {
           "token": null
         }
         """)
-        let component = PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport
-        )
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
 
         let result = try await component.capture(PayabliPayInRequest(
             paymentMethod: .stored(PayabliPayInPaymentMethod.Stored(
@@ -151,9 +147,10 @@ final class PayabliPayInTests: XCTestCase {
         ).request(
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/27",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2037,
                 securityCode: "999",
+                holderName: "Jane Doe",
                 postalCode: "12345"
             )))
         )
@@ -287,7 +284,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -337,7 +334,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -386,7 +383,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         viewModel.firstName = "Jane"
@@ -474,7 +471,7 @@ final class PayabliPayInTests: XCTestCase {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
 
@@ -554,9 +551,10 @@ final class PayabliPayInTests: XCTestCase {
 extension PayabliPayInTests {
     private static let janeDoeCard = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/27",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2037,
         securityCode: "999",
+        holderName: "Jane Doe",
         postalCode: "12345"
     )
 
@@ -590,7 +588,7 @@ extension PayabliPayInTests {
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
-        viewModel.cardExpiration = "02/27"
+        viewModel.cardExpiration = "02/37"
         viewModel.cardCvv = "999"
         viewModel.cardZip = "12345"
         _ = try await viewModel.submit()
@@ -619,6 +617,98 @@ extension PayabliPayInTests {
         XCTAssertEqual(directBody["orderId"] as? String, "order-1")
         XCTAssertFalse(directBody.keys.contains("paymentReference"), "the payment reference is never sent")
         XCTAssertEqual(directBody["subscriptionId"] as? Int, 7)
+    }
+
+    /// The recovery path is the one path that both logs and holds the body's bytes: it replaces a
+    /// refused credential and replays the request inside the same call, so the body must still be
+    /// intact while it runs. Nothing the path writes carries the card number.
+    @MainActor
+    func testTheRecoveryPathReplaysTheCardNumberAndLogsNoneOfIt() async throws {
+        let sink = RecordingLogSink()
+        // A fresh token per mint: the holder refuses a refresh that hands back the token the server
+        // just rejected, and a constant provider would end the recovery before the replay.
+        let minted = Counter()
+        let auth = try PayabliAuth(config: PayabliConfig(
+            entryPoint: "entry",
+            environment: .sandbox,
+            tokenProvider: { "token-\(minted.next())" }
+        ))
+        let base = RecoveryScriptTransport(approvedBody: Self.formCaptureResponse)
+        let client = PayInPaymentFlowClient(
+            transport: AuthenticatedTransport(
+                base: base,
+                auth: auth,
+                logger: PayabliLogger(category: .network, sink: sink)
+            )
+        )
+
+        _ = try await client.capture(
+            entryPoint: "entry",
+            request: PayabliPayInRequest(
+                paymentMethod: .card(PayabliPayInPaymentMethod.Card(data: Self.janeDoeCard)),
+                options: PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 100)
+                )
+            ),
+            idempotencyKey: "k1"
+        )
+
+        let requests = await base.requests
+        XCTAssertEqual(2, requests.count, "The refused credential was replaced and the request replayed")
+        for request in requests {
+            let body = try XCTUnwrap(String(data: XCTUnwrap(request.body), encoding: .utf8))
+            XCTAssertTrue(body.contains(#""cardnumber":"4111111111111111""#), "Every attempt carried the card number")
+        }
+
+        XCTAssertFalse(sink.lines.isEmpty, "The recovery path logs")
+        XCTAssertTrue(
+            sink.lines.allSatisfy { !$0.contains("4111") },
+            "No line carries the card number: \(sink.lines)"
+        )
+    }
+}
+
+/// Records every line the transport chain writes, so a test can assert what a log never carries.
+private final class RecordingLogSink: LogSink, @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [String] = []
+
+    var lines: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
+    }
+
+    func write(level: PayabliLogger.Level, category: PayabliLogger.Category, message: String) {
+        lock.lock()
+        defer { lock.unlock() }
+        recorded.append("\(level) \(category.rawValue): \(message)")
+    }
+}
+
+/// Answers 401 once, then approves: the shape whose recovery both logs and replays a card number.
+private actor RecoveryScriptTransport: PayabliTransport {
+    private(set) var requests: [PayabliRequest] = []
+    private let approvedBody: String
+
+    init(approvedBody: String) {
+        self.approvedBody = approvedBody
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        requests.append(request)
+        if requests.count == 1 {
+            return PayabliResponse(statusCode: 401, headers: [:], body: Data("{}".utf8))
+        }
+        return PayabliResponse(statusCode: 201, headers: [:], body: Data(approvedBody.utf8))
+    }
+
+    func performV2<T: Decodable & Sendable>(
+        _ request: PayabliRequest,
+        decoding _: T.Type
+    ) async throws -> PayabliV2Envelope<T> {
+        requests.append(request)
+        return try JSONDecoder().decode(PayabliV2Envelope<T>.self, from: Data(approvedBody.utf8))
     }
 }
 

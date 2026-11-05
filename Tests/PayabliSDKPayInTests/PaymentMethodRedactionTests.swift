@@ -12,9 +12,10 @@ final class PaymentMethodRedactionTests: XCTestCase {
     private func card() -> PayabliPayInCardData {
         PayabliPayInCardData(
             cardNumber: pan,
-            expiry: "12/30",
-            holderName: "A Payer",
+            expiryMonth: 12,
+            expiryYear: 2030,
             securityCode: securityCode,
+            holderName: "A Payer",
             postalCode: "22039"
         )
     }
@@ -22,9 +23,9 @@ final class PaymentMethodRedactionTests: XCTestCase {
     private func bankAccount() -> PayabliPayInBankAccountData {
         PayabliPayInBankAccountData(
             accountNumber: account,
+            routingNumber: "122105278",
             accountType: .checking,
-            holderName: "A Payer",
-            routingNumber: "122105278"
+            holderName: "A Payer"
         )
     }
 

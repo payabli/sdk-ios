@@ -2,12 +2,8 @@
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// Every money-moving route carries an idempotency key, whether or not the caller supplied one.
-///
-/// Without one the service recognises no repeat, so a double submit or a retry is a second payment.
-/// These cases drive the facade rather than the client, because reserving the key is the facade's job
-/// and a client test cannot tell a reserved key from a caller's.
-/// The fixtures both idempotency suites drive, so neither carries a copy of them.
+/// The fixtures both idempotency suites drive. Every money-moving route carries an idempotency key,
+/// and these cases drive the facade, which reserves it.
 @MainActor
 enum PayInFixture {
     // MARK: - Support
@@ -48,9 +44,10 @@ enum PayInFixture {
                 ? .card(PayabliPayInPaymentMethod.Card(
                     data: PayabliPayInCardData(
                         cardNumber: "4111 1111 1111 1111",
-                        expiry: "02/27",
-                        holderName: "John Cassian",
+                        expiryMonth: 2,
+                        expiryYear: 2037,
                         securityCode: "999",
+                        holderName: "John Cassian",
                         postalCode: "12345"
                     ),
                     saveIfSuccess: false
@@ -132,11 +129,21 @@ final class RecordingIdempotencyTransport: PayabliTransport, @unchecked Sendable
         return recorded.count
     }
 
+    /// Copies of each body as it arrived: the SDK overwrites its own once the call ends.
+    var sentBodies: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return bodiesSent
+    }
+
+    private var bodiesSent: [String] = []
+
     func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
         // It stands for the service, so every call has reached the HTTP layer.
         PayabliSendMark.current?.set()
         lock.lock()
         recorded.append(request.headers["idempotencyKey"])
+        bodiesSent.append(String(bytes: Array(request.body ?? Data()), encoding: .utf8) ?? "")
         let nth = recorded.count - 1
         lock.unlock()
 

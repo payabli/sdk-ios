@@ -189,17 +189,18 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
 
     private static let enteredCard = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/30",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2030,
         securityCode: "1234",
+        holderName: "Jane Doe",
         postalCode: "33139"
     )
 
     private static let enteredBankAccount = PayabliPayInBankAccountData(
         accountNumber: "9876543210",
+        routingNumber: "021000021",
         accountType: .checking,
-        holderName: "Richard Roe",
-        routingNumber: "021000021"
+        holderName: "Richard Roe"
     )
 
     private static let payer = PayabliPayInCustomerData(
