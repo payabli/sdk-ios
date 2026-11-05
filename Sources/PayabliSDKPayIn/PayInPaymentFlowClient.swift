@@ -416,17 +416,21 @@ final class PayInPaymentFlowClient: Sendable {
             throw Self.unapproved(failure)
         }
 
+        // A 402 is a decline whatever its body, so it never reaches the mapper's core decline.
+        if response.statusCode == 402 {
+            throw PayabliPayInError.Refused(failure: PayabliPayInFailure(httpStatusCode: response.statusCode))
+        }
         try mapPayabliHTTPError(response: response)
         throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
     }
 
-    /// The failure an unapproved answer is: a decline when its code is in the `D` family, otherwise the service's
-    /// own failure.
+    /// The failure an unapproved answer is: a decline when its code is in the `D` family or its status is 402,
+    /// otherwise the service's own failure, which therefore never classifies as a decline.
     ///
     /// - Parameter failure: the answer as the envelope read it.
     /// - Returns: the error a caller receives.
     private static func unapproved(_ failure: PayabliPayInFailure) -> PayabliPayInError {
-        failure.code?.hasPrefix(declinedFamily) == true
+        PayabliPayInError.ServiceError.classification(of: failure) == .paymentDeclined
             ? PayabliPayInError.Refused(failure: failure)
             : PayabliPayInError.ServiceError(failure: failure)
     }
