@@ -105,9 +105,19 @@ struct PayInFormCustomization: Hashable {
 
     // MARK: - What the SDK is handed
 
-    func configuration(for operation: PayInOperation) -> PayabliPayInFormConfiguration {
+    /// The form's configuration for `operation`.
+    ///
+    /// - Parameter operation: what the form is for.
+    /// - Parameter held: the method of a payment whose retry is open. The form offers only that method, so it
+    ///   draws no selector and the total stays the one the retry sends. A save sends no retry and ignores it.
+    /// - Returns: the configuration to hand the form.
+    func configuration(
+        for operation: PayInOperation,
+        holding held: PayabliPayInMethodType? = nil
+    ) -> PayabliPayInFormConfiguration {
         // An authorization holds funds on a card and nothing else.
-        let methods = operation == .authorize ? [.card] : allowedMethods
+        let offered: [PayabliPayInMethodType] = operation == .authorize ? [.card] : allowedMethods
+        let methods = operation == .storedMethod ? offered : held.map { [$0] } ?? offered
         let charges = operation != .storedMethod
         return PayabliPayInFormConfiguration(
             allowedMethods: methods,

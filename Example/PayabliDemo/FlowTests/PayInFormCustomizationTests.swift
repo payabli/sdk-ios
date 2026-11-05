@@ -178,4 +178,25 @@ final class PayInFormCustomizationTests: XCTestCase {
         XCTAssertEqual(customization.labels(for: .authorize).submitButton, "Place hold")
         XCTAssertNil(PayInFormCustomization().labels(for: .authorize).submitButton)
     }
+
+    /// A payer switching method under a held key would see a total the retry does not carry.
+    func testAnOpenRetryOffersOnlyTheHeldAttemptsMethodAndSettlingItOffersEveryMethodAgain() {
+        let customization = PayInFormCustomization()
+
+        let held = customization.configuration(for: .capture, holding: .bankAccount)
+        let settled = customization.configuration(for: .capture, holding: nil)
+
+        XCTAssertEqual(held.allowedMethods, [.bankAccount])
+        XCTAssertEqual(held.defaultMethod, .bankAccount)
+        XCTAssertEqual(settled.allowedMethods, [.card, .bankAccount])
+        XCTAssertEqual(settled.defaultMethod, .card)
+    }
+
+    /// A save moves no money and sends no retry, so a held payment's method does not bind it.
+    func testASaveWhileAPaymentsRetryIsOpenKeepsEveryMethod() {
+        let save = PayInFormCustomization().configuration(for: .storedMethod, holding: .bankAccount)
+
+        XCTAssertEqual(save.allowedMethods, [.card, .bankAccount])
+        XCTAssertEqual(save.defaultMethod, .card)
+    }
 }

@@ -19,6 +19,10 @@ struct SimpleCaptureView: View {
     @State private var attempts = PayInAttempts()
     @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
+    /// The method the payer moved to, or nil while the form is on the one it opened with.
+    @State private var drawnMethod: PayabliPayInMethodType?
+    /// The method each charging flow's open retry was sent with.
+    @State private var heldMethods: [PayInOperation: PayabliPayInMethodType] = [:]
 
     var body: some View {
         NavigationStack {
@@ -37,7 +41,8 @@ struct SimpleCaptureView: View {
                                 // Each form reports for the operation it was built for, which a completion that
                                 // lands after the picker has moved still names.
                                 onCompleted: { [operation] outcome in handleCompleted(outcome, for: operation) },
-                                onFailed: handleFailed
+                                onFailed: handleFailed,
+                                onMethodChanged: { drawnMethod = $0 }
                             )
                             // The form keeps part of its configuration from when it was built, so each
                             // change of setting or of flow builds a new one.
@@ -70,6 +75,8 @@ struct SimpleCaptureView: View {
         .onChange(of: demoCustomer.suppliesPayInCustomer, perform: applyCustomer)
         .onChange(of: amountText) { _ in applyAmount() }
         .onChange(of: operation) { _ in applyAmount() }
+        // A form built again opens on its default method and reports no change for it.
+        .onChange(of: FormIdentity(operation: operation, customization: customization)) { _ in drawnMethod = nil }
     }
 
     private var appControls: some View {
@@ -140,11 +147,17 @@ struct SimpleCaptureView: View {
     private var form: PayInFormSetup {
         PayInFormSetup(
             operation: operation,
-            configuration: customization.configuration(for: operation),
+            configuration: customization.configuration(for: operation, holding: heldMethod),
             labels: customization.labels(for: operation),
             style: customization.style,
             storeOptions: PayInFormCustomization.storeOptions
         )
+    }
+
+    /// The method of the payment whose retry is open on this flow. An attempt of its own, after a new amount
+    /// or a completed payment, offers every method again.
+    private var heldMethod: PayabliPayInMethodType? {
+        flow(for: operation).request.attempt == .retry ? heldMethods[operation] : nil
     }
 
     // MARK: - The menu
@@ -284,6 +297,9 @@ struct SimpleCaptureView: View {
             category: "SimpleCaptureDiagnostics"
         ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
+            if failure.outcomeIsUnresolved {
+                heldMethods[operation] = drawnMethod ?? customization.configuration(for: operation).defaultMethod
+            }
             flow(for: operation).chargeFailed(failure)
         }
     }
