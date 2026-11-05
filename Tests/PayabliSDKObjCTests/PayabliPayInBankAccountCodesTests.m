@@ -23,6 +23,17 @@
     XCTAssertEqual(PayabliPayInAccountHolderTypeCodeBusiness, 2);
 }
 
+- (void)testAHostBuildsABankAccountToStoreWithTheNamedValues {
+    PayabliPayInStoreRequestObjC *request = [PayabliPayInStoreRequestObjC bankAccountWithAccountNumber:@"1111111111"
+                                                                                         routingNumber:@"123456780"
+                                                                                           accountType:PayabliPayInAccountTypeCodeChecking
+                                                                                            holderName:@"Jane Doe"
+                                                                                            holderType:PayabliPayInAccountHolderTypeCodeUnspecified
+                                                                                               secCode:PayabliPayInSecCodeCodeUnspecified
+                                                                                              deviceId:nil];
+    XCTAssertNotNil(request);
+}
+
 - (void)testAHostBuildsABankAccountPaymentWithTheNamedValues {
     PayabliPayInRequestObjC *request = [PayabliPayInRequestObjC bankAccountWithAccountNumber:@"1111111111"
                                                                                routingNumber:@"123456780"

@@ -242,41 +242,33 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
 
     /// - Parameter accountNumber: the number of the bank account to store.
     /// - Parameter routingNumber: the routing number of the bank holding the account.
-    /// - Parameter accountType: `Checking` or `Savings`.
+    /// - Parameter accountType: the account's type.
     /// - Parameter holderName: the account holder's name.
-    /// - Parameter holderType: `personal` or `business`, or nil.
-    /// - Parameter secCode: `PPD`, `WEB`, `TEL`, `CCD` or `BOC`; nil for `WEB`.
+    /// - Parameter holderType: the holder's type; `unspecified` leaves it out.
+    /// - Parameter secCode: the SEC code; `unspecified` sends `WEB`.
     /// - Parameter deviceId: the device identifier, or nil.
-    /// - Returns: the request, or nil when a named value is none of those listed.
+    /// - Returns: the request, or nil when a value is a number that names no case of its enum.
     @objc public static func bankAccount(
         accountNumber: String,
         routingNumber: String,
-        accountType: String,
+        accountType: PayabliPayInAccountTypeCode,
         holderName: String,
-        holderType: String?,
-        secCode: String?,
+        holderType: PayabliPayInAccountHolderTypeCode,
+        secCode: PayabliPayInSecCodeCode,
         deviceId: String?
     ) -> PayabliPayInStoreRequestObjC? {
-        guard let type = PayabliPayInAccountType(rawValue: accountType) else { return nil }
-        let code: PayabliPayInSecCode
-        if let secCode {
-            guard let named = PayabliPayInSecCode(rawValue: secCode) else { return nil }
-            code = named
-        } else {
-            code = .web
-        }
-        var holder: PayabliPayInAccountHolderType?
-        if let holderType {
-            guard let named = PayabliPayInAccountHolderType(rawValue: holderType) else { return nil }
-            holder = named
-        }
+        guard let values = try? PayabliPayInObjC.validated(
+            accountType: accountType,
+            secCode: secCode,
+            holderType: holderType
+        ) else { return nil }
         let data = PayabliPayInBankAccountData(
             accountNumber: accountNumber,
             routingNumber: routingNumber,
-            accountType: type,
+            accountType: values.accountType,
             holderName: holderName,
-            holderType: holder,
-            secCode: code,
+            holderType: values.holderType,
+            secCode: values.secCode ?? .web,
             deviceId: deviceId
         )
         return PayabliPayInStoreRequestObjC(instrument: .bankAccount(data))

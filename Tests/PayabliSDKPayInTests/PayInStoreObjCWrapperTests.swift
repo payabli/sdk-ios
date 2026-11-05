@@ -80,10 +80,10 @@ final class PayInStoreObjCWrapperTests: XCTestCase {
         PayabliPayInStoreRequestObjC.bankAccount(
             accountNumber: "1111111111",
             routingNumber: "021000021",
-            accountType: "Checking",
+            accountType: .checking,
             holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
+            holderType: .unspecified,
+            secCode: .unspecified,
             deviceId: nil
         )
     }

@@ -799,7 +799,7 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc final public var source: Swift::String?
   @objc deinit
   @objc public static func card(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC
-  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: Swift::String, holderName: Swift::String, holderType: Swift::String?, secCode: Swift::String?, deviceId: Swift::String?) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?
+  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode, deviceId: Swift::String?) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?
 }
 @objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
   @objc final public let transId: Swift::String
