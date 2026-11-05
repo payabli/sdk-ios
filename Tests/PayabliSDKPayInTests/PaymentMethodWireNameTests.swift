@@ -14,14 +14,14 @@ final class PaymentMethodWireNameTests: XCTestCase {
         ]
 
         for (name, paymentMethod, expected) in cases {
-            XCTAssertEqual(try Self.sentMethod(paymentMethod), expected, name)
+            XCTAssertEqual(try Self.sentMethod(PayInBodyWriter.captureFragment(paymentMethod)), expected, name)
             XCTAssertEqual(paymentMethod.method, expected, name)
         }
     }
 
     func testStoringABankAccountSendsTheServiceMethodName() throws {
-        XCTAssertEqual(try Self.sentMethod(PayabliPayInMethodInput.bankAccount(Self.bankAccount)), "ach")
-        XCTAssertEqual(try Self.sentMethod(PayabliPayInMethodInput.card(Self.card)), "card")
+        XCTAssertEqual(try Self.sentMethod(PayInBodyWriter.storeFragment(.bankAccount(Self.bankAccount))), "ach")
+        XCTAssertEqual(try Self.sentMethod(PayInBodyWriter.storeFragment(.card(Self.card))), "card")
     }
 
     func testMethodEnumsKeepTheServiceWords() {
@@ -53,21 +53,23 @@ final class PaymentMethodWireNameTests: XCTestCase {
 
     private static let card = PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/28",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2028,
         securityCode: "123",
+        holderName: "Jane Doe",
         postalCode: "33139"
     )
 
     private static let bankAccount = PayabliPayInBankAccountData(
         accountNumber: "1111111111",
+        routingNumber: "123456780",
         accountType: .checking,
-        holderName: "Jane Doe",
-        routingNumber: "123456780"
+        holderName: "Jane Doe"
     )
 
-    private static func sentMethod(_ value: some Encodable) throws -> String? {
-        let body = try JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any]
+    /// The method name in the bytes the body writer produced for the request.
+    private static func sentMethod(_ fragment: PayInMethodFragment) throws -> String? {
+        let body = try JSONSerialization.jsonObject(with: Data(fragment.rawCopy())) as? [String: Any]
         return body?["method"] as? String
     }
 }

@@ -104,9 +104,10 @@ let result = try await payIn.capture(
     PayabliPayInRequest(
         paymentMethod: .card(.init(data: PayabliPayInCardData(
             cardNumber: "4012000098765439",
-            expiry: "12/30",
-            holderName: "Jane Doe",
+            expiryMonth: 12,
+            expiryYear: 2030,
             securityCode: "999",
+            holderName: "Jane Doe",
             postalCode: "12345"
         ))),
         options: PayabliPayInRequestConfiguration(

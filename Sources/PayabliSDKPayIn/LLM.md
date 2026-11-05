@@ -227,9 +227,10 @@ Sheet:
 let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
     instrument: .card(PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/28",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2028,
         securityCode: "123",
+        holderName: "Jane Doe",
         postalCode: "33139"
     )),
     options: PayabliPayInStoreOptions(
@@ -244,11 +245,11 @@ let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
 let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
     instrument: .bankAccount(PayabliPayInBankAccountData(
         accountNumber: "111111111111",
+        routingNumber: "123456780",
         accountType: .checking,
         holderName: "Jane Doe",
-        routingNumber: "123456780",
-        secCode: .web,
-        holderType: .personal
+        holderType: .personal,
+        secCode: .web
     )),
     options: PayabliPayInStoreOptions()
 ))
@@ -259,9 +260,10 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | Field | Notes |
 | --- | --- |
 | `cardNumber` | Full PAN. Direct API only; PCI-sensitive. Digits are normalized before request. |
-| `expiry` | Accepts `MMYY` or `MM/YY`; normalized to `MM/YY` for capture. |
-| `holderName` | Required. |
+| `expiryMonth` | `1` to `12`. |
+| `expiryYear` | Four digits, `2099` at the latest. An expiry before the current month is refused before sending, with `VALIDATION_ERROR`. |
 | `securityCode` | Required. Direct API only; PCI-sensitive. |
+| `holderName` | Required. |
 | `postalCode` | Postal code for card billing. Default label is `Postal code`. |
 
 `PayabliPayInBankAccountData` fields:
@@ -269,12 +271,12 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | Field | Notes |
 | --- | --- |
 | `accountNumber` | Required. Direct API only; sensitive. |
+| `routingNumber` | Required routing number; checksum validation enabled by default. |
 | `accountType` | `.checking` or `.savings`; raw values are `Checking` and `Savings`. |
 | `holderName` | Required account holder name. |
-| `routingNumber` | Required routing number; checksum validation enabled by default. |
-| `secCode` | Optional; defaults to `.web`. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
 | `holderType` | Optional `.personal` or `.business`. |
-| `device` | Optional device identifier for bank account request payloads. |
+| `secCode` | Optional; `WEB` is sent when none is given. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
+| `deviceId` | Optional device identifier for bank account request payloads. |
 
 `cardNumber`, `securityCode` and `accountNumber` are passed as `String` and copied into buffers the SDK overwrites once each request is written. They can be set, and never read back from the value.
 

@@ -20,9 +20,10 @@ final class PayInPaymentFlowTests: XCTestCase {
         let result = try await component.storeMethod(PayabliPayInStoreRequest(
             instrument: .card(PayabliPayInCardData(
                 cardNumber: "4111 1111 1111 1111",
-                expiry: "02/25",
-                holderName: "John Doe",
+                expiryMonth: 2,
+                expiryYear: 2035,
                 securityCode: "123",
+                holderName: "John Doe",
                 postalCode: "12345"
             )),
             options: PayabliPayInStoreOptions()
@@ -49,9 +50,10 @@ final class PayInPaymentFlowTests: XCTestCase {
             paymentMethod: .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiry: "02/25",
-                    holderName: "John Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2035,
                     securityCode: "123",
+                    holderName: "John Doe",
                     postalCode: "12345"
                 )
             )),

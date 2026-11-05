@@ -52,9 +52,9 @@ final class PayInAuthorizeClientTests: XCTestCase {
         let methods: [PayabliPayInPaymentMethod] = [
             .bankAccount(PayabliPayInPaymentMethod.BankAccount(data: PayabliPayInBankAccountData(
                 accountNumber: "1111111111111",
+                routingNumber: "123456780",
                 accountType: .checking,
-                holderName: "John Doe",
-                routingNumber: "123456780"
+                holderName: "John Doe"
             ))),
             .check(PayabliPayInPaymentMethod.Check(holderName: "John Doe")),
             .cash

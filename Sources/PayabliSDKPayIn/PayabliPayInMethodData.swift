@@ -2,46 +2,55 @@ public struct PayabliPayInCardData: CustomStringConvertible, CustomDebugStringCo
     Sendable
 {
     let cardNumber: SensitiveDigits
-    public var expiry: String
-    public var holderName: String
+    public var expiryMonth: Int
+    public var expiryYear: Int
     let securityCode: SensitiveDigits
+    public var holderName: String
     public var postalCode: String
 
     /// Card data for a payment or a stored method. The card number and the security code are copied into
     /// buffers the SDK overwrites, and can't be read back from the value.
     ///
+    /// The expiry is checked when the card is sent, not here: a month outside 1 to 12, a year that isn't four
+    /// digits or is after 2099, or a month before the current one is refused before anything is sent.
+    ///
     /// - Parameter cardNumber: the card number.
-    /// - Parameter expiry: the expiry, as `MM/YY` or `MMYY`.
-    /// - Parameter holderName: the cardholder's name.
+    /// - Parameter expiryMonth: the expiry month, 1 to 12.
+    /// - Parameter expiryYear: the expiry year, four digits.
     /// - Parameter securityCode: the security code.
+    /// - Parameter holderName: the cardholder's name.
     /// - Parameter postalCode: the billing postal code.
     public init(
         cardNumber: String,
-        expiry: String,
-        holderName: String,
+        expiryMonth: Int,
+        expiryYear: Int,
         securityCode: String,
+        holderName: String,
         postalCode: String
     ) {
         self.init(
             cardNumber: SensitiveDigits.ofString(cardNumber),
-            expiry: expiry,
-            holderName: holderName,
+            expiryMonth: expiryMonth,
+            expiryYear: expiryYear,
             securityCode: SensitiveDigits.ofString(securityCode),
+            holderName: holderName,
             postalCode: postalCode
         )
     }
 
     init(
         cardNumber: SensitiveDigits,
-        expiry: String,
-        holderName: String,
+        expiryMonth: Int,
+        expiryYear: Int,
         securityCode: SensitiveDigits,
+        holderName: String,
         postalCode: String
     ) {
         self.cardNumber = cardNumber
-        self.expiry = expiry
-        self.holderName = holderName
+        self.expiryMonth = expiryMonth
+        self.expiryYear = expiryYear
         self.securityCode = securityCode
+        self.holderName = holderName
         self.postalCode = postalCode
     }
 
@@ -66,59 +75,59 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
     Sendable
 {
     let accountNumber: SensitiveDigits
+    public var routingNumber: String
     public var accountType: PayabliPayInAccountType
     public var holderName: String
-    public var routingNumber: String
-    public var secCode: PayabliPayInSecCode?
     public var holderType: PayabliPayInAccountHolderType?
-    public var device: String?
+    public var secCode: PayabliPayInSecCode?
+    public var deviceId: String?
 
     /// Bank account data for a payment or a stored method. The account number is copied into a buffer
     /// the SDK overwrites, and can't be read back from the value.
     ///
     /// - Parameter accountNumber: the account number.
+    /// - Parameter routingNumber: the routing number.
     /// - Parameter accountType: checking or savings.
     /// - Parameter holderName: the account holder's name.
-    /// - Parameter routingNumber: the routing number.
-    /// - Parameter secCode: the ACH entry class; `.web` unless set.
     /// - Parameter holderType: personal or business, when known.
-    /// - Parameter device: the device identifier, when one is sent.
+    /// - Parameter secCode: the ACH entry class; `WEB` is sent when none is given.
+    /// - Parameter deviceId: the device identifier, when one is sent.
     public init(
         accountNumber: String,
+        routingNumber: String,
         accountType: PayabliPayInAccountType,
         holderName: String,
-        routingNumber: String,
-        secCode: PayabliPayInSecCode? = .web,
         holderType: PayabliPayInAccountHolderType? = nil,
-        device: String? = nil
+        secCode: PayabliPayInSecCode? = nil,
+        deviceId: String? = nil
     ) {
         self.init(
             accountNumber: SensitiveDigits.ofString(accountNumber),
+            routingNumber: routingNumber,
             accountType: accountType,
             holderName: holderName,
-            routingNumber: routingNumber,
-            secCode: secCode,
             holderType: holderType,
-            device: device
+            secCode: secCode,
+            deviceId: deviceId
         )
     }
 
     init(
         accountNumber: SensitiveDigits,
+        routingNumber: String,
         accountType: PayabliPayInAccountType,
         holderName: String,
-        routingNumber: String,
-        secCode: PayabliPayInSecCode? = .web,
         holderType: PayabliPayInAccountHolderType? = nil,
-        device: String? = nil
+        secCode: PayabliPayInSecCode? = nil,
+        deviceId: String? = nil
     ) {
         self.accountNumber = accountNumber
+        self.routingNumber = routingNumber
         self.accountType = accountType
         self.holderName = holderName
-        self.routingNumber = routingNumber
-        self.secCode = secCode
         self.holderType = holderType
-        self.device = device
+        self.secCode = secCode
+        self.deviceId = deviceId
     }
 
     /// The account's kind alone: an interpolated value reaches a crash report, which does not redact,
