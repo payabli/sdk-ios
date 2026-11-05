@@ -2,59 +2,129 @@ import Foundation
 import PayabliSDKCore
 
 extension PayabliPayInViewModel {
-    func methodInput() -> PayabliPayInMethodInput {
+    /// The form's sensitive buffers for one submission, closed together once the submission ends.
+    final class FormBufferRegistry {
+        private var buffers: [SensitiveDigits] = []
+
+        /// Holds a copy of the supplied digits, registered so `close()` overwrites them too.
+        ///
+        /// - Parameter digits: the digits to hold a copy of.
+        /// - Returns: the value holding a copy of `digits`, registered here.
+        func of(_ digits: [UInt8]) -> SensitiveDigits {
+            let value = SensitiveDigits.of(digits)
+            buffers.append(value)
+            return value
+        }
+
+        /// For digits that are already a `String`, typically from a text field, registered so
+        /// `close()` overwrites them too.
+        ///
+        /// - Parameter source: the digits as a `String`, which this cannot unmake.
+        /// - Returns: the value holding the digits, registered here.
+        func ofString(_ source: String) -> SensitiveDigits {
+            let value = SensitiveDigits.ofString(source)
+            buffers.append(value)
+            return value
+        }
+
+        /// Closes every registered buffer. Idempotent, so a submission that already closed them is
+        /// not an error.
+        func close() {
+            for buffer in buffers {
+                buffer.close()
+            }
+            buffers = []
+        }
+    }
+
+    /// Runs `body` with a registry of the form's sensitive buffers, closing them all once it ends.
+    ///
+    /// - Parameter body: the submission, which takes its buffers from the registry.
+    /// - Returns: what `body` returned.
+    func withFormBuffers<T>(_ body: (FormBufferRegistry) async throws -> T) async rethrows -> T {
+        let registry = FormBufferRegistry()
+        defer { registry.close() }
+        return try await body(registry)
+    }
+
+    /// The expiry as the form sends it, with the configured separator after the month read as `/`. It is
+    /// matched by Unicode scalar, because a combining mark joins the month's second digit.
+    var submittedExpiration: String {
+        let separator = configuration.formatting.expirationSeparator.unicodeScalars
+        let scalars = cardExpiration.unicodeScalars
+        let afterMonth = scalars.dropFirst(2)
+        guard afterMonth.starts(with: separator) else { return cardExpiration }
+        var expiry = String.UnicodeScalarView(scalars.prefix(2))
+        expiry.append("/")
+        expiry.append(contentsOf: afterMonth.dropFirst(separator.count))
+        return String(expiry)
+    }
+
+    /// The form's expiry as a month and a four-digit year, read from ``submittedExpiration`` as `MM/YY` in
+    /// 2000 to 2099. Text that isn't four ASCII digits reads as month 0 and year 0, which the card's own check
+    /// refuses before anything is sent.
+    var submittedExpiry: (month: Int, year: Int) {
+        guard let digits = submittedExpiration.payabliInstrumentDigits, digits.count == 4,
+              let month = Int(digits.prefix(2)), let year = Int(digits.suffix(2))
+        else { return (0, 0) }
+        return (month, 2000 + year)
+    }
+
+    func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInCardData(
-                cardNumber: cardNumber,
-                expiry: cardExpiration,
+                cardNumber: buffers.ofString(cardNumber),
+                expiryMonth: submittedExpiry.month,
+                expiryYear: submittedExpiry.year,
+                securityCode: buffers.ofString(cardCvv),
                 holderName: cardholderName,
-                securityCode: cardCvv,
                 postalCode: cardZip
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: accountNumber,
+                accountNumber: buffers.ofString(accountNumber),
+                routingNumber: routingNumber,
                 accountType: accountType,
                 holderName: accountHolder,
-                routingNumber: routingNumber,
-                secCode: configuration.hiddenValues.secCode ?? .web,
                 holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                secCode: configuration.hiddenValues.secCode,
+                deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
             ))
         }
     }
 
-    func paymentMethod() -> PayabliPayInPaymentMethod {
+    func paymentMethod(with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
         switch effectiveSelectedMethod {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
-                    cardNumber: cardNumber,
-                    expiry: cardExpiration,
+                    cardNumber: buffers.ofString(cardNumber),
+                    expiryMonth: submittedExpiry.month,
+                    expiryYear: submittedExpiry.year,
+                    securityCode: buffers.ofString(cardCvv),
                     holderName: cardholderName,
-                    securityCode: cardCvv,
                     postalCode: cardZip
                 )
             ))
         case .bankAccount:
             return .bankAccount(PayabliPayInPaymentMethod.BankAccount(
                 data: PayabliPayInBankAccountData(
-                    accountNumber: accountNumber,
+                    accountNumber: buffers.ofString(accountNumber),
+                    routingNumber: routingNumber,
                     accountType: accountType,
                     holderName: accountHolder,
-                    routingNumber: routingNumber,
-                    secCode: configuration.hiddenValues.secCode ?? .web,
                     holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                    device: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                    secCode: configuration.hiddenValues.secCode,
+                    deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
                 )
             ))
         }
     }
 
     func mergedCustomerData() -> PayabliPayInCustomerData? {
-        var customer = component.requestConfiguration?.customerData
-            ?? configuration.options.customerData
+        var customer = operation.requestConfiguration?.customerData
+            ?? operation.storeOptions?.customerData
             ?? PayabliPayInCustomerData()
         customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
         customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
@@ -70,10 +140,11 @@ extension PayabliPayInViewModel {
             ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }
 
-    func mergedTokenStorageOptions() -> PayabliPayInTokenStorageOptions {
-        var options = configuration.options
+    func mergedStoreOptions() -> PayabliPayInStoreOptions {
+        var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
         options.methodDescription = mergedOrderDescription()
+            ?? options.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         return options
     }
 
@@ -96,10 +167,8 @@ extension PayabliPayInViewModel {
         return fields
     }
 
-    /// What the payer typed into a field no offered instrument shows any more goes with the field,
-    /// so the form holds a value only while the configuration offers the field somewhere. Nothing
-    /// is written when nothing was held, so an update a payer has not typed into publishes once.
-    /// Host-supplied hidden values are not payer-typed and are untouched.
+    /// Drops what the payer typed into a field the configuration no longer offers, writing nothing when
+    /// nothing was held. Host-supplied hidden values are untouched.
     func dropValuesWithoutAField() {
         dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
@@ -142,10 +211,10 @@ extension PayabliPayInViewModel {
             cardExpirationMonth = nil
             cardExpirationYear = nil
         }
-        if dropped.contains(.cardCvv), !cardCvvStorage.isEmpty {
+        if dropped.contains(.cardSecurityCode), !cardCvvStorage.isEmpty {
             cardCvvStorage = ""
         }
-        if dropped.contains(.cardZip), !cardZipStorage.isEmpty {
+        if dropped.contains(.cardPostalCode), !cardZipStorage.isEmpty {
             cardZipStorage = ""
         }
     }
@@ -190,7 +259,7 @@ extension PayabliPayInViewModel {
         if dropped.contains(.billingEmail), !billingEmail.isEmpty {
             billingEmail = ""
         }
-        if dropped.contains(.billingZip), !billingZipStorage.isEmpty {
+        if dropped.contains(.billingPostalCode), !billingZipStorage.isEmpty {
             billingZipStorage = ""
         }
     }
@@ -199,22 +268,10 @@ extension PayabliPayInViewModel {
         activeRequiredFields.allSatisfy(fieldHasRequiredValue)
     }
 
-    var operationConfigurationIsValid: Bool {
-        if component.operation == .storePaymentMethod {
-            return true
-        }
-        return paymentDetailsArePresent
-    }
-
-    private var paymentDetailsArePresent: Bool {
-        // Present, not valid: an amount the request cannot send is refused at submission with its own message.
-        component.requestConfiguration?.paymentDetails != nil
-    }
-
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(configuration.labels.label(for: field)) is required.")
+                throw PayabliPayInError.invalidInput("\(labels.label(for: field)) is required.")
             }
         }
     }
@@ -225,11 +282,11 @@ extension PayabliPayInViewModel {
 
     func fieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip:
+        case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip:
+        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
         case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
@@ -243,14 +300,14 @@ extension PayabliPayInViewModel {
         case .cardNumber:
             return (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits
                 .maximumCardNumberDigits)
-                .contains(cardNumber.payabliCaptureDigitsOnly.count)
+                .contains(cardNumber.payabliInstrumentDigits?.count ?? 0)
                 && cardNumberValidationMessage == nil
         case .cardExpiration:
-            return cardExpiration.payabliCaptureDigitsOnly.count >= 4
-        case .cardCvv:
+            return (submittedExpiration.payabliInstrumentDigits?.count ?? 0) >= 4
+        case .cardSecurityCode:
             return (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
-                .contains(cardCvv.payabliCaptureDigitsOnly.count)
-        case .cardZip:
+                .contains(cardCvv.payabliInstrumentDigits?.count ?? 0)
+        case .cardPostalCode:
             return !cardZip.payabliCaptureTrimmed.isEmpty
         default:
             return true
@@ -262,11 +319,11 @@ extension PayabliPayInViewModel {
         case .accountHolder:
             return !accountHolder.payabliCaptureTrimmed.isEmpty
         case .routingNumber:
-            return routingNumber.payabliCaptureDigitsOnly.count == PayabliPayInInputLimits.routingNumberDigits
+            return routingNumber.payabliInstrumentDigits?.count == PayabliPayInInputLimits.routingNumberDigits
         case .accountNumber:
             return (PayabliPayInInputLimits.minimumAccountNumberDigits ... PayabliPayInInputLimits
                 .maximumAccountNumberDigits)
-                .contains(accountNumber.payabliCaptureDigitsOnly.count)
+                .contains(accountNumber.payabliInstrumentDigits?.count ?? 0)
         case .accountType:
             return true
         case .accountHolderType:
@@ -294,7 +351,7 @@ extension PayabliPayInViewModel {
             return !customerNumber.payabliCaptureTrimmed.isEmpty
         case .billingEmail:
             return !billingEmail.payabliCaptureTrimmed.isEmpty
-        case .billingZip:
+        case .billingPostalCode:
             return !billingZip.payabliCaptureTrimmed.isEmpty
         default:
             return true
@@ -304,7 +361,8 @@ extension PayabliPayInViewModel {
     private func paymentFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
         case .amount, .serviceFee, .surchargeFee:
-            return paymentDetailsArePresent
+            // Present, not valid: an amount the request cannot send is refused at submission with its own message.
+            return operation.requestConfiguration != nil
         default:
             return true
         }

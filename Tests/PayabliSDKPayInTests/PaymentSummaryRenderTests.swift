@@ -20,23 +20,22 @@ final class PaymentSummaryRenderTests: XCTestCase {
 
     func testAStoredMethodDrawsNoSummary() {
         let capture = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"))
-        let store = renderedHeight(nil, operation: .storePaymentMethod)
+        let store = renderedHeight(nil)
 
         XCTAssertGreaterThan(capture, store, "a capture draws its Total, a stored method draws no summary")
     }
 
-    private func renderedHeight(
-        _ paymentDetails: PayabliPayInPaymentDetails?,
-        operation: PayabliPayInOperation = .capture
-    ) -> CGFloat {
-        let component = flowOnSession(
+    /// The form's height for a capture of `paymentDetails`, or for storing a method when there are none.
+    private func renderedHeight(_ paymentDetails: PayabliPayInPaymentDetails?) -> CGFloat {
+        let operation = paymentDetails.map { PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(paymentDetails: $0)) }
+            ?? .storePaymentMethod()
+        let host = PayInUIKitHostingSupport.host(PayabliPayInForm(
+            payIn: flowOnSession(),
             operation: operation,
-            requestConfiguration: paymentDetails.map { PayabliPayInRequestConfiguration(paymentDetails: $0) }
-        )
-        let host = PayInUIKitHostingSupport.host(PayabliPayInView(
-            component: component,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         ))
         PayInUIKitHostingSupport.waitForRenderedSubviews(in: host.view)
         return host.sizeThatFits(in: CGSize(width: 390, height: CGFloat.greatestFiniteMagnitude)).height

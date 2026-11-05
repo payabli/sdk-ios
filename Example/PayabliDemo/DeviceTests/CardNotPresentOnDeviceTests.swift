@@ -64,12 +64,16 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// The test card, from the file the app prefills its form from.
     private func card() throws -> PayabliPayInCardData {
         let values = try XCTUnwrap(DebugPrefill.values, "DebugPrefill.json is not in the bundle")
+        let expiry = try XCTUnwrap(values.cardExpiration).split(separator: "/")
+        let month = try XCTUnwrap(expiry.first.flatMap { Int($0) }, "cardExpiration is not MM/YY")
+        let year = try XCTUnwrap(expiry.last.flatMap { Int($0) }, "cardExpiration is not MM/YY")
         return PayabliPayInCardData(
             cardNumber: try XCTUnwrap(values.cardNumber).filter(\.isNumber),
-            expiry: try XCTUnwrap(values.cardExpiration),
+            expiryMonth: month,
+            expiryYear: 2000 + year,
+            securityCode: try XCTUnwrap(values.cardSecurityCode),
             holderName: QAIdentity.current.holderName,
-            securityCode: try XCTUnwrap(values.cardCvv),
-            postalCode: try XCTUnwrap(values.cardZip)
+            postalCode: try XCTUnwrap(values.cardPostalCode)
         )
     }
 
@@ -104,13 +108,13 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// A card is stored and comes back with a token to charge later.
     func testAStoringACardReturnsAToken() async throws {
-        let stored = try await makeFlow().addCard(
-            try card(),
-            options: PayabliPayInTokenStorageOptions(
+        let stored = try await makeFlow().storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(try card()),
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
-        )
+        ))
 
         // The token itself is never printed. `PayabliLogger`'s rules put tokens
         // outside every privacy level, and a stored method is reusable, so a run's
@@ -239,13 +243,13 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     /// A card stored in this run, charged as the method and identifier the store returned.
     private func storedCard(on flow: PayabliPayIn) async throws -> PayabliPayInPaymentMethod {
-        let stored = try await flow.addCard(
-            try card(),
-            options: PayabliPayInTokenStorageOptions(
+        let stored = try await flow.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(try card()),
+            options: PayabliPayInStoreOptions(
                 forceCustomerCreation: true,
                 customerData: PayInDemoCustomer.customerData
             )
-        )
+        ))
         let storedMethodId = try XCTUnwrap(stored.storedMethodId, "no stored method came back")
         return .stored(PayabliPayInPaymentMethod.Stored(method: stored.method, storedMethodId: storedMethodId))
     }

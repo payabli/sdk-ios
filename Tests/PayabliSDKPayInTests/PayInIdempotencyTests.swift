@@ -419,16 +419,17 @@ final class PayInIdempotencyTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-9")
 
         let failure = await PayInFixture.failure(from: {
-            _ = try await flow.addCard(
-                PayabliPayInCardData(
+            _ = try await flow.storeMethod(PayabliPayInStoreRequest(
+                instrument: .card(PayabliPayInCardData(
                     cardNumber: "4111 1111 1111 1111",
-                    expiry: "02/27",
-                    holderName: "John Cassian",
+                    expiryMonth: 2,
+                    expiryYear: 2037,
                     securityCode: "999",
+                    holderName: "John Cassian",
                     postalCode: "12345"
-                ),
-                options: PayabliPayInTokenStorageOptions()
-            )
+                )),
+                options: PayabliPayInStoreOptions()
+            ))
         })
 
         guard case .submissionInterrupted = failure as? PayabliPayInError else {

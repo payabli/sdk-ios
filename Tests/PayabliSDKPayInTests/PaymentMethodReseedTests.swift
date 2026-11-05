@@ -25,16 +25,19 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testAnUpdateLeavesTypedValuesAlone() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         type(into: viewModel)
 
         viewModel.update(
             component: makeComponent(entryPoint: "a-different-entry"),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .bankAccount
-            )
+            ),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.cardNumber, "4111 1111 1111 1111")
@@ -53,19 +56,27 @@ final class PaymentMethodReseedTests: XCTestCase {
         let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card])
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: configuration
         )
         var publishes = 0
         let subscription = viewModel.objectWillChange.sink { _ in publishes += 1 }
         defer { subscription.cancel() }
 
-        viewModel.update(component: component, configuration: configuration)
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: configuration,
+            labels: PayabliPayInFormLabels()
+        )
 
         XCTAssertEqual(publishes, 0, "a re-render republished the form")
 
         viewModel.update(
             component: component,
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount]),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(publishes, 1, "a changed configuration did not republish")
@@ -76,6 +87,7 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testAnUpdateReachesTheConfigurationItCarries() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 defaultMethod: .card
@@ -85,10 +97,12 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: makeComponent(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount
-            )
+            ),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.selectedMethod, .bankAccount, "a method the caller withdrew stayed selected")
@@ -102,6 +116,7 @@ final class PaymentMethodReseedTests: XCTestCase {
     func testConfiguredCustomerDataIsMergedRatherThanSeededIntoFields() {
         let viewModel = PayabliPayInViewModel(
             component: makeComponent(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardSections: [Self.customerSection]
@@ -113,6 +128,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         // customer arriving mid-entry is the case that could overwrite a field.
         viewModel.update(
             component: makeComponent(),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardSections: [Self.customerSection],
@@ -123,7 +139,8 @@ final class PaymentMethodReseedTests: XCTestCase {
                         lastName: "Customer"
                     )
                 )
-            )
+            ),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.firstName, "Typed", "a configured customer overwrote a typed field")
@@ -143,11 +160,11 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: true)
         )
         viewModel.cardholderName = "Jane Doe"
@@ -159,7 +176,9 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            configuration: Self.cardConfiguration(showingBillingZip: false)
+            operation: .storePaymentMethod(),
+            configuration: Self.cardConfiguration(showingBillingZip: false),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.billingZip, "", "a typed value survived its field going")
@@ -187,8 +206,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = PayabliPayIn(
             entryPoint: "entry",
             environment: .sandbox,
-            transport: transport,
-            operation: .storePaymentMethod
+            transport: transport
         )
         let hiddenValues = PayabliPayInHiddenValues(
             methodDescription: "Host description",
@@ -196,11 +214,12 @@ final class PaymentMethodReseedTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
-                hiddenValues: hiddenValues,
-                labels: PayabliPayInLabels(title: "Before update")
-            )
+                hiddenValues: hiddenValues
+            ),
+            labels: PayabliPayInFormLabels(title: "Before update")
         )
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
@@ -212,11 +231,12 @@ final class PaymentMethodReseedTests: XCTestCase {
         // drops typed values, not only by the initial build.
         viewModel.update(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
-                hiddenValues: hiddenValues,
-                labels: PayabliPayInLabels(title: "After update")
-            )
+                hiddenValues: hiddenValues
+            ),
+            labels: PayabliPayInFormLabels(title: "After update")
         )
 
         _ = try await viewModel.submit()
@@ -236,14 +256,25 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingBillingZip: true)
         )
         viewModel.billingZip = "33139"
 
-        viewModel.update(component: component, configuration: Self.cardConfiguration(showingBillingZip: false))
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: Self.cardConfiguration(showingBillingZip: false),
+            labels: PayabliPayInFormLabels()
+        )
         XCTAssertEqual(viewModel.billingZip, "", "a typed value survived its field going")
 
-        viewModel.update(component: component, configuration: Self.cardConfiguration(showingBillingZip: true))
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: Self.cardConfiguration(showingBillingZip: true),
+            labels: PayabliPayInFormLabels()
+        )
         XCTAssertEqual(viewModel.billingZip, "", "a dropped value returned with its field")
     }
 
@@ -255,6 +286,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: Self.bankConfiguration(showingOptionalFields: true)
         )
         viewModel.accountHolder = "Jane Business"
@@ -270,7 +302,12 @@ final class PaymentMethodReseedTests: XCTestCase {
         viewModel.billingEmail = "jane@example.com"
         viewModel.billingZip = "33139"
 
-        viewModel.update(component: component, configuration: Self.bankConfiguration(showingOptionalFields: false))
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: Self.bankConfiguration(showingOptionalFields: false),
+            labels: PayabliPayInFormLabels()
+        )
 
         XCTAssertEqual(viewModel.accountHolder, "Jane Business")
         XCTAssertEqual(viewModel.routingNumber, "123456780")
@@ -294,14 +331,25 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: Self.cardConfiguration(showingSecCode: true)
         )
         viewModel.secCode = .ppd
 
-        viewModel.update(component: component, configuration: Self.cardConfiguration(showingSecCode: false))
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: Self.cardConfiguration(showingSecCode: false),
+            labels: PayabliPayInFormLabels()
+        )
         XCTAssertEqual(viewModel.secCode, .web, "a picked value survived its field going")
 
-        viewModel.update(component: component, configuration: Self.cardConfiguration(showingSecCode: true))
+        viewModel.update(
+            component: component,
+            operation: .storePaymentMethod(),
+            configuration: Self.cardConfiguration(showingSecCode: true),
+            labels: PayabliPayInFormLabels()
+        )
         XCTAssertEqual(viewModel.secCode, .web, "a dropped value returned with its field")
     }
 
@@ -313,6 +361,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         viewModel.cardholderName = "Jane Doe"
@@ -327,10 +376,12 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount
-            )
+            ),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.cardholderName, "", "a typed value survived its method going")
@@ -345,7 +396,9 @@ final class PaymentMethodReseedTests: XCTestCase {
 
         viewModel.update(
             component: component,
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card])
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels()
         )
 
         XCTAssertEqual(viewModel.accountHolder, "", "a typed value survived its method going")
@@ -367,7 +420,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardSections: showingBillingZip
-                ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingZip])]
+                ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingPostalCode])]
                 : nil
         )
     }
@@ -392,7 +445,7 @@ final class PaymentMethodReseedTests: XCTestCase {
                     ),
                     PayabliPayInFieldSection(
                         title: "Customer",
-                        fields: [.methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingZip]
+                        fields: [.methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
                     )
                 ]
                 : [

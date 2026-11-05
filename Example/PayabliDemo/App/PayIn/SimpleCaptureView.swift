@@ -140,7 +140,9 @@ struct SimpleCaptureView: View {
         PayInFormSetup(
             operation: operation,
             configuration: customization.configuration(for: operation),
-            style: customization.style
+            labels: customization.labels(for: operation),
+            style: customization.style,
+            storeOptions: PayInFormCustomization.storeOptions
         )
     }
 
@@ -216,9 +218,9 @@ struct SimpleCaptureView: View {
                     Text("Hidden").tag(PayabliPayInCardBrandIconPlacement.hidden)
                 }
                 .pickerStyle(.menu)
-                Picker("Error message", selection: $customization.errorMessagePlacement) {
-                    Text("Top").tag(PayabliPayInErrorMessagePlacement.top)
-                    Text("Above button").tag(PayabliPayInErrorMessagePlacement.aboveSubmitButton)
+                Picker("Failure message", selection: $customization.failureMessagePlacement) {
+                    Text("Top").tag(PayabliPayInFailureMessagePlacement.top)
+                    Text("Above button").tag(PayabliPayInFailureMessagePlacement.aboveSubmitButton)
                 }
                 .pickerStyle(.menu)
                 Picker("Input size", selection: $customization.inputSizing) {
@@ -316,8 +318,8 @@ private struct OwnerFrame<Content: View>: View {
 #Preview {
     WithDemoSession { session, _ in
         SimpleCaptureView(
-            captureFlow: PayInSessions.preview(session: session, operation: .capture),
-            authorizeFlow: PayInSessions.preview(session: session, operation: .authorize),
+            captureFlow: PayInSessions.preview(session: session),
+            authorizeFlow: PayInSessions.preview(session: session),
             saveFlow: PayInSessions.preview(session: session)
         )
         .environmentObject(DemoCustomerSetting())

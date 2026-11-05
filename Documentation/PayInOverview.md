@@ -60,13 +60,12 @@ The component supports four PayIn workflows:
 | Authorize transaction | Hosted form and direct async API | `/api/v2/MoneyIn/authorize` | The hosted form collects a card only. The direct API accepts a card, a stored card, or a cloud device. |
 | Capture prior authorization | Direct async API | `/api/v2/MoneyIn/capture/{transId}` | Uses a prior authorization transaction ID. |
 
-`PayabliPayInOperation` selects the hosted form behavior:
+`PayabliPayInOperation` selects the hosted form behavior. The form takes it as `operation:`, and a payment carries
+the `PayabliPayInRequestConfiguration` it sends:
 
-- `.storePaymentMethod`
-- `.capture`
-- `.authorize`
-
-The default is `.storePaymentMethod`.
+- `.storePaymentMethod(options)`, carrying the `PayabliPayInStoreOptions` the stored method is sent with
+- `.capture(configuration)`
+- `.authorize(configuration)`
 
 ## Authentication Model
 
@@ -103,8 +102,8 @@ are PCI-sensitive because the host app constructs and passes card or bank accoun
 
 ## Hosted UI Capabilities
 
-`PayabliPayInView` can be embedded inline. The sheet modifier
-`.payabliPayInSheet(...)` presents the same component in SwiftUI
+`PayabliPayInForm` can be embedded inline. The sheet modifier
+`.payabliPayInSheet(...)` presents the same form in SwiftUI
 sheet form.
 
 The hosted form supports:
@@ -145,8 +144,8 @@ Supported fields:
 | `.cardholderName` | Name on card | Card input |
 | `.cardNumber` | Card number | Card input |
 | `.cardExpiration` | Expiration | Card input |
-| `.cardCvv` | CVV | Card input |
-| `.cardZip` | Postal code | Card input |
+| `.cardSecurityCode` | CVV | Card input |
+| `.cardPostalCode` | Postal code | Card input |
 | `.accountHolder` | Account holder | bank account input |
 | `.routingNumber` | Routing number | bank account input |
 | `.accountNumber` | Account number | bank account input |
@@ -159,7 +158,7 @@ Supported fields:
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |
 | `.billingEmail` | Billing email | Customer information |
-| `.billingZip` | Billing postal code | Customer information |
+| `.billingPostalCode` | Billing postal code | Customer information |
 | `.amount` | Amount | Read-only payment summary |
 | `.serviceFee` | Fee | Read-only payment summary |
 | `.surchargeFee` | Surcharge | Read-only payment summary |
@@ -169,7 +168,7 @@ Section names are fully configurable:
 ```swift
 PayabliPayInFieldSection(
     title: "Customer Information",
-    fields: [.firstName, .lastName, .billingEmail, .billingZip]
+    fields: [.firstName, .lastName, .billingEmail, .billingPostalCode]
 )
 ```
 
@@ -182,7 +181,7 @@ Each section can also configure:
 
 ## Labels And Placeholders
 
-`PayabliPayInLabels` controls:
+`PayabliPayInFormLabels` controls:
 
 - `title`
 - `subtitle`
@@ -195,23 +194,22 @@ and use placeholder text while the component continues to use the label strings
 for accessibility.
 
 ```swift
-let labels = PayabliPayInLabels(
+let labels = PayabliPayInFormLabels(
     title: "Payment",
     submitButton: "Submit Payment",
     fieldPlaceholders: [
         .cardholderName: "Name on card",
         .cardNumber: "Card number",
         .cardExpiration: "Expiration",
-        .cardCvv: "CVV",
-        .cardZip: "Postal code"
+        .cardSecurityCode: "CVV",
+        .cardPostalCode: "Postal code"
     ]
 )
 
 let configuration = PayabliPayInFormConfiguration(
-    labels: labels,
     labelLayout: .placeholder,
     showsFieldLabels: false,
-    hiddenFieldLabels: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
+    hiddenFieldLabels: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
 )
 ```
 
@@ -243,14 +241,14 @@ The styling is configurable through `PayabliPayInPaymentSummaryConfiguration`:
 - `valueStyle`
 - `rowSpacing`
 
-Relabel a money row through `PayabliPayInLabels.fieldLabels`, and the Total label
-through `PayabliPayInLabels.total`.
+Relabel a money row through `PayabliPayInFormLabels.fieldLabels`, and the Total label
+through `PayabliPayInFormLabels.total`.
 
 Rows are vertical. Labels are left aligned and values are right aligned.
 
 ## Styling Capabilities
 
-Use `PayabliPayInStyle` to style the hosted form.
+Use `PayabliPayInFormStyle` to style the hosted form.
 
 Configurable style areas:
 

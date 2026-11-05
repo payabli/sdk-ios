@@ -24,29 +24,21 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// What the last submission the flow published ended as.
     ///
-    /// **``voidTransaction(_:)`` does not appear here.** One channel per caller: a reversal answers the
-    /// caller that asked for it and leaves this alone, so a screen showing what a payment did does not
-    /// start showing what was done to it afterwards. Read that member's return value instead, and do
-    /// not wait on this for it.
+    /// ``voidTransaction(_:)`` leaves this as it was and returns its result to its caller.
     @Published public private(set) var lastResult: PayabliPayInResult?
 
-    public var lastStoredPaymentMethod: PayabliPayInStoredPaymentMethod? {
+    public var lastStoredPaymentMethod: PayabliPayInStoredMethod? {
         lastResult?.storedPaymentMethod
     }
 
     public private(set) var entryPoint: String
     public private(set) var environment: PayabliEnvironment
     /// Mints the key for an attempt that supplied none.
-    ///
-    /// Settable rather than an initialiser parameter: every initialiser here already carries seven, and
-    /// a test only needs this pinned before it submits. Not public, so a host cannot supply one.
     var newIdempotencyKey: @Sendable () -> String = { UUID().uuidString }
     var newPaymentReference: @Sendable () -> String = { UUID().uuidString.lowercased() }
+    var copyDigits: @Sendable (SensitiveDigits) -> SensitiveDigits = { SensitiveDigits.copy(of: $0) }
     /// Reads the clock a held key ages against. One that keeps counting while the device sleeps.
     var now: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
-
-    @Published public private(set) var operation: PayabliPayInOperation
-    @Published public private(set) var requestConfiguration: PayabliPayInRequestConfiguration?
 
     private(set) var session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
@@ -63,19 +55,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// The entry point and the environment come from the session's configuration, so a flow and the
     /// session it runs on cannot disagree about which merchant or which host they are for.
     ///
-    /// - Parameters:
-    ///   - session: The session the flow sends on.
-    ///   - operation: What a submission does.
-    ///   - requestConfiguration: The request the flow starts with, if any.
-    public init(
-        session: PayabliSession,
-        operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
-    ) {
+    /// - Parameter session: The session the flow sends on.
+    public init(session: PayabliSession) {
         self.entryPoint = session.config.entryPoint
         self.environment = session.config.environment
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
         self.session = session
         injectedTransport = nil
         client = PayInPaymentFlowClient(transport: session.transport)
@@ -92,21 +75,15 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter entryPoint: the paypoint's entry point, as the requests carry it.
     /// - Parameter environment: the environment the requests go to, whose base URL builds the routes.
     /// - Parameter transport: the transport that sends every request, used whole.
-    /// - Parameter operation: what a rendered form submits, `.storePaymentMethod` when nothing is given.
-    /// - Parameter requestConfiguration: the transaction configuration a rendered form's request is built from.
     /// - Parameter telemetry: where the flow reports its operations, nil to report nothing.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
         transport: any PayabliTransport,
-        operation: PayabliPayInOperation = .storePaymentMethod,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil,
         telemetry: TelemetryClient? = nil
     ) {
         self.entryPoint = entryPoint
         self.environment = environment
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
         session = nil
         injectedTransport = transport
         client = PayInPaymentFlowClient(transport: transport)
@@ -149,40 +126,15 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         configure(config: config)
     }
 
-    public func configure(
-        operation: PayabliPayInOperation,
-        requestConfiguration: PayabliPayInRequestConfiguration? = nil
-    ) {
-        self.operation = operation
-        self.requestConfiguration = requestConfiguration
-    }
-
-    public func configure(
-        requestConfiguration: PayabliPayInRequestConfiguration
-    ) {
-        self.requestConfiguration = requestConfiguration
-    }
-
-    public func submitConfigured(
-        _ request: PayabliPayInRequest
-    ) async throws -> PayabliPayInResult {
-        try await submitConfigured(request, origin: .direct)
-    }
-
-    public func submitConfigured(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInResult {
-        try await submitConfigured(paymentMethod, options: options, origin: .direct)
-    }
-
-    /// Runs the configured operation on a payment, reported as started by `origin`.
+    /// Runs an operation on a payment, reported as started by `origin`.
     ///
     /// - Parameter request: the payment and its settings.
+    /// - Parameter operation: the operation to run on it.
     /// - Parameter origin: whether the form or the host started it.
     /// - Returns: the result the service sent.
     func submitConfigured(
         _ request: PayabliPayInRequest,
+        for operation: PayabliPayInOperation,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
         switch operation {
@@ -197,87 +149,78 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
     }
 
-    /// Stores a method when that is the configured operation, reported as started by `origin`.
+    /// Stores a method when that is the operation, reported as started by `origin`.
     ///
-    /// - Parameter paymentMethod: the card or bank account data to store.
-    /// - Parameter options: what the request carries besides the method.
+    /// - Parameter request: the payment method to store and what the request carries besides it.
+    /// - Parameter operation: the operation the method is stored for.
     /// - Parameter origin: whether the form or the host started it.
     /// - Returns: the stored method, as a result.
     func submitConfigured(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions,
+        _ request: PayabliPayInStoreRequest,
+        for operation: PayabliPayInOperation,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        guard operation == .storePaymentMethod else {
+        guard case .storePaymentMethod = operation else {
             return try await reported(
-                operation == .capture ? .capture : .authorize,
+                PayInReports.operation(of: operation.kind),
                 origin: origin,
-                method: PayInReports.method(of: paymentMethod.method)
+                method: PayInReports.method(of: request.instrument.method)
             ) {
                 throw PayabliPayInError.invalidInput("storePaymentMethod operation is required to store a payment method.")
             }
         }
 
-        let storedPaymentMethod = try await addPaymentMethod(paymentMethod, options: options, origin: origin)
-        return PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
+        let storedMethod = try await storeMethod(request, origin: origin)
+        return PayabliPayInResult(storedPaymentMethod: storedMethod)
     }
 
     /// Reports a submission the form refused before handing it to the flow.
     ///
     /// - Parameter error: the refusal.
     /// - Parameter method: the kind of method the form was submitting.
-    func reportFormRefusal(_ error: any Error, method: PayabliPayInMethodType) {
-        let reported: PayInReports.Operation = switch operation {
-        case .storePaymentMethod: .storeMethod
-        case .capture: .capture
-        case .authorize: .authorize
-        }
-        reports?.completed(reported, origin: .form, method: PayInReports.method(of: method), after: nil, error: error)
+    /// - Parameter operation: the operation the form was submitting for.
+    func reportFormRefusal(
+        _ error: any Error,
+        method: PayabliPayInMethodType,
+        operation: PayabliPayInOperation.Kind
+    ) {
+        reports?.completed(
+            PayInReports.operation(of: operation),
+            origin: .form,
+            method: PayInReports.method(of: method),
+            after: nil,
+            error: error
+        )
     }
 
     /// Stores card or bank account payment data using `POST /api/TokenStorage/add`.
     ///
-    /// - Parameter paymentMethod: the card or bank account data to store.
-    /// - Parameter options: what the request carries besides the method, from the customer to the flags.
+    /// - Parameter request: the payment method to store, and what the request carries besides it.
     /// - Returns: the method the service stored, with its identifiers.
-    public func addPaymentMethod(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(paymentMethod, options: options, origin: .direct)
+    public func storeMethod(
+        _ request: PayabliPayInStoreRequest
+    ) async throws -> PayabliPayInStoredMethod {
+        try await storeMethod(request, origin: .direct)
     }
 
-    private func addPaymentMethod(
-        _ paymentMethod: PayabliPayInMethodInput,
-        options: PayabliPayInTokenStorageOptions,
+    private func storeMethod(
+        _ request: PayabliPayInStoreRequest,
         origin: PayInReports.Origin
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: paymentMethod.method)) {
+    ) async throws -> PayabliPayInStoredMethod {
+        let instrument = request.instrument.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(instrument.sensitiveDigits) }
+        return try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: instrument.method)) {
             try beginSubmission()
             defer { endSubmission() }
 
-            let storedPaymentMethod = try await tokenStorageClient.addMethod(
+            let storedMethod = try await tokenStorageClient.addMethod(
                 entryPoint: entryPoint,
-                paymentMethod: paymentMethod,
-                options: options
+                paymentMethod: instrument,
+                options: request.options
             )
-            lastResult = PayabliPayInResult(storedPaymentMethod: storedPaymentMethod)
-            return storedPaymentMethod
+            lastResult = PayabliPayInResult(storedPaymentMethod: storedMethod)
+            return storedMethod
         }
-    }
-
-    public func addCard(
-        _ card: PayabliPayInCardData,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(.card(card), options: options)
-    }
-
-    public func addBankAccount(
-        _ ach: PayabliPayInBankAccountData,
-        options: PayabliPayInTokenStorageOptions = PayabliPayInTokenStorageOptions()
-    ) async throws -> PayabliPayInStoredPaymentMethod {
-        try await addPaymentMethod(.bankAccount(ach), options: options)
     }
 
     /// Authorizes and captures a transaction in one step using
@@ -297,7 +240,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        try await reported(.capture, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+        let request = request.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(request.paymentMethod.sensitiveDigits) }
+        return try await reported(.capture, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
             try await submit {
                 let reference = try paymentReference(of: request)
                 return try await sending(
@@ -332,7 +277,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         _ request: PayabliPayInRequest,
         origin: PayInReports.Origin
     ) async throws -> PayabliPayInResult {
-        try await reported(.authorize, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
+        let request = request.withCopiedDigitBuffers(using: copyDigits)
+        defer { Self.close(request.paymentMethod.sensitiveDigits) }
+        return try await reported(.authorize, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
             try await submit {
                 let reference = try paymentReference(of: request)
                 return try await sending(
@@ -375,11 +322,9 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reverses a transaction using `POST /api/v2/MoneyIn/void/{transId}`, releasing an
     /// authorization's hold or undoing a capture that has not settled.
     ///
-    /// Which transactions can still be reversed is the service's to decide, and is not mirrored here:
-    /// a state it will not reverse comes back as the refusal it sent, carrying its own reason.
+    /// The service decides which transactions can still be reversed, and a refusal carries its own reason.
     ///
-    /// The result is returned and not published: ``lastResult`` keeps whatever the last submission
-    /// left there, so a caller reads the outcome here rather than waiting on that.
+    /// ``lastResult`` is left as it was: the outcome is this call's return value.
     ///
     /// Calling again on a transaction whose reversal ended with its outcome unknown sends the key held for it.
     ///
@@ -630,17 +575,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     /// Runs one operation at a time and publishes its result as the flow's last.
     ///
-    /// For the operations a rendered form drives, where the screen observes the flow rather than
-    /// holding a return value.
+    /// For the operations a rendered form drives, whose screen observes ``lastResult``.
     ///
     /// - Parameter operation: the operation to run under the exclusion.
     /// - Returns: the result the operation ended with, published as ``lastResult``.
     private func submit(
         _ operation: () async throws -> PayabliPayInResult
     ) async throws -> PayabliPayInResult {
-        // Inside the exclusion rather than after it, so the result is published before the
-        // submission reports itself finished. The other way round, an observer woken by
-        // `isSubmitting` going false reads the result of the submission before this one.
+        // Published inside the exclusion, so an observer woken by `isSubmitting` going false reads this result.
         try await exclusively {
             let result = try await operation()
             lastResult = result
@@ -659,5 +601,16 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private func endSubmission() {
         activeSubmissionCount = max(0, activeSubmissionCount - 1)
         isSubmitting = activeSubmissionCount > 0
+    }
+}
+
+extension PayabliPayIn {
+    /// Overwrites a call's own digit buffers.
+    ///
+    /// - Parameter buffers: the buffers to close.
+    static func close(_ buffers: [SensitiveDigits]) {
+        for buffer in buffers {
+            buffer.close()
+        }
     }
 }

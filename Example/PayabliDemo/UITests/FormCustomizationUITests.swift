@@ -180,13 +180,13 @@ final class FormCustomizationLiveUITests: XCTestCase {
             ("billingEmail", "simple-capture@example.com"),
             ("cardholderName", "Simple Capture"),
             ("cardNumber", "4242424242424242"),
-            ("cardCvv", "999"),
-            ("cardZip", "22039")
+            ("cardSecurityCode", "999"),
+            ("cardPostalCode", "22039")
         ]
         for (field, text) in entries {
             let identifier = "payabli.payIn.field.\(field)"
             // The CVV is a secure field, so it is not among the text fields.
-            let box = field == "cardCvv" ? app.secureTextFields[identifier] : app.textFields[identifier]
+            let box = field == "cardSecurityCode" ? app.secureTextFields[identifier] : app.textFields[identifier]
             XCTAssertTrue(box.waitForExistence(timeout: 10), "the form has no \(field) box")
             box.tap()
             box.typeText(text)

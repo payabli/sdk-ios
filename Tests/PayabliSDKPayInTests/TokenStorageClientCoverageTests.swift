@@ -20,9 +20,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -47,12 +48,13 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 )),
-                options: PayabliPayInOptions(
+                options: PayabliPayInStoreOptions(
                     createAnonymous: false,
                     temporary: true
                 )
@@ -90,9 +92,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -111,9 +114,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -144,9 +148,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             entryPoint: "entry",
             paymentMethod: .card(PayabliPayInCardData(
                 cardNumber: "4111111111111111",
-                expiry: "02/28",
-                holderName: "Jane Doe",
+                expiryMonth: 2,
+                expiryYear: 2028,
                 securityCode: "123",
+                holderName: "Jane Doe",
                 postalCode: "33139"
             ))
         )
@@ -166,9 +171,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -200,9 +206,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "entry",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -227,9 +234,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 entryPoint: "   ",
                 paymentMethod: .card(PayabliPayInCardData(
                     cardNumber: "4111111111111111",
-                    expiry: "02/28",
-                    holderName: "Jane Doe",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
                     securityCode: "123",
+                    holderName: "Jane Doe",
                     postalCode: "33139"
                 ))
             )
@@ -253,12 +261,16 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         let component = flowOnSession(token: "")
 
         do {
-            _ = try await component.addCard(PayabliPayInCardData(
-                cardNumber: "4111111111111111",
-                expiry: "02/28",
-                holderName: "Jane Doe",
-                securityCode: "123",
-                postalCode: "33139"
+            _ = try await component.storeMethod(PayabliPayInStoreRequest(
+                instrument: .card(PayabliPayInCardData(
+                    cardNumber: "4111111111111111",
+                    expiryMonth: 2,
+                    expiryYear: 2028,
+                    securityCode: "123",
+                    holderName: "Jane Doe",
+                    postalCode: "33139"
+                )),
+                options: PayabliPayInStoreOptions()
             ))
             XCTFail("Expected missing token error")
         } catch let error as PayabliGenericError {
@@ -288,6 +300,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 environment: .sandbox,
                 transport: transport
             ),
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,

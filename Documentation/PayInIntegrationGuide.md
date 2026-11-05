@@ -50,18 +50,25 @@ access-token provider model as token storage.
 Use hosted UI when the app must avoid clear PAN access:
 
 ```swift
-PayabliPayInView(
-    component: paymentFlow,
+PayabliPayInForm(
+    payIn: paymentFlow,
+    operation: .capture(payment),
     configuration: configuration,
     style: style,
-    onCompleted: { result in
-        outcome = result.code
+    onCompleted: { success in
+        switch success {
+        case let .payment(result):
+            outcome = result.code
+        case .method:
+            outcome = "stored"
+        }
     },
-    onError: { error in
+    onFailed: { error in
         // The form has already shown the payer a message. Keep the code; don't show
         // or log the description, which can quote what was submitted.
         errorCode = (error as? any PayabliError)?.code
-    }
+    },
+    onMethodChanged: { _ in }
 )
 ```
 
@@ -69,12 +76,16 @@ Use direct API only when the app is intentionally collecting raw card or bank
 data:
 
 ```swift
-let stored = try await paymentFlow.addCard(PayabliPayInCardData(
-    cardNumber: "4111111111111111",
-    expiry: "02/28",
-    holderName: "Jane Doe",
-    securityCode: "123",
-    postalCode: "33139"
+let stored = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
+    instrument: .card(PayabliPayInCardData(
+        cardNumber: "4111111111111111",
+        expiryMonth: 2,
+        expiryYear: 2028,
+        securityCode: "123",
+        holderName: "Jane Doe",
+        postalCode: "33139"
+    )),
+    options: PayabliPayInStoreOptions()
 ))
 ```
 
@@ -84,7 +95,7 @@ The SDK copies the card number, security code and bank account number into buffe
 
 ## 4. Store A Payment Method
 
-Create a component for stored-method mode:
+Create a component; the form names the operation:
 
 ```swift
 @MainActor
@@ -95,27 +106,36 @@ final class StorePaymentMethodViewModel: ObservableObject {
 
     // The caller passes the session `initialize` returned, which is where a refused configuration is handled.
     init(session: PayabliSession) {
-        paymentFlow = PayabliPayIn(
-            session: session,
-            operation: .storePaymentMethod
-        )
+        paymentFlow = PayabliPayIn(session: session)
     }
 }
+```
+
+The operation carries what the stored method is sent with besides the payer's details:
+
+```swift
+let storeOptions = PayabliPayInStoreOptions(
+    forceCustomerCreation: true,
+    source: "ios-sdk"
+)
 ```
 
 Render inline:
 
 ```swift
-PayabliPayInView(
-    component: viewModel.paymentFlow,
+PayabliPayInForm(
+    payIn: viewModel.paymentFlow,
+    operation: .storePaymentMethod(storeOptions),
     configuration: storeConfiguration,
     style: payabliStyle,
-    onCompleted: { result in
-        guard let stored = result.storedPaymentMethod else { return }
+    onCompleted: { success in
+        guard case let .method(stored) = success else { return }
         // A stored-method id is a token: keep it, do not log it.
         storedMethodId = stored.storedMethodId
         storedMethodType = stored.method
-    }
+    },
+    onFailed: { _ in },
+    onMethodChanged: { _ in }
 )
 ```
 
@@ -127,7 +147,8 @@ Button("Add Payment Method") {
 }
 .payabliPayInSheet(
     isPresented: $viewModel.isPresented,
-    component: viewModel.paymentFlow,
+    payIn: viewModel.paymentFlow,
+    operation: .storePaymentMethod(storeOptions),
     configuration: storeConfiguration,
     sheetConfiguration: PayabliPayInSheetConfiguration(
         title: "Add Payment Method",
@@ -135,26 +156,30 @@ Button("Add Payment Method") {
         dismissButton: .close
     ),
     style: payabliStyle,
-    onCompleted: { result in
+    onCompleted: { success in
         // A stored-method id is a token: keep it, do not log it.
-        storedMethodId = result.storedPaymentMethod?.storedMethodId
-        storedMethodType = result.storedPaymentMethod?.method
-    }
+        guard case let .method(stored) = success else { return }
+        storedMethodId = stored.storedMethodId
+        storedMethodType = stored.method
+    },
+    onFailed: { _ in },
+    onMethodChanged: { _ in }
 )
 ```
 
 Direct stored card:
 
 ```swift
-let storedCard = try await paymentFlow.addCard(
-    PayabliPayInCardData(
+let storedCard = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
+    instrument: .card(PayabliPayInCardData(
         cardNumber: "4111111111111111",
-        expiry: "02/28",
-        holderName: "Jane Doe",
+        expiryMonth: 2,
+        expiryYear: 2028,
         securityCode: "123",
+        holderName: "Jane Doe",
         postalCode: "33139"
-    ),
-    options: PayabliPayInOptions(
+    )),
+    options: PayabliPayInStoreOptions(
         createAnonymous: false,
         forceCustomerCreation: true,
         customerData: PayabliPayInCustomerData(
@@ -164,75 +189,77 @@ let storedCard = try await paymentFlow.addCard(
         ),
         source: "ios-sdk"
     )
-)
+))
 ```
 
 Direct stored bank account:
 
 ```swift
-let storedBankAccount = try await paymentFlow.addBankAccount(
-    PayabliPayInBankAccountData(
+let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
+    instrument: .bankAccount(PayabliPayInBankAccountData(
         accountNumber: "111111111111",
+        routingNumber: "123456780",
         accountType: .checking,
         holderName: "Jane Doe",
-        routingNumber: "123456780",
-        secCode: .web,
-        holderType: .personal
-    ),
-    options: PayabliPayInOptions(
+        holderType: .personal,
+        secCode: .web
+    )),
+    options: PayabliPayInStoreOptions(
         achValidation: true,
         source: "ios-sdk"
     )
-)
+))
 ```
 
 ## 5. Capture A Transaction
 
-Create a component in capture mode with request configuration:
+Describe the payment the form sends:
 
 ```swift
-let paymentFlow = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(
-            totalAmount: 1.00,
-            serviceFee: 0.10,
-            currency: "USD"
-        ),
-        orderDescription: "iOS checkout",
-        source: "ios-sdk",
-        achValidation: true,
-        forceCustomerCreation: true
-    )
+let paymentFlow = PayabliPayIn(session: session)
+let payment = PayabliPayInRequestConfiguration(
+    paymentDetails: PayabliPayInPaymentDetails(
+        totalAmount: 1.00,
+        serviceFee: 0.10,
+        currency: "USD"
+    ),
+    orderDescription: "iOS checkout",
+    source: "ios-sdk",
+    achValidation: true,
+    forceCustomerCreation: true
 )
 ```
 
-Render the hosted form:
+Render the hosted form with the payment as its operation:
 
 ```swift
-PayabliPayInView(
-    component: paymentFlow,
+PayabliPayInForm(
+    payIn: paymentFlow,
+    operation: .capture(payment),
     configuration: captureConfiguration,
     style: payabliStyle,
-    onCompleted: { result in
+    onCompleted: { success in
+        guard case let .payment(result) = success else { return }
         print("Payment transaction:", result.transaction?.paymentTransId ?? "")
-    }
+    },
+    onFailed: { _ in },
+    onMethodChanged: { _ in }
 )
 ```
 
 The hosted capture form can collect card or bank account. The read-only payment summary
-is displayed before the submit button and is derived from
-`requestConfiguration.paymentDetails`.
+is displayed before the submit button and is derived from the operation's
+`paymentDetails`.
 
 Direct capture with card:
 
 ```swift
 let cardData = PayabliPayInCardData(
     cardNumber: "4111111111111111",
-    expiry: "02/28",
-    holderName: "Jane Doe",
+    expiryMonth: 2,
+    expiryYear: 2028,
     securityCode: "123",
+    holderName: "Jane Doe",
     postalCode: "33139"
 )
 
@@ -257,7 +284,10 @@ let result = try await paymentFlow.capture(PayabliPayInRequest(
 Direct capture with a stored method, charged as the method and identifier the store returned:
 
 ```swift
-let stored = try await paymentFlow.addCard(cardData)
+let stored = try await paymentFlow.storeMethod(PayabliPayInStoreRequest(
+    instrument: .card(cardData),
+    options: PayabliPayInStoreOptions()
+))
 guard let storedMethodId = stored.storedMethodId else { return }
 
 let result = try await paymentFlow.capture(PayabliPayInRequest(
@@ -277,22 +307,19 @@ Direct capture also supports `.bankAccount`, `.cloudDevice`, `.check`, and `.cas
 
 ## 6. Authorize A Transaction
 
-Create a component in authorize mode:
+Describe the hold and hand it to the form as `.authorize`:
 
 ```swift
-let paymentFlow = PayabliPayIn(
-    session: session,
-    operation: .authorize,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(
-            totalAmount: 1.00,
-            serviceFee: 0.10,
-            currency: "USD"
-        ),
-        orderDescription: "iOS authorization",
-        source: "ios-sdk"
-    )
+let hold = PayabliPayInRequestConfiguration(
+    paymentDetails: PayabliPayInPaymentDetails(
+        totalAmount: 1.00,
+        serviceFee: 0.10,
+        currency: "USD"
+    ),
+    orderDescription: "iOS authorization",
+    source: "ios-sdk"
 )
+// PayabliPayInForm(payIn: paymentFlow, operation: .authorize(hold), ...)
 ```
 
 The direct `authorize(_:)` API accepts a card, a stored card, or a cloud device,
@@ -386,24 +413,24 @@ let placeholderFields: [PayabliPayInField] = [
     .cardholderName,
     .cardNumber,
     .cardExpiration,
-    .cardCvv,
-    .cardZip,
+    .cardSecurityCode,
+    .cardPostalCode,
     .firstName,
     .lastName,
     .billingEmail,
-    .billingZip
+    .billingPostalCode
 ]
 
-let labels = PayabliPayInLabels(
+let labels = PayabliPayInFormLabels(
     title: "Payment",
     subtitle: "Enter your payment details",
     submitButton: "Submit Payment",
-    fieldLabels: PayabliPayInLabels.defaultFieldLabels.merging([
-        .cardZip: "Postal code",
-        .billingZip: "Billing postal code"
+    fieldLabels: PayabliPayInFormLabels.defaultFieldLabels.merging([
+        .cardPostalCode: "Postal code",
+        .billingPostalCode: "Billing postal code"
     ]) { _, new in new },
     fieldPlaceholders: Dictionary(uniqueKeysWithValues: placeholderFields.map {
-        ($0, PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue)
+        ($0, PayabliPayInFormLabels.defaultFieldLabels[$0] ?? $0.rawValue)
     })
 )
 
@@ -413,7 +440,7 @@ let configuration = PayabliPayInFormConfiguration(
     cardSections: [
         PayabliPayInFieldSection(
             title: "Card Information",
-            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip],
+            fields: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
             inputVerticalSpacing: 4,
             inputHorizontalSpacing: 8,
             fieldVerticalSpacings: [
@@ -423,7 +450,7 @@ let configuration = PayabliPayInFormConfiguration(
         ),
         PayabliPayInFieldSection(
             title: "Customer Information",
-            fields: [.firstName, .lastName, .billingEmail, .billingZip],
+            fields: [.firstName, .lastName, .billingEmail, .billingPostalCode],
             inputVerticalSpacing: 8
         ),
         PayabliPayInFieldSection(
@@ -442,7 +469,7 @@ let configuration = PayabliPayInFormConfiguration(
         ),
         PayabliPayInFieldSection(
             title: "Customer Information",
-            fields: [.firstName, .lastName, .billingEmail, .billingZip]
+            fields: [.firstName, .lastName, .billingEmail, .billingPostalCode]
         ),
         PayabliPayInFieldSection(
             title: "Payment Information",
@@ -455,12 +482,6 @@ let configuration = PayabliPayInFormConfiguration(
         secCode: .web,
         methodDescription: "iOS payment flow"
     ),
-    options: PayabliPayInOptions(
-        createAnonymous: false,
-        forceCustomerCreation: true,
-        source: "ios-sdk"
-    ),
-    labels: labels,
     labelLayout: .placeholder,
     showsFieldLabels: false,
     hiddenFieldLabels: Set(placeholderFields),
@@ -472,15 +493,18 @@ let configuration = PayabliPayInFormConfiguration(
     inputSizing: PayabliPayInInputSizing(
         defaultSize: PayabliPayInInputSize(height: 52, horizontalPadding: 14),
         fieldSizes: [
-            .cardCvv: PayabliPayInInputSize(width: 120, height: 52)
+            .cardSecurityCode: PayabliPayInInputSize(width: 120, height: 52)
         ]
     ),
     cardBrandIconPlacement: .trailing,
-    errorMessagePlacement: .aboveSubmitButton,
+    failureMessagePlacement: .aboveSubmitButton,
     requiredFields: [.firstName, .lastName, .billingEmail],
     paymentSummary: PayabliPayInPaymentSummaryConfiguration(rowSpacing: 6)
 )
 ```
+
+The wording is not part of the configuration: pass `labels` to `PayabliPayInForm` or
+`.payabliPayInSheet` beside the configuration.
 
 ## 10. Configuration Field Reference
 
@@ -495,15 +519,14 @@ let configuration = PayabliPayInFormConfiguration(
 | `cardSections` | nil | Custom card sections. Required and payment summary fields are appended if missing. |
 | `bankSections` | nil | Custom bank account sections. `secCode` is not rendered. Required and payment summary fields are appended if missing. |
 | `hiddenValues` | default hidden values | Non-editable values submitted with the hosted form. |
-| `options` | empty options | Token-storage options for hosted `.storePaymentMethod`. |
-| `labels` | default labels | Title, subtitle, submit text, labels, placeholders. |
 | `labelLayout` | `.external` | `.external` for visible labels, `.placeholder` for placeholder-first UI. |
 | `showsFieldLabels` | nil | Optional global visible-label override. Nil follows `labelLayout`. |
 | `hiddenFieldLabels` | `[]` | Hide visible labels for specific fields. Accessibility labels remain. |
 | `formatting` | default formatting | Card spacing, expiration separator, account number masking. |
 | `inputSizing` | default input sizing | Default and per-field input sizes. |
 | `cardBrandIconPlacement` | `.trailing` | `.leading`, `.trailing`, or `.hidden`. |
-| `errorMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
+| `failureMessagePlacement` | `.aboveSubmitButton` | `.top` or `.aboveSubmitButton`. |
+| `showsFailureMessage` | `true` | Whether the form draws its failure message. The marks a failure puts on fields stay, and the failure still reaches the host. |
 | `requiredFields` | `[]` | Optional visible fields to require. Amount is always required. |
 | `paymentSummary` | default summary | Read-only amount and fee text/styles. |
 
@@ -520,7 +543,7 @@ let configuration = PayabliPayInFormConfiguration(
 | `fieldVerticalSpacings` | Per-field vertical spacing after specific fields. |
 | `style` | `.inputs` by default. `.summary` marks where the payment amounts are drawn, and under what title. |
 
-### `PayabliPayInLabels`
+### `PayabliPayInFormLabels`
 
 | Field | Default | Description |
 | --- | --- | --- |
@@ -530,6 +553,10 @@ let configuration = PayabliPayInFormConfiguration(
 | `fieldLabels` | default labels | Visible and accessibility labels by field. |
 | `fieldPlaceholders` | empty | Placeholder text by field. |
 | `total` | nil (`Total`) | Label on the payment summary's Total row. |
+| `declinedMessage` | `nil` | The payer's message for a declined submission; `nil` or blank reads the SDK's own. |
+| `retryLaterMessage` | `nil` | The payer's message when the same submission may work later; `nil` or blank reads the SDK's own. |
+| `outcomeUnknownMessage` | `nil` | The payer's message when a submission may have gone through; `nil` or blank reads the SDK's own. |
+| `otherMessage` | `nil` | The payer's message for every failure category but the three named ones; `nil` or blank reads the SDK's own. |
 
 Default field labels:
 
@@ -538,8 +565,8 @@ Default field labels:
 | `.cardholderName` | Name on card |
 | `.cardNumber` | Card number |
 | `.cardExpiration` | Expiration |
-| `.cardCvv` | CVV |
-| `.cardZip` | Postal code |
+| `.cardSecurityCode` | CVV |
+| `.cardPostalCode` | Postal code |
 | `.accountHolder` | Account holder |
 | `.routingNumber` | Routing number |
 | `.accountNumber` | Account number |
@@ -552,7 +579,7 @@ Default field labels:
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
 | `.billingEmail` | Billing email |
-| `.billingZip` | Billing postal code |
+| `.billingPostalCode` | Billing postal code |
 | `.amount` | Amount |
 | `.serviceFee` | Fee |
 | `.surchargeFee` | Surcharge |
@@ -601,7 +628,7 @@ Default field labels:
 ## 11. Styling Reference
 
 ```swift
-let payabliStyle = PayabliPayInStyle(
+let payabliStyle = PayabliPayInFormStyle(
     accentColor: .blue,
     title: PayabliPayInTextStyle(
         font: .title3.weight(.semibold),
@@ -664,7 +691,7 @@ Style fields:
 | Type | Fields |
 | --- | --- |
 | `PayabliPayInTextStyle` | `font`, `color` |
-| `PayabliPayInStyle` | `accentColor`, `title`, `subtitle`, `sectionTitle`, `label`, `input`, `submitButton`, `error`, `layout` |
+| `PayabliPayInFormStyle` | `accentColor`, `title`, `subtitle`, `sectionTitle`, `label`, `input`, `submitButton`, `error`, `layout` |
 | `PayabliPayInInputStyle` | `font`, `uiFont`, `textColor`, `placeholderColor`, `backgroundColor`, `focusedBackgroundColor`, `borderColor`, `focusedBorderColor`, `borderWidth`, `focusedBorderWidth`, `cornerRadius`, `pickerIconColor` |
 | `PayabliPayInSubmitButtonStyle` | `font`, `backgroundColor`, `foregroundColor`, `disabledBackgroundColor`, `disabledForegroundColor`, `cornerRadius`, `height`, `horizontalPadding` |
 | `PayabliPayInLayoutStyle` | `contentSpacing`, `headerSpacing`, `fieldGroupSpacing`, `pairedFieldSpacing`, `labelSpacing`, `sectionSpacing`, `sectionTitleSpacing`, `inputVerticalSpacing`, `inputHorizontalSpacing` |
@@ -672,21 +699,27 @@ Style fields:
 Apply style inline:
 
 ```swift
-PayabliPayInView(
-    component: paymentFlow,
+PayabliPayInForm(
+    payIn: paymentFlow,
+    operation: .capture(payment),
     configuration: configuration,
     style: payabliStyle,
-    onCompleted: { _ in }
+    onCompleted: { _ in },
+    onFailed: { _ in },
+    onMethodChanged: { _ in }
 )
 ```
 
 Apply style through environment:
 
 ```swift
-PayabliPayInView(
-    component: paymentFlow,
+PayabliPayInForm(
+    payIn: paymentFlow,
+    operation: .capture(payment),
     configuration: configuration,
-    onCompleted: { _ in }
+    onCompleted: { _ in },
+    onFailed: { _ in },
+    onMethodChanged: { _ in }
 )
 .payabliPayInStyle(payabliStyle)
 ```
@@ -704,7 +737,7 @@ The SDK can use any font available to the host app.
 Example:
 
 ```swift
-let style = PayabliPayInStyle(
+let style = PayabliPayInFormStyle(
     title: PayabliPayInTextStyle(
         font: .custom("Inter-SemiBold", size: 20),
         color: .primary
