@@ -11,6 +11,7 @@ extension TTPChargeKeyTests {
         private var sentKeys: [String] = []
         private var initiate = 200
         private var refusal: String?
+        private var refusalCode: String?
         private var duplicateSale = false
         private var closeFails = false
         private var notApproved = false
@@ -28,6 +29,11 @@ extension TTPChargeKeyTests {
         var updateRefusal: String? {
             get { lock.withLock { refusal } }
             set { lock.withLock { refusal = newValue } }
+        }
+
+        var updateRefusalCode: String? {
+            get { lock.withLock { refusalCode } }
+            set { lock.withLock { refusalCode = newValue } }
         }
 
         var conflictIsDuplicateSale: Bool {
@@ -101,7 +107,9 @@ extension TTPChargeKeyTests {
                 data = try JSONSerialization.data(withJSONObject: ["title": "Server Error", "status": 500])
             } else if let refusal = wire.updateRefusal {
                 status = 400
-                data = try JSONSerialization.data(withJSONObject: ["title": "Bad Request", "status": 400, "detail": refusal])
+                var body: [String: Any] = ["title": "Bad Request", "status": 400, "detail": refusal]
+                body["code"] = wire.updateRefusalCode
+                data = try JSONSerialization.data(withJSONObject: body)
             } else {
                 data = try JSONSerialization.data(withJSONObject: ["code": "A01", "data": ["paymentTransId": "TXN-KEY"]])
             }
