@@ -68,9 +68,10 @@ final class PaymentMethodSwitchWhilePendingTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedMethod, .bankAccount)
     }
 
-    /// The move a reconfiguration asks for waits for the outcome, then lands.
+    /// The refusal is for the payer's switch. A configuration is the host's, and the method on screen
+    /// and the fields drawn have to agree.
     @MainActor
-    func testAReconfigurationThatDropsTheMethodWhilePendingMovesItOnceTheSubmissionEnds() async {
+    func testAReconfigurationThatDropsTheMethodWhilePendingMovesItAtOnce() async {
         let transport = HeldTransport()
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let operation = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
@@ -95,7 +96,8 @@ final class PaymentMethodSwitchWhilePendingTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.bankAccount]),
             labels: PayabliPayInFormLabels()
         )
-        XCTAssertEqual(viewModel.selectedMethod, .card)
+        XCTAssertEqual(viewModel.selectedMethod, .bankAccount)
+        XCTAssertEqual(viewModel.effectiveSelectedMethod, viewModel.selectedMethod)
 
         await transport.release()
         _ = try? await submission.value

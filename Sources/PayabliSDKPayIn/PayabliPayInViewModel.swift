@@ -4,7 +4,7 @@ import SwiftUI
 
 @MainActor
 final class PayabliPayInViewModel: ObservableObject {
-    /// The method on screen. Written only through `selectedMethod`.
+    /// The method on screen. Written only through `show(_:)`.
     @Published private(set) var methodOnScreen: PayabliPayInMethodType
 
     /// The method the payer chose. While a submission is pending a switch is refused before anything is
@@ -12,18 +12,25 @@ final class PayabliPayInViewModel: ObservableObject {
     var selectedMethod: PayabliPayInMethodType {
         get { methodOnScreen }
         set {
-            let previous = methodOnScreen
-            guard !isSubmitting || newValue == previous else {
+            guard !isSubmitting || newValue == methodOnScreen else {
                 // The selector drew the tap already, so it has to read the method back.
                 objectWillChange.send()
                 return
             }
-            methodOnScreen = newValue
-            if newValue != previous {
-                dropValuesLeftBehind(by: previous)
-            }
-            dropMarksOffScreen()
+            show(newValue)
         }
+    }
+
+    /// Puts `method` on screen and drops what the previous method had typed and marked.
+    ///
+    /// - Parameter method: the method to draw.
+    private func show(_ method: PayabliPayInMethodType) {
+        let previous = methodOnScreen
+        methodOnScreen = method
+        if method != previous {
+            dropValuesLeftBehind(by: previous)
+        }
+        dropMarksOffScreen()
     }
 
     @Published var cardholderNameStorage = "" {
@@ -265,19 +272,18 @@ final class PayabliPayInViewModel: ObservableObject {
 
     /// Moves off a method the configuration no longer offers, to its default where it offers that.
     ///
-    /// Refused while a submission is pending, so the submission that ends calls it again.
+    /// Taken while a submission is pending too: the refusal is for the payer's switch, and the
+    /// configuration is the host's.
     private func keepTheMethodOnScreenOffered() {
         let methods = availableMethods
-        if !methods.contains(selectedMethod) {
-            selectedMethod = methods.contains(configuration.defaultMethod)
-                ? configuration.defaultMethod
-                : methods[0]
+        if !methods.contains(methodOnScreen) {
+            show(methods.contains(configuration.defaultMethod) ? configuration.defaultMethod : methods[0])
         }
     }
 
     func normalizeSelectedMethodForAvailableMethods() {
-        guard !availableMethods.contains(selectedMethod) else { return }
-        selectedMethod = availableMethods[0]
+        guard !availableMethods.contains(methodOnScreen) else { return }
+        show(availableMethods[0])
     }
 
     var cardNumberValidationMessage: String? {
@@ -349,7 +355,6 @@ final class PayabliPayInViewModel: ObservableObject {
         defer {
             isSubmitting = false
             submittingOperation = nil
-            keepTheMethodOnScreenOffered()
         }
         let submittedFlow = component
 
