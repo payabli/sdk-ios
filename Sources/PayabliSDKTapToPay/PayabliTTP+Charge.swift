@@ -256,8 +256,10 @@ extension PayabliTTP {
             // The no-record close says this charge took nothing, so it replaces the read's failure — but only
             // where this run minted the key: a resent key names an earlier charge, which it cannot settle. A read
             // that never reached a card keeps its 3017, which already says nothing was taken.
-            if case .failed(_, _, processorHasNoRecord: true, _, _) = close, !reservation.reused, !touchedNoCard {
-                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId)
+            if case let .failed(_, _, processorHasNoRecord: true, httpStatus, rawCode) = close, !reservation.reused,
+               !touchedNoCard
+            {
+                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId, httpStatus: httpStatus, rawCode: rawCode)
             }
             throw failure
         }

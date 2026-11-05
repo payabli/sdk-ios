@@ -76,8 +76,8 @@ package enum PayabliTTPError: Error, Sendable {
     case outcomeUnknown(paymentTransId: String)
 
     /// The processor has no record of the payment, so the card was not charged. Only the close of
-    /// a failed read raises it, and only for a key this run minted.
-    case paymentNotTaken(paymentTransId: String)
+    /// a failed read raises it, and only for a key this run minted. `httpStatus` and `rawCode` are that close's answer's.
+    case paymentNotTaken(paymentTransId: String, httpStatus: Int? = nil, rawCode: String? = nil)
 }
 
 package extension PayabliTTPError {
@@ -116,7 +116,7 @@ package extension PayabliTTPError {
         case let .updateFailed(_, paymentTransId, _, _, _, _),
              let .cardDeclined(paymentTransId),
              let .outcomeUnknown(paymentTransId),
-             let .paymentNotTaken(paymentTransId):
+             let .paymentNotTaken(paymentTransId, _, _):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
@@ -140,13 +140,14 @@ package extension PayabliTTPError {
             return (httpStatus, nil)
         case let .cardPresentNotEnabled(httpStatus, rawCode),
              let .paymentNotOpened(_, httpStatus, rawCode),
-             let .updateFailed(_, _, _, _, httpStatus, rawCode):
+             let .updateFailed(_, _, _, _, httpStatus, rawCode),
+             let .paymentNotTaken(_, httpStatus, rawCode):
             return (httpStatus, rawCode)
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .readerSetupFailed,
              .readerCredentialsUnusable, .nfcFailed, .tokenExpired, .activationFailed, .activationCodeMalformed,
              .networkError, .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
              .readerUnavailable, .guardFailed, .readerDeviceRefused, .readerSessionExpired, .cardDeclined,
-             .outcomeUnknown, .paymentNotTaken:
+             .outcomeUnknown:
             return (nil, nil)
         }
     }
