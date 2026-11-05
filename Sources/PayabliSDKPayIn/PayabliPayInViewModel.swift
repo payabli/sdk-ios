@@ -4,10 +4,26 @@ import SwiftUI
 
 @MainActor
 final class PayabliPayInViewModel: ObservableObject {
-    @Published var selectedMethod: PayabliPayInMethodType {
-        didSet {
-            if selectedMethod != oldValue {
-                dropValuesLeftBehind(by: oldValue)
+    /// The method on screen. Written only through `selectedMethod`.
+    @Published private(set) var methodOnScreen: PayabliPayInMethodType
+
+    /// The method the payer chose.
+    ///
+    /// While a submission is pending a switch is refused before anything is published, so the method on
+    /// screen stays the one being sent and nothing typed for it is dropped. Disabling the selector is not
+    /// enough on its own: it takes effect on the next draw, and a tap can land before then.
+    var selectedMethod: PayabliPayInMethodType {
+        get { methodOnScreen }
+        set {
+            let previous = methodOnScreen
+            guard !isSubmitting || newValue == previous else {
+                // The selector drew the tap already, so it has to read the method back.
+                objectWillChange.send()
+                return
+            }
+            methodOnScreen = newValue
+            if newValue != previous {
+                dropValuesLeftBehind(by: previous)
             }
             dropMarksOffScreen()
         }
@@ -123,7 +139,7 @@ final class PayabliPayInViewModel: ObservableObject {
             operation: operation,
             configuredMethods: configuration.allowedMethods
         )
-        self.selectedMethod = availableMethods.contains(configuration.defaultMethod)
+        self.methodOnScreen = availableMethods.contains(configuration.defaultMethod)
             ? configuration.defaultMethod
             : availableMethods[0]
     }
@@ -176,12 +192,7 @@ final class PayabliPayInViewModel: ObservableObject {
             )
         }
 
-        let methods = availableMethods
-        if !methods.contains(selectedMethod) {
-            selectedMethod = methods.contains(configuration.defaultMethod)
-                ? configuration.defaultMethod
-                : methods[0]
-        }
+        keepTheMethodOnScreenOffered()
         dropValuesWithoutAField()
         dropMarksOffScreen()
     }
@@ -253,6 +264,18 @@ final class PayabliPayInViewModel: ObservableObject {
 
     var effectiveSelectedMethod: PayabliPayInMethodType {
         availableMethods.contains(selectedMethod) ? selectedMethod : availableMethods[0]
+    }
+
+    /// Moves off a method the configuration no longer offers, to its default where it offers that.
+    ///
+    /// Refused while a submission is pending, so the submission that ends calls it again.
+    private func keepTheMethodOnScreenOffered() {
+        let methods = availableMethods
+        if !methods.contains(selectedMethod) {
+            selectedMethod = methods.contains(configuration.defaultMethod)
+                ? configuration.defaultMethod
+                : methods[0]
+        }
     }
 
     func normalizeSelectedMethodForAvailableMethods() {
@@ -329,6 +352,7 @@ final class PayabliPayInViewModel: ObservableObject {
         defer {
             isSubmitting = false
             submittingOperation = nil
+            keepTheMethodOnScreenOffered()
         }
         let submittedFlow = component
 
