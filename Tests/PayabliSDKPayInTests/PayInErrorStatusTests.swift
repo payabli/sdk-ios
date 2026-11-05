@@ -45,6 +45,25 @@ final class PayInErrorStatusTests: XCTestCase {
         }
     }
 
+    func testA402IsRefusedWhenItsBodyNamesAnApprovalOrAnotherStatus() async throws {
+        let bodies = [
+            #"{"code":"A0000","reason":"Approved","data":null,"token":null}"#,
+            #"{"isSuccess":false,"responseText":"Declined","responseCode":5001}"#,
+            #"{"status":400,"reason":"Declined"}"#
+        ]
+        for (index, body) in bodies.enumerated() {
+            let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 402, responseBody: body))
+
+            let error = await failure {
+                _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-402-b\(index)")
+            }
+
+            let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "body \(body): got \(error)")
+            XCTAssertEqual(refused.type, .paymentDeclined, "body \(body)")
+            XCTAssertEqual(refused.httpStatus, 402, "body \(body)")
+        }
+    }
+
     func testAnAuthorizationAnswered402WithNoDeclineCodeIsRefused() async throws {
         let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
             statusCode: 402,
