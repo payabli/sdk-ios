@@ -87,9 +87,9 @@ struct PayInFailure {
     /// payment. What settles the earlier attempt is reading the transaction back.
     let isDuplicateSubmission: Bool
 
-    /// Whether the SDK refused a retry for describing another payment. Nothing was sent, so the payment the
-    /// retry names is still open.
-    let refusedAsAnotherPayment: Bool
+    /// Whether the service answered the payment, with a decline or a refusal of what was sent, which ends any
+    /// retry of it. A refusal made on the device, or a failure the service may not have seen, leaves one open.
+    let answersThePayment: Bool
 }
 
 extension PayInOutcome {
@@ -189,7 +189,7 @@ extension PayInFailure {
         isDuplicateSubmission = duplicate
         outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
         refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
-        refusedAsAnotherPayment = (error as? any PayabliError)?.type == .retryNotSamePayment
+        answersThePayment = Self.answersThePayment(error)
         logLabel = LoggableError.label(for: error)
         message = Self.message(for: error, operation: operation, duplicate: duplicate)
     }
@@ -245,6 +245,18 @@ extension PayInFailure {
             "The reversal couldn't be completed. Please try again."
         case (.void, _):
             "The reversal couldn't be completed."
+        }
+    }
+
+    private static func answersThePayment(_ error: Error) -> Bool {
+        switch error {
+        // Refused on the device, or possibly never answered, whatever type they carry.
+        case PayabliPayInError.invalidInput, PayabliPayInError.submissionInProgress,
+             PayabliPayInError.submissionInterrupted:
+            return false
+        default:
+            let type = (error as? any PayabliError)?.type
+            return type == .paymentDeclined || type == .validation
         }
     }
 

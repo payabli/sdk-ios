@@ -394,12 +394,12 @@ struct ShownFormMethod: Equatable {
     ///
     /// - Parameter failure: how the charge ended.
     /// - Parameter held: the method held before it, if a retry was open.
-    /// - Returns: the method sent while the outcome is unknown, the one held while a retry refused as another
-    ///   payment left it open, and otherwise nil, so the next charge may use any method.
+    /// - Returns: the method sent while the outcome is unknown, nil once the service answered the payment, and
+    ///   otherwise the one held.
     func heldMethod(after failure: PayInFailure, holding held: PayabliPayInMethodType?) -> PayabliPayInMethodType? {
         if failure.outcomeIsUnresolved {
             return method
         }
-        return failure.refusedAsAnotherPayment ? held : nil
+        return failure.answersThePayment ? nil : held
     }
 }

@@ -225,21 +225,30 @@ final class PayInFormCustomizationTests: XCTestCase {
     }
 
     /// The service answered the retry, so the next charge is a payment of its own and may use any method.
-    func testADeclineOfAHeldRetryEndsTheHold() {
+    func testADeclineOrARefusalOfWhatWasSentEndsTheHold() {
         var shown = ShownFormMethod()
         shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture, holding: .bankAccount))
-        let decline = PayInFailure(Reason(type: .paymentDeclined), operation: .capture)
 
-        XCTAssertNil(shown.heldMethod(after: decline, holding: .bankAccount))
+        for type in [PayabliErrorType.paymentDeclined, .validation] {
+            let answer = PayInFailure(Reason(type: type), operation: .capture)
+            XCTAssertNil(shown.heldMethod(after: answer, holding: .bankAccount), "\(type)")
+        }
     }
 
-    /// Nothing was sent, so the payment the retry names is still open.
-    func testARetryRefusedAsAnotherPaymentKeepsTheHold() {
+    /// The service has not answered the payment the retry names, so it is still open.
+    func testAFailureTheServiceDidNotAnswerKeepsTheHold() {
         var shown = ShownFormMethod()
         shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture, holding: .bankAccount))
-        let refusal = PayInFailure(Reason(type: .retryNotSamePayment), operation: .capture)
+        let failures: [Error] = [
+            Reason(type: .retryNotSamePayment),
+            Reason(type: .serverError),
+            PayabliPayInError.invalidInput("amount")
+        ]
 
-        XCTAssertEqual(shown.heldMethod(after: refusal, holding: .bankAccount), .bankAccount)
+        for error in failures {
+            let failure = PayInFailure(error, operation: .capture)
+            XCTAssertEqual(shown.heldMethod(after: failure, holding: .bankAccount), .bankAccount, "\(error)")
+        }
     }
 
     /// A save moves no money and sends no retry, so a held payment's method does not bind it.
