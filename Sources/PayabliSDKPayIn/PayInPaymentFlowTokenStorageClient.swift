@@ -113,19 +113,22 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     ///
     /// - Parameter response: A 400 from the route.
     /// - Returns: ``PayabliPayInError/Refused`` for `responseCode` 9005; otherwise the validation error carrying the
-    ///   route's `responseText` as its detail, the status, and the `responseCode` as its code.
+    ///   route's `responseText` as its detail, the status, and the `responseCode` as its code. The code is read apart
+    ///   from the text, so an answer without `responseText` keeps it.
     private static func badRequest(from response: PayabliResponse) -> any Error {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
-        let code = decoded?.responseCode.map(String.init)
-        if let decoded, decoded.responseCode == blockedByFraudControl {
-            return PayabliPayInError.Refused(failure: decoded.failure(httpStatusCode: response.statusCode, code: code))
+        let code = serviceCode(of: response)
+        if code == blockedByFraudControl {
+            let failure = decoded?.failure(httpStatusCode: response.statusCode, code: code)
+                ?? PayabliPayInFailure(code: code, reason: "Unable to save payment method.", httpStatusCode: response.statusCode)
+            return PayabliPayInError.Refused(failure: failure)
         }
         let validation = PayabliValidationError(detail: decoded?.responseText.trimmed.nilIfEmpty)
         return PayabliPaymentError.validation(validation.carrying(httpStatus: response.statusCode, rawCode: code))
     }
 
     /// The route's `responseCode` for a payer blocked by fraud control.
-    private static let blockedByFraudControl = 9005
+    private static let blockedByFraudControl = "9005"
 
     private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInFailure? {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
