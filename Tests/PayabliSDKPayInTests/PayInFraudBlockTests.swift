@@ -48,6 +48,18 @@ final class PayInFraudBlockTests: XCTestCase {
         XCTAssertEqual(refused.rawCode, "E9005")
     }
 
+    func testACaptureBlockedByFraudControlAt409IsADeclineNotAConflict() async throws {
+        let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 409, responseBody: Self.block("E9005")))
+
+        let error = await failure {
+            _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-409")
+        }
+
+        let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "got \(error)")
+        XCTAssertEqual(refused.httpStatus, 409)
+        XCTAssertEqual(refused.rawCode, "E9005")
+    }
+
     func testAnyOtherBadRequestOnACaptureStaysAValidationError() async throws {
         let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 400, responseBody: Self.block("E1001")))
 

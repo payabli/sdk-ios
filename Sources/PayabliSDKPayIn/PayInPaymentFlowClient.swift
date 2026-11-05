@@ -365,7 +365,8 @@ final class PayInPaymentFlowClient: Sendable {
             } else {
                 error
             }
-            let conflict = answer?.statusCode == 409
+            // A fraud block is a decline at any status, a 409 included, so it is not the conflict that leaves a key open.
+            let conflict = answer.map { $0.statusCode == 409 && fraudBlockCode(of: $0) == nil } ?? false
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
             // was sent, so the outcome is known and there is no key to report.
