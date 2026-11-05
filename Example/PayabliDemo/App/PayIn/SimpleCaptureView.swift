@@ -19,6 +19,9 @@ struct SimpleCaptureView: View {
     @State private var attempts = PayInAttempts()
     @State private var amountText = AmountEntry.text(for: 10)
     @State private var resultText = ""
+    @State private var shownMethod = ShownFormMethod()
+    /// The method each charging flow's open retry was sent with.
+    @State private var heldMethods: [PayInOperation: PayabliPayInMethodType] = [:]
 
     var body: some View {
         NavigationStack {
@@ -28,8 +31,7 @@ struct SimpleCaptureView: View {
                         appControls
                     }
 
-                    // A capture or an authorization needs an amount, so without a valid one there is no form to submit.
-                    if !charges || enteredAmount != nil {
+                    if showsForm {
                         OwnerFrame(title: "Payabli SDK", dashed: true) {
                             PaymentFormHost(
                                 flow: flow(for: operation),
@@ -37,7 +39,8 @@ struct SimpleCaptureView: View {
                                 // Each form reports for the operation it was built for, which a completion that
                                 // lands after the picker has moved still names.
                                 onCompleted: { [operation] outcome in handleCompleted(outcome, for: operation) },
-                                onFailed: handleFailed
+                                onFailed: handleFailed,
+                                onMethodChanged: { shownMethod.moved(to: $0) }
                             )
                             // The form keeps part of its configuration from when it was built, so each
                             // change of setting or of flow builds a new one.
@@ -66,10 +69,21 @@ struct SimpleCaptureView: View {
         .onAppear {
             applyCustomer(demoCustomer.suppliesPayInCustomer)
             applyAmount()
+            if shownMethod.method == nil, showsForm {
+                shownMethod.formBuilt(with: form.configuration)
+            }
         }
         .onChange(of: demoCustomer.suppliesPayInCustomer, perform: applyCustomer)
         .onChange(of: amountText) { _ in applyAmount() }
         .onChange(of: operation) { _ in applyAmount() }
+        .onChange(of: FormIdentity(operation: operation, customization: customization)) { _ in
+            shownMethod.formBuilt(with: form.configuration)
+        }
+        .onChange(of: showsForm) { shows in
+            if shows {
+                shownMethod.formBuilt(with: form.configuration)
+            }
+        }
     }
 
     private var appControls: some View {
@@ -110,6 +124,11 @@ struct SimpleCaptureView: View {
         AmountEntry.amount(from: amountText)
     }
 
+    /// A capture or an authorization needs an amount, so without a valid one there is no form to submit.
+    private var showsForm: Bool {
+        !charges || enteredAmount != nil
+    }
+
     private var charges: Bool {
         operation != .storedMethod
     }
@@ -140,11 +159,17 @@ struct SimpleCaptureView: View {
     private var form: PayInFormSetup {
         PayInFormSetup(
             operation: operation,
-            configuration: customization.configuration(for: operation),
+            configuration: customization.configuration(for: operation, holding: heldMethod),
             labels: customization.labels(for: operation),
             style: customization.style,
             storeOptions: PayInFormCustomization.storeOptions
         )
+    }
+
+    /// The method of the payment whose retry is open on this flow. An attempt of its own, after a new amount
+    /// or a completed payment, offers every method again.
+    private var heldMethod: PayabliPayInMethodType? {
+        flow(for: operation).request.attempt == .retry ? heldMethods[operation] : nil
     }
 
     // MARK: - The menu
@@ -233,6 +258,8 @@ struct SimpleCaptureView: View {
             Image(systemName: "ellipsis.circle")
                 .accessibilityLabel("Form settings")
         }
+        // A setting builds the form again, which a submission in flight would report against.
+        .disabled(flow(for: operation).isSubmitting)
         .accessibilityIdentifier("simpleCapture.menu")
     }
 
@@ -284,6 +311,7 @@ struct SimpleCaptureView: View {
             category: "SimpleCaptureDiagnostics"
         ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
+            heldMethods[operation] = shownMethod.heldMethod(after: failure, holding: heldMethod)
             flow(for: operation).chargeFailed(failure)
         }
     }

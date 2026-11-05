@@ -162,6 +162,10 @@ with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliP
 retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
 is refused as invalid input, and so is a retry that names no reference.
 
+On the form, while a payment's outcome is unknown, pass only that attempt's method in `allowedMethods`. The form
+then draws no method selector, so the total you show can't move to another method's fee. Pass the full list again
+once the outcome is settled.
+
 Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
 from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after
 its latest send, and holds at most 16 for each entry point and environment. A retry after that, or after your app

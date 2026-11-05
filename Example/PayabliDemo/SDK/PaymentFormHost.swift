@@ -15,6 +15,7 @@ struct PaymentFormHost: View {
     let form: PayInFormSetup
     let onCompleted: (PayInOutcome) -> Void
     let onFailed: (PayInFailure) -> Void
+    var onMethodChanged: (PayabliPayInMethodType) -> Void = { _ in }
 
     var body: some View {
         PayabliPayInForm(
@@ -24,7 +25,7 @@ struct PaymentFormHost: View {
             labels: form.labels,
             onCompleted: { onCompleted(PayInOutcome($0)) },
             onFailed: { onFailed(PayInFailure($0, operation: form.operation)) },
-            onMethodChanged: { _ in }
+            onMethodChanged: onMethodChanged
         )
         .payabliPayInStyle(form.style)
     }

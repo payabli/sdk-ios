@@ -86,6 +86,10 @@ struct PayInFailure {
     /// That refusal lapses after a while, so submitting again later can take a second
     /// payment. What settles the earlier attempt is reading the transaction back.
     let isDuplicateSubmission: Bool
+
+    /// Whether the service answered the payment, with a decline or a refusal of what was sent, which ends any
+    /// retry of it. A refusal made on the device, or a failure the service may not have seen, leaves one open.
+    let answersThePayment: Bool
 }
 
 extension PayInOutcome {
@@ -185,6 +189,7 @@ extension PayInFailure {
         isDuplicateSubmission = duplicate
         outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
         refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
+        answersThePayment = Self.answersThePayment(error)
         logLabel = LoggableError.label(for: error)
         message = Self.message(for: error, operation: operation, duplicate: duplicate)
     }
@@ -240,6 +245,20 @@ extension PayInFailure {
             "The reversal couldn't be completed. Please try again."
         case (.void, _):
             "The reversal couldn't be completed."
+        }
+    }
+
+    /// Only the shapes the service's own answer arrives in. A refusal made on the device can carry the same
+    /// error type, so the type alone does not tell them apart.
+    private static func answersThePayment(_ error: Error) -> Bool {
+        switch error {
+        case PayabliPaymentError.decline, PayabliPaymentError.validation:
+            return true
+        case PayabliPayInError.transactionFailed:
+            let type = (error as? any PayabliError)?.type
+            return type == .paymentDeclined || type == .validation
+        default:
+            return false
         }
     }
 

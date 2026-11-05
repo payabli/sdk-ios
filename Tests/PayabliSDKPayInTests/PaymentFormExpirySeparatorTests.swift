@@ -23,14 +23,14 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         XCTAssertEqual(viewModel.cardExpiration, "02\u{2013}30")
         XCTAssertTrue(viewModel.fieldHasRequiredValue(.cardExpiration), "the form's own separator read as unsupported")
 
-        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(with: $0) }
+        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(viewModel.effectiveSelectedMethod, with: $0) }
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method")
         }
         XCTAssertEqual(card.data.wireExpiry, "02/30")
         XCTAssertEqual(card.data.expiryYear, 2030)
 
-        let input = await viewModel.withFormBuffers { viewModel.methodInput(with: $0) }
+        let input = await viewModel.withFormBuffers { viewModel.methodInput(viewModel.effectiveSelectedMethod, with: $0) }
         guard case let .card(data) = input else {
             return XCTFail("The card tab builds a card input")
         }
@@ -54,7 +54,7 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         XCTAssertTrue(viewModel.fieldHasRequiredValue(.cardExpiration), "the form's own separator read as unsupported")
         XCTAssertEqual(viewModel.expirationDisplayText, "02/30")
 
-        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(with: $0) }
+        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(viewModel.effectiveSelectedMethod, with: $0) }
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method")
         }
@@ -123,12 +123,12 @@ final class PaymentFormExpirySeparatorTests: XCTestCase {
         line: UInt = #line
     ) async {
         XCTAssertTrue(viewModel.fieldHasRequiredValue(.cardExpiration), file: file, line: line)
-        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(with: $0) }
+        let method = await viewModel.withFormBuffers { viewModel.paymentMethod(viewModel.effectiveSelectedMethod, with: $0) }
         guard case let .card(card) = method else {
             return XCTFail("The card tab builds a card method", file: file, line: line)
         }
         XCTAssertEqual(card.data.wireExpiry, expiry, file: file, line: line)
-        let input = await viewModel.withFormBuffers { viewModel.methodInput(with: $0) }
+        let input = await viewModel.withFormBuffers { viewModel.methodInput(viewModel.effectiveSelectedMethod, with: $0) }
         guard case let .card(data) = input else {
             return XCTFail("The card tab builds a card input", file: file, line: line)
         }
