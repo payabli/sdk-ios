@@ -104,8 +104,8 @@ package final class TTPTransactionClient: Sendable {
         // A blank or dot-segment identifier counts as none: the close could not address it, and the card would
         // already be taken.
         guard let data = envelope.data, Self.isAddressable(data.paymentTransId) else {
-            throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
-                .carrying(httpStatus: status)
+            let reason = "The opening was approved with no payment"
+            throw TapToPayError(type: .decodingError, reason: reason, detail: nil, httpStatus: status, rawCode: envelope.code)
         }
         return data.paymentTransId
     }
