@@ -129,6 +129,41 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertEqual(refused.rawCode, "E1001")
     }
 
+    func testA402WhoseCodeLeavesTheOutcomeOpenIsUnsettledNeverRefused() async throws {
+        let answers: [(code: String, type: PayabliErrorType)] = [("E9060", .unknown), ("E9999", .serverError)]
+        for answer in answers {
+            for route in ["capture", "authorize"] {
+                let body = #"{"code":"\#(answer.code)","reason":"Unknown","data":{"paymentTransId":"trans-open"}}"#
+                let transport = RecordingIdempotencyTransport(body: Data(body.utf8), status: 402)
+                let flow = PayInFixture.makeFlow(transport: transport, key: "k-open-\(answer.code)-\(route)")
+
+                let error = await PayInFixture.failure(from: {
+                    if route == "capture" {
+                        _ = try await flow.capture(PayInFixture.request(cardOnly: true))
+                    } else {
+                        _ = try await flow.authorize(PayInFixture.request(cardOnly: true))
+                    }
+                })
+
+                let unsettled = try XCTUnwrap(error as? PayabliPayInError.Unsettled, "\(answer.code) \(route): got \(error)")
+                XCTAssertEqual(unsettled.type, answer.type, "\(answer.code) \(route)")
+                XCTAssertEqual(unsettled.httpStatus, 402, "\(answer.code) \(route)")
+                XCTAssertEqual(unsettled.rawCode, answer.code, "\(answer.code) \(route)")
+                XCTAssertEqual(unsettled.paymentTransId, "trans-open", "\(answer.code) \(route)")
+                XCTAssertEqual(RedactedCause.simpleName(unsettled.redactedCause.originalType), "ServiceError", "\(answer.code) \(route)")
+            }
+        }
+    }
+
+    func testAServiceErrorAnswered402WithAnOpenCodeIsTypedByTheCode() {
+        let cases: [(code: String, type: PayabliErrorType)] = [("E9060", .unknown), ("E9999", .serverError), ("E1001", .paymentDeclined)]
+        for answer in cases {
+            let failure = PayabliPayInFailure(code: answer.code, httpStatusCode: 402)
+
+            XCTAssertEqual(PayabliPayInError.ServiceError(failure: failure).type, answer.type, answer.code)
+        }
+    }
+
     func testACaptureAnswerThatCannotBeReadIsUndecodableAtItsStatus() async throws {
         let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 200, responseBody: "not json"))
 
