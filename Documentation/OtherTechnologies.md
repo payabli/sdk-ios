@@ -264,7 +264,7 @@ Each call is one SDK call underneath:
 | Call | iOS SDK |
 |---|---|
 | `initialize` | `PayabliSession.initialize(config:)` |
-| `payWithCard` | present `PayabliPayInView` for a `PayabliPayIn` with `operation: .capture` |
+| `payWithCard` | present `PayabliPayInForm` with `operation: .capture` |
 | `tapToPay` | `PayabliTTP.create()`, `initialize()`, then `charge(paymentDetails:)` |
 | `presentTerms` | `presentTerms()`, `areTermsAccepted()`, then `initialize()` when they accepted |
 | `activateDevice` | `activateDevice(activationCode:)`, then `initialize()` |
@@ -283,14 +283,7 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
         let presenter = self.appContext?.utilities?.currentViewController() else {
     return promise.reject("NO_SESSION", "Call initialize first")
   }
-  let payIn = PayabliPayIn(
-    session: session,
-    operation: .capture,
-    requestConfiguration: PayabliPayInRequestConfiguration(
-      paymentDetails: PayabliPayInPaymentDetails(totalAmount: request.amount),
-      orderId: request.orderId
-    )
-  )
+  let payIn = PayabliPayIn(session: session)
   weak var sheet: UIViewController?
   var settled = false
   let finish = { (outcome: [String: Any?]) in
@@ -303,16 +296,23 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
       promise.resolve(outcome)
     }
   }
-  let host = UIHostingController(rootView: ScrollView { PayabliPayInView(
-    component: payIn,
-    onCompleted: { result in
+  let host = UIHostingController(rootView: ScrollView { PayabliPayInForm(
+    payIn: payIn,
+    operation: .capture(PayabliPayInRequestConfiguration(
+      paymentDetails: PayabliPayInPaymentDetails(totalAmount: request.amount),
+      orderId: request.orderId
+    )),
+    configuration: PayabliPayInFormConfiguration(),
+    onCompleted: { success in
+      guard case let .payment(result) = success else { return }
       finish(["status": "charged", "paymentTransId": result.transaction?.paymentTransId])
     },
-    onError: { error in
+    onFailed: { error in
       // A second tap while the first submission runs; that submission still reports.
       if case PayabliPayInError.submissionInProgress = error { return }
       finish(cardOutcome(for: error))
-    }
+    },
+    onMethodChanged: { _ in }
   ).padding() })
   sheet = host
   presenter.present(host, animated: true)
@@ -327,12 +327,10 @@ makes the dismissal and the SDK's callbacks resolve the promise once between the
 Map the SDK's errors to the outcome as [Handle the outcome](../README.md#handle-the-outcome) does:
 
 ```swift
-func cardOutcome(for error: Error) -> [String: Any?] {
+func cardOutcome(for error: any PayabliError) -> [String: Any?] {
   switch error {
   case let PayabliPayInError.submissionInterrupted(_, _, paymentTransId, _):
     return ["status": "unknown", "paymentTransId": paymentTransId]
-  case is CancellationError:
-    return ["status": "unknown", "paymentTransId": nil]
   default:
     return ["status": "notCharged", "paymentTransId": nil]
   }
