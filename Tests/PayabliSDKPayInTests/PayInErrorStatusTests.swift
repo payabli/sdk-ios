@@ -25,6 +25,40 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertEqual(refused.rawCode, "D0200")
     }
 
+    func testACaptureAnswered402IsRefusedWhateverItsCode() async throws {
+        let cases: [(body: String, rawCode: String?)] = [
+            (#"{"code":"E1001","reason":"Declined","data":null,"token":null}"#, "E1001"),
+            (#"{"reason":"Declined"}"#, nil),
+            ("", nil)
+        ]
+        for (index, answer) in cases.enumerated() {
+            let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 402, responseBody: answer.body))
+
+            let error = await failure {
+                _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-402-\(index)")
+            }
+
+            let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "body \(answer.body): got \(error)")
+            XCTAssertEqual(refused.type, .paymentDeclined, "body \(answer.body)")
+            XCTAssertEqual(refused.httpStatus, 402, "body \(answer.body)")
+            XCTAssertEqual(refused.rawCode, answer.rawCode, "body \(answer.body)")
+        }
+    }
+
+    func testAnAuthorizationAnswered402WithNoDeclineCodeIsRefused() async throws {
+        let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+            statusCode: 402,
+            responseBody: #"{"code":"E1001","reason":"Declined","data":null,"token":null}"#
+        ))
+
+        let error = await failure { _ = try await client.authorize(entryPoint: "entry", request: Self.request, idempotencyKey: "k-402-a") }
+
+        let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "got \(error)")
+        XCTAssertEqual(refused.type, .paymentDeclined)
+        XCTAssertEqual(refused.httpStatus, 402)
+        XCTAssertEqual(refused.rawCode, "E1001")
+    }
+
     func testACaptureAnswerThatCannotBeReadIsUndecodableAtItsStatus() async throws {
         let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(statusCode: 200, responseBody: "not json"))
 
