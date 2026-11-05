@@ -242,17 +242,7 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     var activeFields: [PayabliPayInField] {
-        let fields = switch effectiveSelectedMethod {
-        case .card:
-            configuration.cardFieldOrder
-        case .bankAccount:
-            configuration.bankFieldOrder
-        }
-
-        guard case .storePaymentMethod = operation else { return fields }
-        return fields.filter { field in
-            field != .amount && field != .serviceFee && field != .surchargeFee
-        }
+        fields(for: effectiveSelectedMethod)
     }
 
     var detectedCardBrand: PayabliPayInCardBrand {
@@ -349,8 +339,9 @@ final class PayabliPayInViewModel: ObservableObject {
             throw error
         }
         isSubmitting = true
-        // The operation sent, which picks the message even if the form is given another while it runs.
+        // The operation and method sent, which a configuration given while it runs does not change.
         let operation = self.operation
+        let method = effectiveSelectedMethod
         submittingOperation = operation.kind
         defer {
             isSubmitting = false
@@ -362,14 +353,14 @@ final class PayabliPayInViewModel: ObservableObject {
         do {
             try validateRequiredFields()
         } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+            component.reportFormRefusal(error, method: method, operation: operation.kind)
             drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
 
         let sendMark = PayabliSendMark()
         do {
-            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow(operation) }
+            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow(operation, method: method) }
             clearSensitiveFields()
             return result
         } catch {
@@ -381,7 +372,7 @@ final class PayabliPayInViewModel: ObservableObject {
             // After the clear, because its edits take a mark off. A refusal of a flow replaced while
             // it was in flight marks nothing.
             if component === submittedFlow {
-                rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
+                rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(fields(for: method))
             }
             // A marked field is the whole answer; a failure that marks none on screen shows its
             // message, which the opt-out hides while the marks stay.
@@ -394,7 +385,7 @@ final class PayabliPayInViewModel: ObservableObject {
     /// category and operation that picked the wording so a change to the wording redraws the
     /// message already drawn.
     private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
-        guard rejectedFields.isEmpty, configuration.showsFailureMessage else {
+        guard !hasMarkedFieldOnScreen, configuration.showsFailureMessage else {
             failureMessage = nil
             drawnFailure = nil
             return
@@ -410,21 +401,25 @@ final class PayabliPayInViewModel: ObservableObject {
     /// whatever it ends in.
     ///
     /// - Parameter operation: the operation the submission sends.
+    /// - Parameter method: the method the submission sends.
     /// - Returns: what the flow returned.
-    private func submitToFlow(_ operation: PayabliPayInOperation) async throws -> PayabliPayInResult {
+    private func submitToFlow(
+        _ operation: PayabliPayInOperation,
+        method: PayabliPayInMethodType
+    ) async throws -> PayabliPayInResult {
         try await withFormBuffers { buffers in
             let request: PayabliPayInRequest?
             do {
-                request = try configuredRequest(for: operation, with: buffers)
+                request = try configuredRequest(for: operation, method: method, with: buffers)
             } catch {
-                component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+                component.reportFormRefusal(error, method: method, operation: operation.kind)
                 throw error
             }
             if let request {
                 return try await component.submitConfigured(request, for: operation, origin: .form)
             }
             return try await component.submitConfigured(
-                PayabliPayInStoreRequest(instrument: methodInput(with: buffers), options: mergedStoreOptions()),
+                PayabliPayInStoreRequest(instrument: methodInput(method, with: buffers), options: mergedStoreOptions()),
                 for: operation,
                 origin: .form
             )
@@ -434,15 +429,17 @@ final class PayabliPayInViewModel: ObservableObject {
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
     /// - Parameter operation: the operation whose configuration the request is built from.
+    /// - Parameter method: the method whose fields the request carries.
     /// - Parameter buffers: the registry the submission's sensitive buffers are built through.
     /// - Returns: the request built from the configuration and the fields.
     private func configuredRequest(
         for operation: PayabliPayInOperation,
+        method: PayabliPayInMethodType,
         with buffers: FormBufferRegistry
     ) throws -> PayabliPayInRequest? {
         guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
-            paymentMethod: paymentMethod(with: buffers),
+            paymentMethod: paymentMethod(method, with: buffers),
             customerData: mergedCustomerData(),
             orderDescription: mergedOrderDescription()
         )
