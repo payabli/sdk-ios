@@ -199,7 +199,18 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
     @objc public var createAnonymous: NSNumber?
     @objc public var forceCustomerCreation: NSNumber?
     @objc public var temporary: NSNumber?
+    @objc public var customerData: PayabliPayInCustomerDataObjC?
+    /// The vendor's identifier, sent as the store options' vendor data with ``vendorNumber``.
+    @objc public var vendorId: NSNumber?
+    /// The vendor's number, sent as the store options' vendor data with ``vendorId``.
+    @objc public var vendorNumber: String?
+    @objc public var fallbackAuth: NSNumber?
+    @objc public var fallbackAuthAmount: NSNumber?
+    @objc public var methodDescription: String?
     @objc public var source: String?
+    @objc public var subdomain: String?
+    @objc public var requiresLuhnCheck = PayabliPayInValidation.default.requiresLuhnCheck
+    @objc public var validatesRoutingNumberChecksum = PayabliPayInValidation.default.validatesRoutingNumberChecksum
 
     private init(instrument: PayabliPayInMethodInput) {
         self.instrument = instrument
@@ -275,12 +286,26 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
     }
 
     func toSwift() -> PayabliPayInStoreRequest {
-        var options = PayabliPayInStoreOptions()
-        options.achValidation = achValidation?.boolValue
-        options.createAnonymous = createAnonymous?.boolValue
-        options.forceCustomerCreation = forceCustomerCreation?.boolValue
-        options.temporary = temporary?.boolValue
-        options.source = source
+        let vendorData = vendorId == nil && vendorNumber == nil
+            ? nil
+            : PayabliPayInVendorData(vendorId: vendorId?.int64Value, vendorNumber: vendorNumber)
+        let options = PayabliPayInStoreOptions(
+            achValidation: achValidation?.boolValue,
+            createAnonymous: createAnonymous?.boolValue,
+            forceCustomerCreation: forceCustomerCreation?.boolValue,
+            temporary: temporary?.boolValue,
+            customerData: customerData?.toSwift(),
+            vendorData: vendorData,
+            fallbackAuth: fallbackAuth?.boolValue,
+            fallbackAuthAmount: fallbackAuthAmount?.intValue,
+            methodDescription: methodDescription,
+            source: source,
+            subdomain: subdomain,
+            validation: PayabliPayInValidation(
+                requiresLuhnCheck: requiresLuhnCheck,
+                validatesRoutingNumberChecksum: validatesRoutingNumberChecksum
+            )
+        )
         return PayabliPayInStoreRequest(
             instrument: instrument.withCopiedDigitBuffers(using: SensitiveDigits.copy(of:)),
             options: options

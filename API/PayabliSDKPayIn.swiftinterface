@@ -796,7 +796,16 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc final public var createAnonymous: Foundation::NSNumber?
   @objc final public var forceCustomerCreation: Foundation::NSNumber?
   @objc final public var temporary: Foundation::NSNumber?
+  @objc final public var customerData: PayabliSDKPayIn::PayabliPayInCustomerDataObjC?
+  @objc final public var vendorId: Foundation::NSNumber?
+  @objc final public var vendorNumber: Swift::String?
+  @objc final public var fallbackAuth: Foundation::NSNumber?
+  @objc final public var fallbackAuthAmount: Foundation::NSNumber?
+  @objc final public var methodDescription: Swift::String?
   @objc final public var source: Swift::String?
+  @objc final public var subdomain: Swift::String?
+  @objc final public var requiresLuhnCheck: Swift::Bool
+  @objc final public var validatesRoutingNumberChecksum: Swift::Bool
   @objc deinit
   @objc public static func card(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC
   @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode, deviceId: Swift::String?) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?

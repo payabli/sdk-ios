@@ -98,7 +98,7 @@ struct PayabliPayInSheetContent: View {
     @State private var measuredContentHeight: CGFloat = 0
     @State private var largestAvailableSheetHeight: CGFloat = 0
 
-    let payIn: PayabliPayIn
+    @ObservedObject var payIn: PayabliPayIn
     let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
     let labels: PayabliPayInFormLabels
@@ -122,7 +122,7 @@ struct PayabliPayInSheetContent: View {
     ) {
         _isPresented = isPresented
         _selectedDetent = State(initialValue: Self.initialDetent(for: sheetConfiguration))
-        self.payIn = payIn
+        _payIn = ObservedObject(wrappedValue: payIn)
         self.operation = operation
         self.configuration = configuration
         self.labels = labels
@@ -183,6 +183,7 @@ struct PayabliPayInSheetContent: View {
         .background(Color(uiColor: .systemBackground))
         .presentationDetents(effectiveDetents, selection: $selectedDetent)
         .presentationDragIndicator(sheetConfiguration.dragIndicatorVisibility)
+        .interactiveDismissDisabled(payIn.isSubmitting)
     }
 
     @ViewBuilder
@@ -222,7 +223,7 @@ struct PayabliPayInSheetContent: View {
     private var dismissButton: some View {
         if let systemImageName = sheetConfiguration.dismissButton.systemImageName {
             Button {
-                isPresented = false
+                dismissUnlessSubmitting()
             } label: {
                 Image(systemName: systemImageName)
                     .font(.body.weight(.semibold))
@@ -233,6 +234,13 @@ struct PayabliPayInSheetContent: View {
             .buttonStyle(.plain)
             .accessibilityLabel(sheetConfiguration.dismissButton.accessibilityLabel)
         }
+    }
+
+    /// Closes the sheet, unless a submission is in flight: a payer who closes it then leaves a payment running
+    /// behind a screen that has gone.
+    func dismissUnlessSubmitting() {
+        guard !payIn.isSubmitting else { return }
+        isPresented = false
     }
 
     private var shouldShowHeader: Bool {
