@@ -1,18 +1,15 @@
 import PayabliSDKPayIn
 
-/// What this app hands the SDK's form, for one operation.
-///
-/// Two values because the SDK separates them: the configuration is what to
-/// collect, the style is how it is drawn. A screen holds one of these and names
-/// neither type.
-///
-/// It also carries what the form is for, because a failure reads differently on
-/// each: only a capture sends an idempotency key, so only a capture can be refused
-/// as a repeat of an attempt the service already holds.
+/// What this app hands the SDK's form for one operation. The operation is carried with it,
+/// because this app reads a failure against it. A screen holds one of these and names none of
+/// the types.
 struct PayInFormSetup {
     let operation: PayInOperation
     let configuration: PayabliPayInFormConfiguration
-    let style: PayabliPayInStyle
+    let labels: PayabliPayInFormLabels
+    let style: PayabliPayInFormStyle
+    /// What a stored method is sent with; read only when the operation stores one.
+    var storeOptions = PayabliPayInStoreOptions()
 }
 
 /// The two forms this app shows.
@@ -36,8 +33,8 @@ enum PayInForms {
                         .cardholderName,
                         .cardNumber,
                         .cardExpiration,
-                        .cardCvv,
-                        .cardZip
+                        .cardSecurityCode,
+                        .cardPostalCode
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
@@ -55,21 +52,6 @@ enum PayInForms {
                     secCode: .web,
                     methodDescription: QAIdentity.current.note("save")
                 ),
-                options: PayabliPayInOptions(
-                    // `createAnonymous` and `temporary` are left unset so the paypoint's
-                    // own settings decide them. The encoder omits only nil, so passing
-                    // `false` sends `createAnonymous=false` and `temporary=false`, which
-                    // opts the sample out of two behaviours on an integrator's behalf.
-                    // The sibling's store options set neither.
-                    forceCustomerCreation: true,
-                    source: "ios-payment-method-qa"
-                ),
-                labels: PayabliPayInLabels(
-                    title: "Save Payment Method",
-                    subtitle: "Create a card or bank account token.",
-                    submitButton: "Save payment method",
-                    fieldPlaceholders: placeholders
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
@@ -77,7 +59,19 @@ enum PayInForms {
                 inputSizing: PayInSharedConfiguration.inputSizing,
                 cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement
             ),
-            style: PayInSharedConfiguration.style
+            labels: PayabliPayInFormLabels(
+                title: "Save Payment Method",
+                subtitle: "Create a card or bank account token.",
+                submitButton: "Save payment method",
+                fieldPlaceholders: placeholders
+            ),
+            style: PayInSharedConfiguration.style,
+            storeOptions: PayabliPayInStoreOptions(
+                // `createAnonymous` and `temporary` stay unset so the paypoint decides them:
+                // the encoder omits only nil, so `false` would opt out of both.
+                forceCustomerCreation: true,
+                source: "ios-payment-method-qa"
+            )
         )
     }
 
@@ -96,8 +90,8 @@ enum PayInForms {
                         .cardholderName,
                         .cardNumber,
                         .cardExpiration,
-                        .cardCvv,
-                        .cardZip
+                        .cardSecurityCode,
+                        .cardPostalCode
                     ]),
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)
@@ -120,12 +114,6 @@ enum PayInForms {
                     // component merges the form's description over the request's before it sends.
                     methodDescription: QAIdentity.current.note("capture")
                 ),
-                labels: PayabliPayInLabels(
-                    title: "Payment Capture",
-                    subtitle: "Submit a card or bank account payment.",
-                    submitButton: "Submit Payment",
-                    fieldPlaceholders: placeholders
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
@@ -143,6 +131,12 @@ enum PayInForms {
                     ),
                     rowSpacing: 6
                 )
+            ),
+            labels: PayabliPayInFormLabels(
+                title: "Payment Capture",
+                subtitle: "Submit a card or bank account payment.",
+                submitButton: "Submit Payment",
+                fieldPlaceholders: placeholders
             ),
             style: PayInSharedConfiguration.style
         )

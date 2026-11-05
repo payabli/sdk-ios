@@ -105,7 +105,7 @@ final class PaymentMethodUIKitFieldCoordinatorTests: XCTestCase {
         let field = PayabliPayInUIKitTextField(
             text: Binding(get: { text }, set: { text = $0 }),
             placeholder: "CVV",
-            field: .cardCvv,
+            field: .cardSecurityCode,
             focusedField: Binding(get: { focusedField }, set: { focusedField = $0 }),
             keyboardType: .numberPad,
             isSecure: true,

@@ -35,7 +35,7 @@ final class TokenStorageBodyWriterTests: XCTestCase {
                 holderName: "John Doe",
                 postalCode: "12345"
             )),
-            options: PayabliPayInOptions(
+            options: PayabliPayInStoreOptions(
                 createAnonymous: true,
                 forceCustomerCreation: false,
                 temporary: true,

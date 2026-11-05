@@ -59,7 +59,10 @@ final class PaymentFormExpiryYearTests: XCTestCase {
     }
 
     private static func form() -> PayabliPayInViewModel {
-        PayabliPayInViewModel(component: flowOnSession(token: "access-token", entryPoint: "entry", environment: .sandbox))
+        PayabliPayInViewModel(
+            component: flowOnSession(token: "access-token", entryPoint: "entry", environment: .sandbox),
+            operation: .storePaymentMethod()
+        )
     }
 
     private static func date(year: Int, month: Int) throws -> Date {

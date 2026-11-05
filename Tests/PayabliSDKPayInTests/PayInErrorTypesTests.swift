@@ -144,7 +144,11 @@ final class PayInErrorTypesTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: RecordingIdempotencyTransport(failure: CancellationError()), key: "k")
 
         let error = await PayInFixture.failure {
-            _ = try await flow.submitConfigured(.card(Self.card), options: PayabliPayInTokenStorageOptions(), origin: .form)
+            _ = try await flow.submitConfigured(
+                PayabliPayInStoreRequest(instrument: .card(Self.card), options: PayabliPayInStoreOptions()),
+                for: .storePaymentMethod(),
+                origin: .form
+            )
         }
 
         let interrupted = try XCTUnwrap(error as? PayabliPayInError.Interrupted, "\(error)")
@@ -156,7 +160,11 @@ final class PayInErrorTypesTests: XCTestCase {
         let flow = PayInFixture.makeFlow(transport: RecordingIdempotencyTransport(failure: CancellationError()), key: "k")
 
         let error = await PayInFixture.failure {
-            _ = try await flow.submitConfigured(.card(Self.card), options: PayabliPayInTokenStorageOptions(), origin: .direct)
+            _ = try await flow.submitConfigured(
+                PayabliPayInStoreRequest(instrument: .card(Self.card), options: PayabliPayInStoreOptions()),
+                for: .storePaymentMethod(),
+                origin: .direct
+            )
         }
 
         XCTAssertTrue(error is CancellationError, "\(error)")

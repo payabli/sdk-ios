@@ -45,6 +45,38 @@ final class PayInFlowHandleTests: XCTestCase {
         XCTAssertEqual(handle.requestTotal, total)
     }
 
+    func testAfterAnUnknownOutcomeTheFormIsHandedTheSamePaymentAsARetry() throws {
+        let handle = try makeHandle()
+        XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
+        let reference = handle.requestReference
+
+        handle.chargeFailed(Self.unknownOutcome)
+
+        for purpose in [PayInOperation.capture, .authorize] {
+            let operation = handle.formOperation(for: purpose)
+            let retried: PayabliPayInRequestConfiguration
+            switch (purpose, operation) {
+            case let (.capture, .capture(request)), let (.authorize, .authorize(request)):
+                retried = request
+            default:
+                return XCTFail("\(purpose) was handed \(operation)")
+            }
+            XCTAssertEqual(retried.attempt, .retry, "the form was handed a new payment")
+            XCTAssertEqual(retried.paymentReference, reference, "the form was handed another payment")
+        }
+    }
+
+    func testASaveFormIsHandedTheStoreOptionsItWasGiven() throws {
+        let handle = try makeHandle()
+        let options = PayabliPayInStoreOptions(forceCustomerCreation: true, source: "save-source")
+
+        guard case let .storePaymentMethod(handed) = handle.formOperation(for: .storedMethod, storeOptions: options) else {
+            return XCTFail("a save form was handed a payment")
+        }
+        XCTAssertEqual(handed.source, "save-source")
+        XCTAssertEqual(handed.forceCustomerCreation, true)
+    }
+
     func testAnAnsweredFailureLeavesTheNextSubmitANewPayment() throws {
         let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
@@ -95,7 +127,7 @@ final class PayInFlowHandleTests: XCTestCase {
     // MARK: - Several operations on one screen
 
     func testAChangedAmountGivesOnlyTheFlowOnScreenANewPayment() throws {
-        let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
+        let (capture, authorize) = try (makeHandle(), makeHandle())
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
@@ -124,7 +156,7 @@ final class PayInFlowHandleTests: XCTestCase {
     }
 
     func testACompletedPaymentGivesItsOwnFlowANewPayment() throws {
-        let (capture, authorize) = try (makeHandle(), makeHandle(.authorize))
+        let (capture, authorize) = try (makeHandle(), makeHandle())
         var attempts = PayInAttempts()
         attempts.apply(amount: 10, to: capture, for: .capture, suppliesCustomer: true, source: "test")
         attempts.apply(amount: 10, to: authorize, for: .authorize, suppliesCustomer: true, source: "test")
@@ -162,7 +194,7 @@ final class PayInFlowHandleTests: XCTestCase {
 
     // MARK: -
 
-    private func makeHandle(_ operation: PayabliPayInOperation = .capture) throws -> PayInFlowHandle {
+    private func makeHandle() throws -> PayInFlowHandle {
         PayInFlowHandle(
             PayabliPayIn(
                 session: PayabliSession(config: try PayabliConfig(
@@ -170,8 +202,7 @@ final class PayInFlowHandleTests: XCTestCase {
                     environment: .sandbox,
 
                     tokenProvider: { "test-token" }
-                )),
-                operation: operation
+                ))
             )
         )
     }
@@ -180,26 +211,26 @@ final class PayInFlowHandleTests: XCTestCase {
 /// The request's own fields, for a test that has to see what a new attempt changed.
 private extension PayInFlowHandle {
     var requestAttempt: PayabliAttempt? {
-        flow.requestConfiguration?.attempt
+        request.attempt
     }
 
     var requestReference: String? {
-        flow.requestConfiguration?.paymentReference
+        request.paymentReference
     }
 
     var requestOrderId: String? {
-        flow.requestConfiguration?.orderId
+        request.orderId
     }
 
     var requestTotal: Double? {
-        flow.requestConfiguration?.paymentDetails.totalAmount
+        request.paymentDetails.totalAmount
     }
 
     var requestSource: String? {
-        flow.requestConfiguration?.source
+        request.source
     }
 
     var requestCustomerNumber: String? {
-        flow.requestConfiguration?.customerData?.customerNumber
+        request.customerData?.customerNumber
     }
 }

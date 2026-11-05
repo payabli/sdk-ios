@@ -30,8 +30,66 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         return try PayabliPayInObjC.create()
     }
 
-    func testStoredPaymentMethodWrapperConvertsValuesAndResponse() {
-        let storedMethod = PayabliPayInStoredPaymentMethod(
+    func testEachStoreFlagReachesItsOwnOption() throws {
+        let flags: [(ReferenceWritableKeyPath<PayabliPayInStoreRequestObjC, NSNumber?>, KeyPath<PayabliPayInStoreOptions, Bool?>)] = [
+            (\.achValidation, \.achValidation),
+            (\.createAnonymous, \.createAnonymous),
+            (\.forceCustomerCreation, \.forceCustomerCreation),
+            (\.temporary, \.temporary)
+        ]
+
+        for (set, _) in flags {
+            let request = try storeRequest()
+            request[keyPath: set] = true
+            let options = request.toSwift().options
+            for (other, read) in flags {
+                XCTAssertEqual(options[keyPath: read], other == set ? true : nil, "\(set) set \(read)")
+            }
+        }
+    }
+
+    func testAStoreRequestCarriesItsSourceAndLeavesUnsetFlagsUnsent() throws {
+        let request = try storeRequest()
+        request.source = "objc-source"
+
+        let options = request.toSwift().options
+
+        XCTAssertEqual(options.source, "objc-source")
+        XCTAssertNil(options.achValidation)
+        XCTAssertNil(options.createAnonymous)
+        XCTAssertNil(options.forceCustomerCreation)
+        XCTAssertNil(options.temporary)
+    }
+
+    private func storeRequest() throws -> PayabliPayInStoreRequestObjC {
+        try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
+            accountNumber: "123456789",
+            routingNumber: "021000021",
+            accountType: "Checking",
+            holderName: "Jane Doe",
+            holderType: nil,
+            secCode: nil,
+            deviceId: nil
+        ))
+    }
+
+    func testTheBankAccountFactoryRejectsAnInvalidHolderType() {
+        XCTAssertNil(
+            PayabliPayInStoreRequestObjC.bankAccount(
+                accountNumber: "123456789",
+                routingNumber: "021000021",
+                accountType: "Checking",
+                holderName: "Jane Doe",
+                holderType: "company",
+                secCode: "WEB",
+                deviceId: nil
+            ),
+            "a holder type that names none of the kinds is refused before a request exists"
+        )
+    }
+
+    func testStoredMethodWrapperConvertsValuesAndResponse() {
+        let storedMethod = PayabliPayInStoredMethod(
             storedMethodId: "stored-123",
             method: .bankAccount,
             methodReferenceId: "method-123",
@@ -53,7 +111,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             )
         )
 
-        let wrapper = PayabliPayInStoredPaymentMethodObjC(storedMethod)
+        let wrapper = PayabliPayInStoredMethodObjC(storedMethod)
 
         XCTAssertEqual(wrapper.storedMethodId, "stored-123")
         XCTAssertEqual(wrapper.method, "bankAccount")
@@ -64,23 +122,48 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
     }
 
-    func testAddCardReturnsValidationErrorWithoutCallingTokenHandler() async throws {
+    func testTheBankAccountFactoryRejectsInvalidArguments() {
+        XCTAssertNil(
+            PayabliPayInStoreRequestObjC.bankAccount(
+                accountNumber: "111111111",
+                routingNumber: "123456780",
+                accountType: "Business",
+                holderName: "Jane Doe",
+                holderType: nil,
+                secCode: nil,
+                deviceId: nil
+            ),
+            "an account type that names none of the kinds is refused before a request exists"
+        )
+        XCTAssertNil(
+            PayabliPayInStoreRequestObjC.bankAccount(
+                accountNumber: "111111111",
+                routingNumber: "123456780",
+                accountType: PayabliPayInAccountType.checking.rawValue,
+                holderName: "Jane Doe",
+                holderType: nil,
+                secCode: "POP",
+                deviceId: nil
+            ),
+            "an SEC code that names none of the kinds is refused before a request exists"
+        )
+    }
+
+    func testStoreMethodReturnsValidationErrorWithoutCallingTokenHandler() async throws {
         let completionExpectation = expectation(description: "ObjC card completion")
         let component = try await makeBridge(
             tokenHandler: { _ in XCTFail("Token handler should not be called before local validation fails") }
         )
 
-        component.addCard(
-            cardNumber: "4111111111111111",
-            expiryMonth: 2,
-            expiryYear: 2028,
-            securityCode: "123",
-            holderName: "",
-            postalCode: "33139",
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
+        component.storeMethod(
+            PayabliPayInStoreRequestObjC.card(
+                cardNumber: "4111111111111111",
+                expiryMonth: 2,
+                expiryYear: 2028,
+                securityCode: "123",
+                holderName: "",
+                postalCode: "33139"
+            )
         ) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.code, PayabliErrorType.validation.number)
@@ -106,17 +189,15 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             }
         )
 
-        component.addCard(
-            cardNumber: "4111111111111111",
-            expiryMonth: 2,
-            expiryYear: 2028,
-            securityCode: "123",
-            holderName: "Jane Doe",
-            postalCode: "33139",
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
+        component.storeMethod(
+            PayabliPayInStoreRequestObjC.card(
+                cardNumber: "4111111111111111",
+                expiryMonth: 2,
+                expiryYear: 2028,
+                securityCode: "123",
+                holderName: "Jane Doe",
+                postalCode: "33139"
+            )
         ) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.domain, "com.payabli.payIn")
@@ -141,16 +222,18 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let securityCode = SensitiveDigits.ofString("123")
         let completionExpectation = expectation(description: "closed card buffers completion")
 
-        component.addPaymentMethod(
-            .card(PayabliPayInCardData(
-                cardNumber: cardNumber,
-                expiryMonth: 2,
-                expiryYear: 2028,
-                securityCode: securityCode,
-                holderName: "Jane Doe",
-                postalCode: "33139"
-            )),
-            options: PayabliPayInOptions()
+        component.storeMethod(
+            PayabliPayInStoreRequest(
+                instrument: .card(PayabliPayInCardData(
+                    cardNumber: cardNumber,
+                    expiryMonth: 2,
+                    expiryYear: 2028,
+                    securityCode: securityCode,
+                    holderName: "Jane Doe",
+                    postalCode: "33139"
+                )),
+                options: PayabliPayInStoreOptions()
+            )
         ) { method, error in
             XCTAssertNil(method)
             XCTAssertNotNil(error)
@@ -177,14 +260,16 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let accountNumber = SensitiveDigits.ofString("1111111111")
         let completionExpectation = expectation(description: "closed account number completion")
 
-        component.addPaymentMethod(
-            .bankAccount(PayabliPayInBankAccountData(
-                accountNumber: accountNumber,
-                routingNumber: "123456780",
-                accountType: .checking,
-                holderName: "Jane Doe"
-            )),
-            options: PayabliPayInOptions()
+        component.storeMethod(
+            PayabliPayInStoreRequest(
+                instrument: .bankAccount(PayabliPayInBankAccountData(
+                    accountNumber: accountNumber,
+                    routingNumber: "123456780",
+                    accountType: .checking,
+                    holderName: "Jane Doe"
+                )),
+                options: PayabliPayInStoreOptions()
+            )
         ) { method, error in
             XCTAssertNil(method)
             XCTAssertNotNil(error)
@@ -208,21 +293,20 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         let component = try await makeBridge(
             tokenHandler: { completion in completion(nil, nil) }
         )
+        let request = try XCTUnwrap(
+            PayabliPayInStoreRequestObjC.bankAccount(
+                accountNumber: "1111111111",
+                routingNumber: "123456780",
+                accountType: PayabliPayInAccountType.checking.rawValue,
+                holderName: "Jane Doe",
+                holderType: PayabliPayInAccountHolderType.personal.rawValue,
+                secCode: nil,
+                deviceId: nil
+            ),
+            "a bank account request whose named values are all real is a request"
+        )
 
-        component.addBankAccount(
-            accountNumber: "1111111111",
-            routingNumber: "123456780",
-            accountType: .checking,
-            holderName: "Jane Doe",
-            holderType: .personal,
-            secCode: .unspecified,
-            deviceId: nil,
-            achValidation: true,
-            createAnonymous: false,
-            forceCustomerCreation: false,
-            temporary: false,
-            source: nil
-        ) { result, error in
+        component.storeMethod(request) { result, error in
             XCTAssertNil(result)
             XCTAssertEqual(error?.domain, "com.payabli.payIn")
             let type = (error?.userInfo["PayabliErrorType"] as? String).flatMap(PayabliErrorType.init(rawValue:))

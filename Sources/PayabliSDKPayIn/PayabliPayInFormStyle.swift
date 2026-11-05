@@ -133,7 +133,7 @@ public struct PayabliPayInLayoutStyle {
     }
 }
 
-public struct PayabliPayInStyle {
+public struct PayabliPayInFormStyle {
     public let accentColor: Color
     public let title: PayabliPayInTextStyle
     public let subtitle: PayabliPayInTextStyle
@@ -181,22 +181,22 @@ public struct PayabliPayInStyle {
         self.layout = layout
     }
 
-    public static let `default` = PayabliPayInStyle()
+    public static let `default` = PayabliPayInFormStyle()
 }
 
 private struct PayabliPayInStyleKey: EnvironmentKey {
-    static let defaultValue = PayabliPayInStyle.default
+    static let defaultValue = PayabliPayInFormStyle.default
 }
 
 public extension EnvironmentValues {
-    var payabliPayInStyle: PayabliPayInStyle {
+    var payabliPayInStyle: PayabliPayInFormStyle {
         get { self[PayabliPayInStyleKey.self] }
         set { self[PayabliPayInStyleKey.self] = newValue }
     }
 }
 
 public extension View {
-    func payabliPayInStyle(_ style: PayabliPayInStyle) -> some View {
+    func payabliPayInStyle(_ style: PayabliPayInFormStyle) -> some View {
         environment(\.payabliPayInStyle, style)
     }
 }

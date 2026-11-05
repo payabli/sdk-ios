@@ -79,18 +79,18 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
     }
 
     func testARefusalAnnouncesTheFieldsItNewlyMarkedInTheOrderTheFormDrawsThem() {
-        let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardCvv, .cardZip]
-        let label: (PayabliPayInField) -> String = { PayabliPayInLabels.defaultFieldLabels[$0] ?? $0.rawValue }
+        let drawn: [PayabliPayInField] = [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode]
+        let label: (PayabliPayInField) -> String = { PayabliPayInFormLabels.defaultFieldLabels[$0] ?? $0.rawValue }
         let message = PayabliPayInAccessibility.rejectedFieldMessage
 
         XCTAssertEqual(
             PayabliPayInAccessibility.rejectedFieldsAnnouncement(
-                newlyMarked: [.cardZip, .cardholderName, .firstName],
+                newlyMarked: [.cardPostalCode, .cardholderName, .firstName],
                 drawnFields: drawn,
                 label: label,
                 message: message
             ),
-            "\(label(.cardholderName)): That was not accepted. \(label(.cardZip)): That was not accepted"
+            "\(label(.cardholderName)): That was not accepted. \(label(.cardPostalCode)): That was not accepted"
         )
         XCTAssertNil(
             PayabliPayInAccessibility.rejectedFieldsAnnouncement(
@@ -142,25 +142,29 @@ final class PaymentMethodAccessibilityTests: XCTestCase {
         let hiddenLabelFields: [PayabliPayInField] = [
             .cardholderName,
             .cardNumber,
-            .cardCvv,
-            .cardZip
+            .cardSecurityCode,
+            .cardPostalCode
         ]
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
-            labels: PayabliPayInLabels(
-                fieldPlaceholders: Dictionary(uniqueKeysWithValues: hiddenLabelFields.map { field in
-                    (
-                        field,
-                        PayabliPayInLabels.defaultFieldLabels[field] ?? field.rawValue
-                    )
-                })
-            ),
             showsFieldLabels: false
         )
-        let view = PayabliPayInView(
-            component: component,
+        let labels = PayabliPayInFormLabels(
+            fieldPlaceholders: Dictionary(uniqueKeysWithValues: hiddenLabelFields.map { field in
+                (
+                    field,
+                    PayabliPayInFormLabels.defaultFieldLabels[field] ?? field.rawValue
+                )
+            })
+        )
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: configuration,
-            onCompleted: { _ in }
+            labels: labels,
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = UIHostingController(rootView: view)
         let window = UIWindow(frame: UIScreen.main.bounds)

@@ -5,7 +5,7 @@ struct PayInSubmitWording {
     let idle: String
     let busy: String
 
-    init(_ operation: PayabliPayInOperation) {
+    init(_ operation: PayabliPayInOperation.Kind) {
         switch operation {
         case .capture:
             idle = "Pay"
@@ -27,8 +27,8 @@ struct PayInSubmitWording {
     /// - Parameter hostWording: the host's replacement for the idle text, ignored while a submission runs.
     /// - Returns: the text the button reads.
     static func text(
-        showing operation: PayabliPayInOperation,
-        submitting: PayabliPayInOperation?,
+        showing operation: PayabliPayInOperation.Kind,
+        submitting: PayabliPayInOperation.Kind?,
         hostWording: String?
     ) -> String {
         if let submitting {

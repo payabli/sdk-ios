@@ -2,7 +2,7 @@ import PayabliSDKCore
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// A card's expiry is a month and a four-digit year. `capture`, `authorize` and `addPaymentMethod` refuse one the
+/// A card's expiry is a month and a four-digit year. `capture`, `authorize` and `storeMethod` refuse one the
 /// wire can't carry or that has passed, with `VALIDATION_ERROR`, before anything is sent. The wire carries `MM/YY`.
 @MainActor
 final class PayInCardExpiryTests: XCTestCase {
@@ -42,6 +42,21 @@ final class PayInCardExpiryTests: XCTestCase {
         for route in Route.allCases {
             await assertRefusedUnsent(month: 1, year: 2100, on: route)
         }
+    }
+
+    func testAYearBefore2000IsRefusedUnsentOnEveryRoute() async {
+        for route in Route.allCases {
+            await assertRefusedUnsent(month: 12, year: 1999, on: route)
+        }
+    }
+
+    func testAYearBefore2000IsRefusedWhateverTheClockReads() throws {
+        // The request carries two digits of the year, so 1998 would go out as 98 and read as 2098.
+        let clock = try XCTUnwrap(
+            PayabliPayInCardData.expiryCalendar.date(from: DateComponents(year: 1995, month: 6, day: 15))
+        )
+        XCTAssertThrowsError(try Self.card(month: 1, year: 1998).validateExpiry(at: clock))
+        XCTAssertNoThrow(try Self.card(month: 1, year: 2000).validateExpiry(at: clock))
     }
 
     func testLastMonthsExpiryIsRefusedUnsentOnEveryRoute() async {
@@ -151,7 +166,7 @@ final class PayInCardExpiryTests: XCTestCase {
         switch route {
         case .capture: _ = try await flow.capture(request)
         case .authorize: _ = try await flow.authorize(request)
-        case .store: _ = try await flow.addPaymentMethod(.card(card))
+        case .store: _ = try await flow.storeMethod(PayabliPayInStoreRequest(instrument: .card(card), options: PayabliPayInStoreOptions()))
         }
     }
 

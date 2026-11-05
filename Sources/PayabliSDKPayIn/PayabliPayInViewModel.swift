@@ -28,11 +28,11 @@ final class PayabliPayInViewModel: ObservableObject {
     @Published var cardExpirationYear: Int?
 
     @Published var cardCvvStorage = "" {
-        didSet { acceptEdit(of: .cardCvv) }
+        didSet { acceptEdit(of: .cardSecurityCode) }
     }
 
     @Published var cardZipStorage = "" {
-        didSet { acceptEdit(of: .cardZip) }
+        didSet { acceptEdit(of: .cardPostalCode) }
     }
 
     @Published var achHolderStorage = "" {
@@ -83,32 +83,44 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     @Published var billingZipStorage = "" {
-        didSet { acceptEdit(of: .billingZip) }
+        didSet { acceptEdit(of: .billingPostalCode) }
     }
 
     @Published private(set) var isSubmitting = false
     /// The operation the submission in flight is sending, or nil when none is.
-    @Published private(set) var submittingOperation: PayabliPayInOperation?
-    @Published private(set) var errorMessage: String?
+    @Published private(set) var submittingOperation: PayabliPayInOperation.Kind?
+    @Published private(set) var failureMessage: String?
+    /// The failure whose message is drawn, by the category and operation that picked its wording, so
+    /// a change to the wording redraws the message already drawn. Cleared with the message.
+    private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind)?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
     private(set) var component: PayabliPayIn
+    /// The operation the form submits, which is the form's own: one form, one operation.
+    private(set) var operation: PayabliPayInOperation
     var configuration: PayabliPayInFormConfiguration
+    var labels: PayabliPayInFormLabels
     private var lifecycleSignature: String
 
     init(
         component: PayabliPayIn,
-        configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration()
+        operation: PayabliPayInOperation,
+        configuration: PayabliPayInFormConfiguration = PayabliPayInFormConfiguration(),
+        labels: PayabliPayInFormLabels = PayabliPayInFormLabels()
     ) {
         self.component = component
+        self.operation = operation
         self.configuration = configuration
+        self.labels = labels
         lifecycleSignature = Self.lifecycleSignature(
             component: component,
-            configuration: configuration
+            operation: operation,
+            configuration: configuration,
+            labels: labels
         )
         let availableMethods = Self.availableMethods(
-            operation: component.operation,
+            operation: operation,
             configuredMethods: configuration.allowedMethods
         )
         self.selectedMethod = availableMethods.contains(configuration.defaultMethod)
@@ -118,12 +130,18 @@ final class PayabliPayInViewModel: ObservableObject {
 
     func update(
         component: PayabliPayIn,
-        configuration: PayabliPayInFormConfiguration
+        operation: PayabliPayInOperation,
+        configuration: PayabliPayInFormConfiguration,
+        labels: PayabliPayInFormLabels
     ) {
         let nextSignature = Self.lifecycleSignature(
             component: component,
-            configuration: configuration
+            operation: operation,
+            configuration: configuration,
+            labels: labels
         )
+        // The operation is what a submission sends, so it is taken even when nothing drawn changes.
+        self.operation = operation
         guard nextSignature != lifecycleSignature else { return }
 
         objectWillChange.send()
@@ -136,12 +154,26 @@ final class PayabliPayInViewModel: ObservableObject {
             .elementsEqual(self.configuration.formatting.expirationSeparator.unicodeScalars)
         self.component = component
         self.configuration = configuration
+        self.labels = labels
         if separatorChanges, !cardExpiration.isEmpty {
             cardExpiration = formatExpiration(expiry)
         }
         lifecycleSignature = nextSignature
         if replacesFlow {
             clearMarks()
+        }
+        // The opt-out applies to a message already drawn, so an update that withdraws it takes the
+        // message with it; the marks stay, because a marked field is the whole answer. A message
+        // still drawn follows the wording the form holds now, so a change to its label redraws it.
+        if !configuration.showsFailureMessage {
+            failureMessage = nil
+            drawnFailure = nil
+        } else if let failure = drawnFailure {
+            failureMessage = PayabliPayInFailureMessage.text(
+                for: failure.category,
+                operation: failure.operation,
+                labels: labels
+            )
         }
 
         let methods = availableMethods
@@ -202,7 +234,7 @@ final class PayabliPayInViewModel: ObservableObject {
             configuration.bankFieldOrder
         }
 
-        guard component.operation == .storePaymentMethod else { return fields }
+        guard case .storePaymentMethod = operation else { return fields }
         return fields.filter { field in
             field != .amount && field != .serviceFee && field != .surchargeFee
         }
@@ -214,7 +246,7 @@ final class PayabliPayInViewModel: ObservableObject {
 
     var availableMethods: [PayabliPayInMethodType] {
         Self.availableMethods(
-            operation: component.operation,
+            operation: operation,
             configuredMethods: configuration.allowedMethods
         )
     }
@@ -269,32 +301,31 @@ final class PayabliPayInViewModel: ObservableObject {
                 && fieldHasRequiredValue(.cardNumber)
                 && cardNumberValidationMessage == nil
                 && submittedExpiration.payabliCaptureDigitsOnly.count >= 4
-                && fieldHasRequiredValue(.cardCvv)
-                && fieldHasRequiredValue(.cardZip)
-                && operationConfigurationIsValid
+                && fieldHasRequiredValue(.cardSecurityCode)
+                && fieldHasRequiredValue(.cardPostalCode)
                 && requiredFieldsAreSatisfied
         case .bankAccount:
             return fieldHasRequiredValue(.accountHolder)
                 && fieldHasRequiredValue(.routingNumber)
                 && fieldHasRequiredValue(.accountNumber)
-                && operationConfigurationIsValid
                 && requiredFieldsAreSatisfied
         }
     }
 
     func submit() async throws -> PayabliPayInResult {
-        errorMessage = nil
+        failureMessage = nil
+        drawnFailure = nil
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.AlreadySubmitting()
-            component.reportFormRefusal(error, method: effectiveSelectedMethod)
-            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: component.operation)
+            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
         isSubmitting = true
         // The operation sent, which picks the message even if the form is given another while it runs.
-        let operation = component.operation
-        submittingOperation = operation
+        let operation = self.operation
+        submittingOperation = operation.kind
         defer {
             isSubmitting = false
             submittingOperation = nil
@@ -305,14 +336,14 @@ final class PayabliPayInViewModel: ObservableObject {
         do {
             try validateRequiredFields()
         } catch {
-            component.reportFormRefusal(error, method: effectiveSelectedMethod)
-            errorMessage = PayabliPayInFailureMessage.text(for: error, operation: operation)
+            component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
 
         let sendMark = PayabliSendMark()
         do {
-            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow() }
+            let result = try await PayabliSendMark.$current.withValue(sendMark) { try await submitToFlow(operation) }
             clearSensitiveFields()
             return result
         } catch {
@@ -326,10 +357,25 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(activeFields)
             }
-            // A marked field is the whole answer; a failure that marks none on screen shows its message.
-            errorMessage = rejectedFields.isEmpty ? PayabliPayInFailureMessage.text(for: error, operation: operation) : nil
+            // A marked field is the whole answer; a failure that marks none on screen shows its
+            // message, which the opt-out hides while the marks stay.
+            drawFailureMessage(for: error, operation: operation.kind)
             throw error
         }
+    }
+
+    /// Draws the failure's message where the form shows one, or takes it away, remembering the
+    /// category and operation that picked the wording so a change to the wording redraws the
+    /// message already drawn.
+    private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
+        guard rejectedFields.isEmpty, configuration.showsFailureMessage else {
+            failureMessage = nil
+            drawnFailure = nil
+            return
+        }
+        let category = PayabliPayInFailureMessage.messageCategory(for: error)
+        drawnFailure = (category, operation)
+        failureMessage = PayabliPayInFailureMessage.text(for: category, operation: operation, labels: labels)
     }
 
     /// Hands the form's submission to the flow, which reports it. A refusal before the flow has it is reported here.
@@ -337,34 +383,38 @@ final class PayabliPayInViewModel: ObservableObject {
     /// The submission runs inside `withFormBuffers`, so the buffers it built are closed once it ends,
     /// whatever it ends in.
     ///
+    /// - Parameter operation: the operation the submission sends.
     /// - Returns: what the flow returned.
-    private func submitToFlow() async throws -> PayabliPayInResult {
+    private func submitToFlow(_ operation: PayabliPayInOperation) async throws -> PayabliPayInResult {
         try await withFormBuffers { buffers in
             let request: PayabliPayInRequest?
             do {
-                request = try configuredRequest(with: buffers)
+                request = try configuredRequest(for: operation, with: buffers)
             } catch {
-                component.reportFormRefusal(error, method: effectiveSelectedMethod)
+                component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
                 throw error
             }
             if let request {
-                return try await component.submitConfigured(request, origin: .form)
+                return try await component.submitConfigured(request, for: operation, origin: .form)
             }
             return try await component.submitConfigured(
-                methodInput(with: buffers), options: mergedTokenStorageOptions(), origin: .form
+                PayabliPayInStoreRequest(instrument: methodInput(with: buffers), options: mergedStoreOptions()),
+                for: operation,
+                origin: .form
             )
         }
     }
 
     /// The payment the form submits, or nil when the operation stores a method instead.
     ///
+    /// - Parameter operation: the operation whose configuration the request is built from.
     /// - Parameter buffers: the registry the submission's sensitive buffers are built through.
     /// - Returns: the request built from the configuration and the fields.
-    private func configuredRequest(with buffers: FormBufferRegistry) throws -> PayabliPayInRequest? {
-        guard component.operation != .storePaymentMethod else { return nil }
-        guard let requestConfiguration = component.requestConfiguration else {
-            throw PayabliPayInError.InvalidInput(field: nil, reason: "Payment request configuration is required.")
-        }
+    private func configuredRequest(
+        for operation: PayabliPayInOperation,
+        with buffers: FormBufferRegistry
+    ) throws -> PayabliPayInRequest? {
+        guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
             paymentMethod: paymentMethod(with: buffers),
             customerData: mergedCustomerData(),
@@ -455,12 +505,12 @@ final class PayabliPayInViewModel: ObservableObject {
     func paymentSummaryLabelText(for field: PayabliPayInField) -> String {
         PayabliPayInSummaryRows.labelText(
             for: field,
-            labels: configuration.labels
+            labels: labels
         )
     }
 
     private var validation: PayabliPayInValidation {
-        component.requestConfiguration?.validation ?? configuration.options.validation
+        operation.requestConfiguration?.validation ?? operation.storeOptions?.validation ?? .default
     }
 
     private static func availableMethods(
@@ -468,7 +518,7 @@ final class PayabliPayInViewModel: ObservableObject {
         configuredMethods: [PayabliPayInMethodType]
     ) -> [PayabliPayInMethodType] {
         let methods = configuredMethods.filter { method in
-            switch operation {
+            switch operation.kind {
             case .storePaymentMethod, .capture:
                 return true
             case .authorize:
@@ -480,15 +530,16 @@ final class PayabliPayInViewModel: ObservableObject {
 
     private static func lifecycleSignature(
         component: PayabliPayIn,
-        configuration: PayabliPayInFormConfiguration
+        operation: PayabliPayInOperation,
+        configuration: PayabliPayInFormConfiguration,
+        labels: PayabliPayInFormLabels
     ) -> String {
-        [
+        payabliFramedSignature([
             "component:\(ObjectIdentifier(component))",
-            "operation:\(component.operation.rawValue)",
-            "request:\(component.requestConfiguration?.payabliViewModelSignature ?? "")",
-            "configuration:\(configuration.payabliViewModelSignature)"
-        ]
-        .joined(separator: "|")
+            "operation:\(operation.payabliViewModelSignature)",
+            "configuration:\(configuration.payabliViewModelSignature)",
+            "labels:\(labels.payabliViewModelSignature)"
+        ])
     }
 
     private var selectedExpirationMonth: Int? {

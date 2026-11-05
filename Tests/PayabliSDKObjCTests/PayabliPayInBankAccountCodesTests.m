@@ -23,28 +23,6 @@
     XCTAssertEqual(PayabliPayInAccountHolderTypeCodeBusiness, 2);
 }
 
-- (void)testAHostStoresABankAccountWithTheNamedValues {
-    SEL store = @selector(addBankAccountWithAccountNumber:routingNumber:accountType:holderName:holderType:secCode:deviceId:achValidation:createAnonymous:forceCustomerCreation:temporary:source:completion:);
-    XCTAssertTrue([PayabliPayInObjC instancesRespondToSelector:store]);
-
-    void (^call)(PayabliPayInObjC *) = ^(PayabliPayInObjC *payIn) {
-        [payIn addBankAccountWithAccountNumber:@"1111111111"
-                                 routingNumber:@"123456780"
-                                   accountType:PayabliPayInAccountTypeCodeChecking
-                                    holderName:@"Jane Doe"
-                                    holderType:PayabliPayInAccountHolderTypeCodeUnspecified
-                                       secCode:PayabliPayInSecCodeCodeUnspecified
-                                      deviceId:nil
-                                 achValidation:NO
-                               createAnonymous:NO
-                         forceCustomerCreation:NO
-                                     temporary:NO
-                                        source:nil
-                                    completion:^(PayabliPayInStoredPaymentMethodObjC *method, NSError *error) {}];
-    };
-    XCTAssertNotNil(call);
-}
-
 - (void)testAHostBuildsABankAccountPaymentWithTheNamedValues {
     PayabliPayInRequestObjC *request = [PayabliPayInRequestObjC bankAccountWithAccountNumber:@"1111111111"
                                                                                routingNumber:@"123456780"

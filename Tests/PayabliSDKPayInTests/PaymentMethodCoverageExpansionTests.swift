@@ -147,7 +147,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     func testStoredPaymentMethodBuildsDefaultAPIResponse() {
-        let storedMethod = PayabliPayInStoredPaymentMethod(
+        let storedMethod = PayabliPayInStoredMethod(
             storedMethodId: "stored-123",
             method: .card,
             methodReferenceId: "method-123",
@@ -186,14 +186,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             environment: .sandbox
         )
         let rootView = PaymentMethodSheetHarness(
-            component: component,
-            configuration: PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                labels: PayabliPayInLabels(
-                    title: "Inline title",
-                    subtitle: "Inline subtitle"
-                )
-            ),
+            payIn: component,
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: "Sheet title",
                 subtitle: "Sheet subtitle",
@@ -222,14 +218,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInSheetContent(
             isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
-            component: component,
-            configuration: PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                labels: PayabliPayInLabels(
-                    title: "Inline title",
-                    subtitle: "Inline subtitle"
-                )
-            ),
+            payIn: component,
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: "Sheet title",
                 subtitle: "Sheet subtitle",
@@ -239,7 +231,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             ),
             style: nil,
             onCompleted: { _ in },
-            onError: { _ in }
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = UIHostingController(rootView: view)
         let window = UIWindow(frame: UIScreen.main.bounds)
@@ -261,13 +254,12 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         )
         let view = PayabliPayInSheetContent(
             isPresented: Binding(get: { isPresented }, set: { isPresented = $0 }),
-            component: component,
-            configuration: PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                labels: PayabliPayInLabels(
-                    title: "Inline card form",
-                    subtitle: "Inline subtitle"
-                )
+            payIn: component,
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(
+                title: "Inline card form",
+                subtitle: "Inline subtitle"
             ),
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 dismissButton: .hidden,
@@ -278,7 +270,8 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             ),
             style: nil,
             onCompleted: { _ in },
-            onError: { _ in }
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = UIHostingController(rootView: view)
         let window = UIWindow(frame: UIScreen.main.bounds)
@@ -292,14 +285,76 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     @MainActor
+    func testTheSheetsOwnWordingWinsWhenBothSupplyIt() {
+        let content = sheetContent(movingHeader: true, sheetTitle: "Sheet title", sheetSubtitle: "Sheet subtitle")
+
+        XCTAssertEqual(content.sheetTitle, "Sheet title")
+        XCTAssertEqual(content.sheetSubtitle, "Sheet subtitle")
+        XCTAssertNil(content.formLabels.title, "the form draws no heading of its own")
+        XCTAssertNil(content.formLabels.subtitle, "the form draws no subtitle of its own")
+    }
+
+    @MainActor
+    func testTheFormsWordingMovesUpWhenTheSheetSuppliesNoneOfItsOwn() {
+        let content = sheetContent(movingHeader: true, sheetTitle: nil, sheetSubtitle: nil)
+
+        XCTAssertEqual(content.sheetTitle, "Inline title")
+        XCTAssertEqual(content.sheetSubtitle, "Inline subtitle")
+        XCTAssertNil(content.formLabels.title, "the heading was moved, not copied")
+    }
+
+    @MainActor
+    func testTheFormKeepsItsWordingWhenTheHeaderMoveIsOff() {
+        let content = sheetContent(movingHeader: false, sheetTitle: "Sheet title", sheetSubtitle: "Sheet subtitle")
+
+        XCTAssertEqual(content.sheetTitle, "Sheet title")
+        XCTAssertEqual(content.sheetSubtitle, "Sheet subtitle")
+        XCTAssertEqual(content.formLabels.title, "Inline title", "the form keeps its own heading")
+        XCTAssertEqual(content.formLabels.subtitle, "Inline subtitle")
+    }
+
+    @MainActor
+    func testABlankSheetTitleCountsAsUnsupplied() {
+        let content = sheetContent(movingHeader: true, sheetTitle: "   ", sheetSubtitle: nil)
+
+        XCTAssertEqual(content.sheetTitle, "Inline title")
+    }
+
+    /// A sheet content whose form supplies its own wording, with the header move as given.
+    @MainActor
+    private func sheetContent(
+        movingHeader: Bool,
+        sheetTitle: String?,
+        sheetSubtitle: String?
+    ) -> PayabliPayInSheetContent {
+        PayabliPayInSheetContent(
+            isPresented: .constant(true),
+            payIn: flowOnSession(),
+            operation: .storePaymentMethod(),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
+            sheetConfiguration: PayabliPayInSheetConfiguration(
+                title: sheetTitle,
+                subtitle: sheetSubtitle,
+                movesFormHeaderToSheetHeader: movingHeader
+            ),
+            style: nil,
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
+        )
+    }
+
+    @MainActor
     func testHostedACHFormRendersAccountPickerAndCustomerFields() {
         let component = flowOnSession(
             token: "access-token",
             entryPoint: "entry",
             environment: .sandbox
         )
-        let view = PayabliPayInView(
-            component: component,
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -310,10 +365,12 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                     .lastName,
                     .customerNumber,
                     .billingEmail,
-                    .billingZip
+                    .billingPostalCode
                 ]
             ),
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = PayInUIKitHostingSupport.host(view)
 
@@ -336,8 +393,9 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox
         )
-        let view = PayabliPayInView(
-            component: component,
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
@@ -354,15 +412,17 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                         fields: [.firstName, .lastName, .billingEmail]
                     )
                 ],
-                labels: PayabliPayInLabels(
-                    title: "Bank account form",
-                    subtitle: "Collect bank details"
-                ),
                 labelLayout: .placeholder,
                 formatting: PayabliPayInFormatting(masksAccountNumber: false),
                 requiredFields: [.firstName, .lastName, .billingEmail]
             ),
-            onCompleted: { _ in }
+            labels: PayabliPayInFormLabels(
+                title: "Bank account form",
+                subtitle: "Collect bank details"
+            ),
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         .environment(\.dynamicTypeSize, .accessibility1)
         let host = PayInUIKitHostingSupport.host(view)
@@ -383,13 +443,16 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox
         )
-        let view = PayabliPayInView(
-            component: component,
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
                 cardBrandIconPlacement: .leading
             ),
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = PayInUIKitHostingSupport.host(view)
 
@@ -417,10 +480,13 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             entryPoint: "entry",
             environment: .sandbox
         )
-        let view = PayabliPayInView(
-            component: component,
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
         let host = PayInUIKitHostingSupport.host(view)
 
@@ -457,25 +523,27 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
           }
         }
         """)
-        let component = PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport
-        )
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
 
-        let cardResult = try await component.addCard(PayabliPayInCardData(
-            cardNumber: "4111111111111111",
-            expiryMonth: 2,
-            expiryYear: 2028,
-            securityCode: "123",
-            holderName: "Jane Doe",
-            postalCode: "33139"
+        let cardResult = try await component.storeMethod(PayabliPayInStoreRequest(
+            instrument: .card(PayabliPayInCardData(
+                cardNumber: "4111111111111111",
+                expiryMonth: 2,
+                expiryYear: 2028,
+                securityCode: "123",
+                holderName: "Jane Doe",
+                postalCode: "33139"
+            )),
+            options: PayabliPayInStoreOptions()
         ))
-        let achResult = try await component.addBankAccount(PayabliPayInBankAccountData(
-            accountNumber: "1111111111",
-            routingNumber: "123456780",
-            accountType: .checking,
-            holderName: "Jane Doe"
+        let achResult = try await component.storeMethod(PayabliPayInStoreRequest(
+            instrument: .bankAccount(PayabliPayInBankAccountData(
+                accountNumber: "1111111111",
+                routingNumber: "123456780",
+                accountType: .checking,
+                holderName: "Jane Doe"
+            )),
+            options: PayabliPayInStoreOptions()
         ))
 
         XCTAssertEqual(cardResult.storedMethodId, "stored-123")
@@ -555,18 +623,24 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
 private struct PaymentMethodSheetHarness: View {
     @State private var isPresented = true
 
-    let component: PayabliPayIn
+    let payIn: PayabliPayIn
+    let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
+    let labels: PayabliPayInFormLabels
     let sheetConfiguration: PayabliPayInSheetConfiguration
 
     var body: some View {
         Text("Host")
             .payabliPayInSheet(
                 isPresented: $isPresented,
-                component: component,
+                payIn: payIn,
+                operation: operation,
                 configuration: configuration,
+                labels: labels,
                 sheetConfiguration: sheetConfiguration,
-                onCompleted: { _ in }
+                onCompleted: { _ in },
+                onFailed: { _ in },
+                onMethodChanged: { _ in }
             )
     }
 }

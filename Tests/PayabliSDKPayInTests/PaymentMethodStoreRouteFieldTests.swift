@@ -4,19 +4,23 @@ import XCTest
 final class PaymentMethodStoreRouteFieldTests: XCTestCase {
     @MainActor
     func testTheStoreRouteDropsEveryMoneyRow() {
-        let component = flowOnSession(operation: .storePaymentMethod)
+        let component = flowOnSession()
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
             cardFieldOrder: [.surchargeFee] + PayabliPayInFormConfiguration.defaultCardFieldOrder
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
+            operation: .storePaymentMethod(),
             configuration: configuration
         )
-        let view = PayabliPayInView(
-            component: component,
+        let view = PayabliPayInForm(
+            payIn: component,
+            operation: .storePaymentMethod(),
             configuration: configuration,
-            onCompleted: { _ in }
+            onCompleted: { _ in },
+            onFailed: { _ in },
+            onMethodChanged: { _ in }
         )
 
         for moneyField in [PayabliPayInField.amount, .serviceFee, .surchargeFee] {

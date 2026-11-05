@@ -116,6 +116,18 @@ final class PayInReports {
         }
     }
 
+    /// The operation a form submission is counted under.
+    ///
+    /// - Parameter kind: the operation the form submits.
+    /// - Returns: the reported operation.
+    static func operation(of kind: PayabliPayInOperation.Kind) -> Operation {
+        switch kind {
+        case .storePaymentMethod: .storeMethod
+        case .capture: .capture
+        case .authorize: .authorize
+        }
+    }
+
     /// How an operation that threw ended, keyed on what the caller was told.
     ///
     /// - Parameter error: what the operation threw.

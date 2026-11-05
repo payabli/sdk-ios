@@ -29,8 +29,8 @@ enum PayInFieldPath {
         case .cardholderName: storedMethod(.cardHolder)
         case .cardNumber: storedMethod(.cardnumber)
         case .cardExpiration: storedMethod(.cardexp)
-        case .cardCvv: storedMethod(.cardcvv)
-        case .cardZip: storedMethod(.cardzip)
+        case .cardSecurityCode: storedMethod(.cardcvv)
+        case .cardPostalCode: storedMethod(.cardzip)
         case .accountHolder: storedMethod(.achHolder)
         case .routingNumber: storedMethod(.achRouting)
         case .accountNumber: storedMethod(.achAccount)
@@ -39,7 +39,8 @@ enum PayInFieldPath {
         case .secCode: storedMethod(.achCode)
         case .deviceId: storedMethod(.device)
         case .methodDescription: "methodDescription"
-        case .firstName, .lastName, .customerNumber, .billingEmail, .billingZip: "customerData.\(field.rawValue)"
+        case .firstName, .lastName, .customerNumber, .billingEmail: "customerData.\(field.rawValue)"
+        case .billingPostalCode: "customerData.billingZip"
         case .amount: totalAmount
         case .serviceFee: serviceFee
         case .surchargeFee: surchargeFee

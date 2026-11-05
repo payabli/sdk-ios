@@ -1,16 +1,6 @@
 import Foundation
 import PayabliSDKCore
 
-public enum PayabliPayInOperation: String, CaseIterable, Identifiable, Sendable, Equatable {
-    case storePaymentMethod
-    case capture
-    case authorize
-
-    public var id: String {
-        rawValue
-    }
-}
-
 public enum PayabliPayInAuthorizationMethod: String, CaseIterable, Identifiable, Sendable, Equatable {
     case card
 
@@ -295,7 +285,7 @@ public struct PayabliPayInRequestConfiguration: Sendable {
 
 extension PayabliPayInRequestConfiguration {
     var payabliViewModelSignature: String {
-        [
+        payabliFramedSignature([
             "paymentDetails:\(paymentDetails.payabliViewModelSignature)",
             "accountId:\(accountId ?? "")",
             "customerData:\(customerData.payabliJSONSignature)",
@@ -310,8 +300,7 @@ extension PayabliPayInRequestConfiguration {
             "achValidation:\(achValidation.map { "\($0)" } ?? "")",
             "forceCustomerCreation:\(forceCustomerCreation.map { "\($0)" } ?? "")",
             "validation:\(validation.payabliViewModelSignature)"
-        ]
-        .joined(separator: "|")
+        ])
     }
 }
 
@@ -374,7 +363,7 @@ public struct PayabliPayInResult: Sendable, Equatable {
     public let explanation: String?
     public let action: String?
     public let transaction: PayabliPayInTransaction?
-    public let storedPaymentMethod: PayabliPayInStoredPaymentMethod?
+    public let storedPaymentMethod: PayabliPayInStoredMethod?
     public let apiResponse: PayabliPayInAPIResponse?
 
     public init(apiResponse: PayabliPayInAPIResponse) {
@@ -388,7 +377,7 @@ public struct PayabliPayInResult: Sendable, Equatable {
         self.apiResponse = apiResponse
     }
 
-    public init(storedPaymentMethod: PayabliPayInStoredPaymentMethod) {
+    public init(storedPaymentMethod: PayabliPayInStoredMethod) {
         kind = .storedPaymentMethod
         code = storedPaymentMethod.resultCode.map(String.init) ?? "1"
         reason = storedPaymentMethod.resultText ?? storedPaymentMethod.responseText
