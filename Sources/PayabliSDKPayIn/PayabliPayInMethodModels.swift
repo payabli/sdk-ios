@@ -605,20 +605,22 @@ extension PayabliPayInCardData {
         }
     }
 
-    /// Refuses a month outside 1 to 12, a year that isn't four digits or is after 2099, or an expiry before the
-    /// device's current month. A card is good through the last day of its expiry month.
-    func validateExpiry() throws {
+    /// Refuses a month outside 1 to 12, a year that isn't four digits or is outside 2000 to 2099, or an expiry
+    /// before the current month. A card is good through the last day of its expiry month.
+    ///
+    /// - Parameter now: the moment the current month is read at.
+    func validateExpiry(at now: Date = Date()) throws {
         guard (1 ... 12).contains(expiryMonth) else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiry month must be between 1 and 12.")
         }
         guard (1000 ... 9999).contains(expiryYear) else {
             throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be four digits.")
         }
-        // The request carries two digits of the year, so a year after 2099 can't be sent as given.
-        guard expiryYear <= Self.expiryYears.upperBound else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be 2099 or earlier.")
+        // The request carries two digits of the year, so only 2000 to 2099 can be sent as given.
+        guard Self.expiryYears.contains(expiryYear) else {
+            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be between 2000 and 2099.")
         }
-        let today = Self.expiryCalendar.dateComponents([.year, .month], from: Date())
+        let today = Self.expiryCalendar.dateComponents([.year, .month], from: now)
         guard let year = today.year, let month = today.month else { return }
         guard (expiryYear, expiryMonth) >= (year, month) else {
             throw PayabliPayInTokenStorageError.invalidInput("Card is expired.")
