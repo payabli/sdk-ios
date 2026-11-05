@@ -1,3 +1,4 @@
+import os
 import PayabliSDKPayIn
 import SwiftUI
 
@@ -278,6 +279,10 @@ struct SimpleCaptureView: View {
     private func handleFailed(_ failure: PayInFailure) {
         guard !failure.refusedForAnotherSubmission else { return }
         resultText = "Failed: \(failure.message)"
+        Logger(
+            subsystem: "com.payabli.example.app",
+            category: "SimpleCaptureDiagnostics"
+        ).error("Simple capture failed: \(failure.logLabel, privacy: .public)")
         if charges {
             flow(for: operation).chargeFailed(failure)
         }

@@ -161,10 +161,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             storedMethodId: "stored-123",
             method: .card,
             methodReferenceId: "method-123",
-            resultCode: 1,
-            resultText: "Approved",
-            customerId: 4440,
-            responseText: "Success"
+            customerId: 4440
         )
 
         let outcome = PayabliPayInFormSuccess(PayabliPayInResult(storedPaymentMethod: stored))

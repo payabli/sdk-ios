@@ -159,7 +159,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         )
 
         XCTAssertEqual(result.storedMethodId, "stored-result-code")
-        XCTAssertEqual(result.resultCode, 1)
     }
 
     func testA200ThatClaimsNothingIsARefusalRatherThanAStoredMethod() async throws {

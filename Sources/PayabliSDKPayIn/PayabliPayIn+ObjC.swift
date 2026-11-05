@@ -11,21 +11,13 @@ public final class PayabliPayInStoredMethodObjC: NSObject {
     @objc public let storedMethodId: String?
     @objc public let method: String
     @objc public let methodReferenceId: String?
-    @objc public let resultCode: NSNumber?
-    @objc public let resultText: String?
     @objc public let customerId: NSNumber?
-    @objc public let responseText: String
-    @objc public let apiResponse: NSDictionary
 
     init(_ method: PayabliPayInStoredMethod) {
         storedMethodId = method.storedMethodId
         self.method = Self.name(of: method.method)
         methodReferenceId = method.methodReferenceId
-        resultCode = method.resultCode.map(NSNumber.init(value:))
-        resultText = method.resultText
         customerId = method.customerId.map(NSNumber.init(value:))
-        responseText = method.responseText
-        apiResponse = Self.dictionary(from: method.apiResponse)
         super.init()
     }
 
@@ -34,15 +26,6 @@ public final class PayabliPayInStoredMethodObjC: NSObject {
         case .card: return "card"
         case .bankAccount: return "bankAccount"
         }
-    }
-
-    private static func dictionary(from response: PayabliPayInTokenStorageAPIResponse) -> NSDictionary {
-        guard let data = try? JSONEncoder().encode(response),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            return [:]
-        }
-        return object as NSDictionary
     }
 }
 

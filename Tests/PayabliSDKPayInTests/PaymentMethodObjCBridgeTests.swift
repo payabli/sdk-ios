@@ -129,27 +129,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         ))
     }
 
-    func testStoredMethodWrapperConvertsValuesAndResponse() {
+    func testStoredMethodWrapperConvertsEachField() {
         let storedMethod = PayabliPayInStoredMethod(
             storedMethodId: "stored-123",
             method: .bankAccount,
             methodReferenceId: "method-123",
-            resultCode: 1,
-            resultText: "Approved",
-            customerId: 4440,
-            responseText: "Success",
-            apiResponse: PayabliPayInTokenStorageAPIResponse(
-                isSuccess: true,
-                responseText: "Success",
-                responseCode: 200,
-                responseData: PayabliPayInTokenStorageAPIResponseData(
-                    referenceId: "stored-123",
-                    resultCode: 1,
-                    resultText: "Approved",
-                    customerId: 4440,
-                    methodReferenceId: "method-123"
-                )
-            )
+            customerId: 4440
         )
 
         let wrapper = PayabliPayInStoredMethodObjC(storedMethod)
@@ -157,10 +142,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.storedMethodId, "stored-123")
         XCTAssertEqual(wrapper.method, "bankAccount")
         XCTAssertEqual(wrapper.methodReferenceId, "method-123")
-        XCTAssertEqual(wrapper.resultCode, 1)
         XCTAssertEqual(wrapper.customerId, 4440)
-        XCTAssertEqual(wrapper.responseText, "Success")
-        XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
     }
 
     func testStoreMethodReturnsValidationErrorWithoutCallingTokenHandler() async throws {

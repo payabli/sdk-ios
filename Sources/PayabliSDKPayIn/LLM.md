@@ -737,24 +737,19 @@ Custom fonts:
 | Field | Meaning |
 | --- | --- |
 | `kind` | `.storedPaymentMethod` or `.transaction`. |
-| `code` | Stored-method result code or MoneyIn response code. |
-| `reason` | Result reason/result text. |
+| `code` | `1` for a stored method, or the MoneyIn response code. |
+| `reason` | The payment's reason; `nil` for a stored method. |
 | `explanation` | API explanation where present. |
 | `action` | API action/todo where present. |
 | `transaction` | Present for capture/authorize/capture-authorized responses. |
 | `storedPaymentMethod` | Present for token-storage responses. |
-| `apiResponse` | Full MoneyIn v2 response for transaction operations. |
 
 Stored-method result fields:
 
 - `storedMethodId`
 - `method`, the `PayabliPayInStoredMethodType` to charge it as
 - `methodReferenceId`
-- `resultCode`
-- `resultText`
 - `customerId`
-- `responseText`
-- `apiResponse`
 
 Transaction result fields:
 
