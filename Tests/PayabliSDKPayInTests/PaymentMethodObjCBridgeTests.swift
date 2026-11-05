@@ -61,6 +61,62 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertNil(options.temporary)
     }
 
+    func testAStoreRequestCarriesEveryStoreOption() throws {
+        let customer = PayabliPayInCustomerDataObjC()
+        customer.customerId = 4440
+        let request = try storeRequest()
+        request.customerData = customer
+        request.vendorId = 4
+        request.vendorNumber = "4781"
+        request.fallbackAuth = true
+        request.fallbackAuthAmount = 150
+        request.methodDescription = "House account"
+        request.subdomain = "objc-subdomain"
+        request.requiresLuhnCheck = false
+        request.validatesRoutingNumberChecksum = false
+
+        let options = request.toSwift().options
+
+        XCTAssertEqual(options.customerData?.customerId, 4440)
+        XCTAssertEqual(options.vendorData?.vendorId, 4)
+        XCTAssertEqual(options.vendorData?.vendorNumber, "4781")
+        XCTAssertEqual(options.fallbackAuth, true)
+        XCTAssertEqual(options.fallbackAuthAmount, 150)
+        XCTAssertEqual(options.methodDescription, "House account")
+        XCTAssertEqual(options.subdomain, "objc-subdomain")
+        XCTAssertFalse(options.validation.requiresLuhnCheck)
+        XCTAssertFalse(options.validation.validatesRoutingNumberChecksum)
+    }
+
+    func testAStoreRequestNamingOneVendorIdentifierSendsOnlyThatOne() throws {
+        let byId = try storeRequest()
+        byId.vendorId = 4
+        let byNumber = try storeRequest()
+        byNumber.vendorNumber = "4781"
+
+        XCTAssertEqual(byId.toSwift().options.vendorData?.vendorId, 4)
+        XCTAssertNil(byId.toSwift().options.vendorData?.vendorNumber)
+        XCTAssertNil(byNumber.toSwift().options.vendorData?.vendorId)
+        XCTAssertEqual(byNumber.toSwift().options.vendorData?.vendorNumber, "4781")
+    }
+
+    func testAStoreRequestSettingNothingCarriesTheSwiftDefaults() throws {
+        let options = try storeRequest().toSwift().options
+        let defaults = PayabliPayInStoreOptions()
+
+        XCTAssertNil(options.customerData)
+        XCTAssertNil(options.vendorData)
+        XCTAssertNil(options.fallbackAuth)
+        XCTAssertNil(options.fallbackAuthAmount)
+        XCTAssertNil(options.methodDescription)
+        XCTAssertNil(options.subdomain)
+        XCTAssertEqual(options.validation.requiresLuhnCheck, defaults.validation.requiresLuhnCheck)
+        XCTAssertEqual(
+            options.validation.validatesRoutingNumberChecksum,
+            defaults.validation.validatesRoutingNumberChecksum
+        )
+    }
+
     private func storeRequest() throws -> PayabliPayInStoreRequestObjC {
         try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
             accountNumber: "123456789",
