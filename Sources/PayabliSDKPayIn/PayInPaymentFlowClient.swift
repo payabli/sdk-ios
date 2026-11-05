@@ -406,7 +406,7 @@ final class PayInPaymentFlowClient: Sendable {
         }
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
-            guard decoded.isApproved, response.statusCode != 409 else {
+            guard decoded.isApproved, response.statusCode != 409, response.statusCode != declinedStatus else {
                 throw Self.unapproved(decoded.failure(httpStatusCode: response.statusCode))
             }
             return PayabliPayInResult(apiResponse: decoded)
@@ -417,20 +417,21 @@ final class PayInPaymentFlowClient: Sendable {
         }
 
         // A 402 is a decline whatever its body, so it never reaches the mapper's core decline.
-        if response.statusCode == 402 {
+        if response.statusCode == declinedStatus {
             throw PayabliPayInError.Refused(failure: PayabliPayInFailure(httpStatusCode: response.statusCode))
         }
         try mapPayabliHTTPError(response: response)
         throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
     }
 
-    /// The failure an unapproved answer is: a decline when its code is in the `D` family or its status is 402,
-    /// otherwise the service's own failure, which therefore never classifies as a decline.
+    /// The failure an unapproved answer is: a decline when it was answered 402, whatever the body says, or when it
+    /// classifies as one; otherwise the service's own failure, which therefore never classifies as a decline.
     ///
     /// - Parameter failure: the answer as the envelope read it.
     /// - Returns: the error a caller receives.
     private static func unapproved(_ failure: PayabliPayInFailure) -> PayabliPayInError {
-        PayabliPayInError.ServiceError.classification(of: failure) == .paymentDeclined
+        failure.httpStatusCode == declinedStatus
+            || PayabliPayInError.ServiceError.classification(of: failure) == .paymentDeclined
             ? PayabliPayInError.Refused(failure: failure)
             : PayabliPayInError.ServiceError(failure: failure)
     }
@@ -464,6 +465,9 @@ final class PayInPaymentFlowClient: Sendable {
         return envelope.failure(httpStatusCode: response.statusCode)
     }
 }
+
+/// The status the service answers a declined payment or authorization with.
+private let declinedStatus = 402
 
 /// The one field an unknown outcome keeps from the answer.
 private struct NamedTransaction: Decodable {
