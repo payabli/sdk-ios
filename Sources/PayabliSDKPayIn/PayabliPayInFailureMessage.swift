@@ -85,6 +85,8 @@ enum PayabliPayInFailureMessage {
             "This payment method couldn't be saved. Try another one."
         case (.storePaymentMethod, .retryLater):
             "The payment method couldn't be saved. Please try again."
+        case (.storePaymentMethod, .outcomeUnknown):
+            "We couldn't confirm the payment method was saved."
         case (.storePaymentMethod, _):
             "The payment method couldn't be saved."
         }

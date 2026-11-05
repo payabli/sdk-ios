@@ -767,7 +767,7 @@ final class TokenStorageClientTests: XCTestCase {
             XCTFail("Expected payment method failure")
         } catch let error as PayabliPaymentError {
             guard case .server = error else { return XCTFail("Wrong error: \(error)") }
-            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "We couldn't confirm the payment method was saved.")
             XCTAssertEqual(viewModel.accountHolder, "Jane Business")
             XCTAssertEqual(viewModel.routingNumber, "")
             XCTAssertEqual(viewModel.accountNumber, "")
@@ -790,10 +790,8 @@ private func firstRequest(from transport: MockTransport) async throws -> Payabli
 
 private func assertCardPaymentMethodResult(_ result: PayabliPayInStoredMethod) {
     XCTAssertEqual(result.storedMethodId, "stored-123")
-    XCTAssertEqual(result.apiResponse.isSuccess, true)
-    XCTAssertEqual(result.apiResponse.responseText, "Success")
-    XCTAssertEqual(result.apiResponse.responseData?.referenceId, "stored-123")
-    XCTAssertEqual(result.apiResponse.responseData?.customerId, 4440)
+    XCTAssertEqual(result.method, .card)
+    XCTAssertEqual(result.customerId, 4440)
 }
 
 private func assertCardPaymentMethodRequest(_ request: PayabliRequest) throws {

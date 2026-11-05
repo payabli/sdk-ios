@@ -145,20 +145,19 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertEqual(response.responseData?.customerId, 4440)
     }
 
-    func testStoredPaymentMethodBuildsDefaultAPIResponse() {
+    func testAStoredMethodResultCarriesNoServiceText() {
         let storedMethod = PayabliPayInStoredMethod(
             storedMethodId: "stored-123",
             method: .card,
             methodReferenceId: "method-123",
-            resultCode: 1,
-            resultText: "Approved",
-            customerId: 4440,
-            responseText: "Success"
+            customerId: 4440
         )
 
-        XCTAssertEqual(storedMethod.apiResponse.responseText, "Success")
-        XCTAssertEqual(storedMethod.apiResponse.responseData?.referenceId, "stored-123")
-        XCTAssertEqual(storedMethod.apiResponse.responseData?.methodReferenceId, "method-123")
+        let result = PayabliPayInResult(storedPaymentMethod: storedMethod)
+
+        XCTAssertEqual(result.code, "1")
+        XCTAssertNil(result.reason)
+        XCTAssertEqual(result.storedPaymentMethod, storedMethod)
     }
 
     func testPaymentMethodFailureFallbackReasonUsesResponseText() {

@@ -1,15 +1,24 @@
+import PayabliSDKCore
 import XCTest
 
 /// The line the Tap to Pay tab shows after asking the SDK to present the terms.
 final class TermsPresentationTests: XCTestCase {
-    private struct Refusal: LocalizedError {
-        var errorDescription: String? {
+    private struct Refusal: PayabliError {
+        var type: PayabliErrorType {
+            .readerUnavailable
+        }
+
+        var reason: String {
             "The reader is not ready."
+        }
+
+        var detail: String? {
+            nil
         }
     }
 
-    func testAFailedPresentationIsTheMarkPlusTheErrorsMessageWithNoStepName() {
-        XCTAssertEqual(TermsPresentation.failed(Refusal()).line, "✗ The reader is not ready.")
+    func testAFailedPresentationIsTheMarkPlusItsCategorysMessageWithNoStepName() {
+        XCTAssertEqual(TermsPresentation.failed(Refusal()).line, "✗ That didn't work. Please try again.")
     }
 
     func testAReturnedPresentationReportsWhatAskingFound() {
@@ -20,7 +29,7 @@ final class TermsPresentationTests: XCTestCase {
     func testAFailureToAskAfterwardsIsNotReportedAsAFailedPresentation() {
         XCTAssertEqual(
             TermsPresentation.returned(accepted: .failure(Refusal())).line,
-            "returned; could not ask whether accepted: The reader is not ready."
+            "returned; could not ask whether accepted: That didn't work. Please try again."
         )
     }
 }

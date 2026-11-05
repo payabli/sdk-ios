@@ -364,9 +364,8 @@ public struct PayabliPayInResult: Sendable, Equatable {
     public let action: String?
     public let transaction: PayabliPayInTransaction?
     public let storedPaymentMethod: PayabliPayInStoredMethod?
-    public let apiResponse: PayabliPayInAPIResponse?
 
-    public init(apiResponse: PayabliPayInAPIResponse) {
+    init(apiResponse: PayabliPayInAPIResponse) {
         kind = .transaction
         self.code = apiResponse.code
         self.reason = apiResponse.reason
@@ -374,30 +373,28 @@ public struct PayabliPayInResult: Sendable, Equatable {
         self.action = apiResponse.action
         transaction = apiResponse.data
         storedPaymentMethod = nil
-        self.apiResponse = apiResponse
     }
 
     public init(storedPaymentMethod: PayabliPayInStoredMethod) {
         kind = .storedPaymentMethod
-        code = storedPaymentMethod.resultCode.map(String.init) ?? "1"
-        reason = storedPaymentMethod.resultText ?? storedPaymentMethod.responseText
+        code = "1"
+        reason = nil
         explanation = nil
         action = nil
         transaction = nil
         self.storedPaymentMethod = storedPaymentMethod
-        apiResponse = nil
     }
 }
 
-public struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
-    public let code: String
-    public let reason: String?
-    public let explanation: String?
-    public let action: String?
-    public let data: PayabliPayInTransaction?
-    public let token: String?
+struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
+    let code: String
+    let reason: String?
+    let explanation: String?
+    let action: String?
+    let data: PayabliPayInTransaction?
+    let token: String?
 
-    public init(
+    init(
         code: String,
         reason: String? = nil,
         explanation: String? = nil,
@@ -413,11 +410,11 @@ public struct PayabliPayInAPIResponse: Codable, Sendable, Equatable {
         self.token = token
     }
 
-    public var isApproved: Bool {
+    var isApproved: Bool {
         code.hasPrefix("A")
     }
 
-    public func failure(httpStatusCode: Int? = nil) -> PayabliPayInFailure {
+    func failure(httpStatusCode: Int? = nil) -> PayabliPayInFailure {
         PayabliPayInFailure(
             code: code,
             reason: reason,

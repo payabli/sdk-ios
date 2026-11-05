@@ -419,16 +419,16 @@ private func payabliEncodedJSONSignature(_ value: (some Encodable)?) -> String {
     return text
 }
 
-public struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
-    public let referenceId: String?
-    public let resultCode: Int?
-    public let resultText: String?
-    public let explanation: String?
-    public let todoAction: String?
-    public let customerId: Int64?
-    public let methodReferenceId: String?
+struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equatable {
+    let referenceId: String?
+    let resultCode: Int?
+    let resultText: String?
+    let explanation: String?
+    let todoAction: String?
+    let customerId: Int64?
+    let methodReferenceId: String?
 
-    public init(
+    init(
         referenceId: String? = nil,
         resultCode: Int? = nil,
         resultText: String? = nil,
@@ -456,7 +456,7 @@ public struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equata
         case methodReferenceId
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         referenceId = try c.decodeIfPresent(String.self, forKey: .referenceId)
         resultCode = c.decodeLossyIntIfPresent(forKey: .resultCode)
@@ -468,13 +468,13 @@ public struct PayabliPayInTokenStorageAPIResponseData: Codable, Sendable, Equata
     }
 }
 
-public struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
-    public let isSuccess: Bool?
-    public let responseText: String
-    public let responseCode: Int?
-    public let responseData: PayabliPayInTokenStorageAPIResponseData?
+struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
+    let isSuccess: Bool?
+    let responseText: String
+    let responseCode: Int?
+    let responseData: PayabliPayInTokenStorageAPIResponseData?
 
-    public init(
+    init(
         isSuccess: Bool? = nil,
         responseText: String,
         responseCode: Int? = nil,
@@ -493,7 +493,7 @@ public struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable 
         case responseData
     }
 
-    public init(from decoder: Decoder) throws {
+    init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         isSuccess = try c.decodeIfPresent(Bool.self, forKey: .isSuccess)
         responseText = try c.decode(String.self, forKey: .responseText)
@@ -501,7 +501,7 @@ public struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable 
         responseData = try? c.decodeIfPresent(PayabliPayInTokenStorageAPIResponseData.self, forKey: .responseData)
     }
 
-    public func failure(httpStatusCode: Int? = nil) -> PayabliPayInSaveFailure {
+    func failure(httpStatusCode: Int? = nil) -> PayabliPayInSaveFailure {
         PayabliPayInSaveFailure(
             isSuccess: isSuccess,
             responseText: responseText,
@@ -519,39 +519,18 @@ public struct PayabliPayInStoredMethod: Sendable, Equatable {
     public let storedMethodId: String?
     public let method: PayabliPayInStoredMethodType
     public let methodReferenceId: String?
-    public let resultCode: Int?
-    public let resultText: String?
     public let customerId: Int64?
-    public let responseText: String
-    public let apiResponse: PayabliPayInTokenStorageAPIResponse
 
     public init(
         storedMethodId: String?,
         method: PayabliPayInStoredMethodType,
         methodReferenceId: String?,
-        resultCode: Int?,
-        resultText: String?,
-        customerId: Int64?,
-        responseText: String,
-        apiResponse: PayabliPayInTokenStorageAPIResponse? = nil
+        customerId: Int64?
     ) {
         self.storedMethodId = storedMethodId
         self.method = method
         self.methodReferenceId = methodReferenceId
-        self.resultCode = resultCode
-        self.resultText = resultText
         self.customerId = customerId
-        self.responseText = responseText
-        self.apiResponse = apiResponse ?? PayabliPayInTokenStorageAPIResponse(
-            responseText: responseText,
-            responseData: PayabliPayInTokenStorageAPIResponseData(
-                referenceId: storedMethodId,
-                resultCode: resultCode,
-                resultText: resultText,
-                customerId: customerId,
-                methodReferenceId: methodReferenceId
-            )
-        )
     }
 }
 
