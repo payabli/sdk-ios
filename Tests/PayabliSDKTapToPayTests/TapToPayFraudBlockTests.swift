@@ -45,6 +45,29 @@ final class TapToPayFraudBlockTests: XCTestCase {
         }
     }
 
+    func testAFraudBlockOnAResentKeyKeepsTheKeyHeldAndTheCaptureUnknown() async throws {
+        let (ttp, provider, _) = try await makeReadyTTP()
+        provider.readingResult = Self.read(.indeterminate)
+        wire.reset(initiate: [(200, Self.opened), (400, Self.block("E9005"))])
+        _ = try? await ttp.charge(paymentDetails: Self.details)
+        provider.readingResult = Self.read(.approved)
+
+        let blocked: TapToPayError
+        do {
+            _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+            return XCTFail("expected the retry to be blocked")
+        } catch let failure as TapToPayError {
+            blocked = failure
+        }
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(blocked.type, .paymentNotOpened, "\(blocked)")
+        XCTAssertEqual(blocked.code, 3019)
+        XCTAssertEqual(blocked.capture, .unknown)
+        XCTAssertEqual(wire.initiateKeys.count, 3)
+        XCTAssertEqual(Set(wire.initiateKeys).count, 1, "every attempt sent the held key: \(wire.initiateKeys)")
+    }
+
     func testAnOpeningAnswered401WithAnyOtherBodyStillRefreshesAndReplays() async throws {
         let (ttp, _, tokens) = try await makeReadyTTP()
         let issued = tokens.value
@@ -71,6 +94,10 @@ final class TapToPayFraudBlockTests: XCTestCase {
 
     private static let details = PayabliTTPPaymentDetails(amount: 1, currency: "USD")
     private static let opened = #"{"code":"A01","data":{"paymentTransId":"ttp-txn-1"}}"#
+
+    private static func read(_ outcome: CardReadOutcome) -> Result<CardReadResult, Error> {
+        .success(CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome))
+    }
 
     private static func block(_ code: String) -> String {
         #"{"code":"\#(code)","reason":"Blocked","explanation":"The payer is blocked.","data":null}"#
