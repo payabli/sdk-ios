@@ -148,6 +148,24 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(refused.userInfo["capture"] as? Int, 0)
     }
 
+    func testARefusalThroughObjectiveCCarriesTheTransactionItNames() {
+        let named = PayabliPayInError.Refused(failure: PayabliPayInFailure(code: "D0200", httpStatusCode: 402, paymentTransId: "trans-1"))
+        let unnamed = PayabliPayInError.Refused(failure: PayabliPayInFailure(code: "D0200", httpStatusCode: 402))
+
+        XCTAssertEqual(named.toPayabliPayInNSError(movesMoney: true).userInfo["paymentTransId"] as? String, "trans-1")
+        XCTAssertNil(unnamed.toPayabliPayInNSError(movesMoney: true).userInfo["paymentTransId"])
+    }
+
+    func testAServiceErrorThroughObjectiveCCarriesTheTransactionItNames() {
+        let service = PayabliPayInError.ServiceError(failure: PayabliPayInFailure(
+            code: "E4003",
+            httpStatusCode: 403,
+            paymentTransId: "trans-2"
+        ))
+
+        XCTAssertEqual(service.toPayabliPayInNSError().userInfo["paymentTransId"] as? String, "trans-2")
+    }
+
     func testAnErrorFromACallThatMovesNoMoneyCarriesNoCapture() {
         let error = PayabliGenericError(type: .networkError, reason: "lost").toPayabliPayInNSError()
 
