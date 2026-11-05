@@ -51,7 +51,8 @@ package final class TTPTransactionClient: Sendable {
             method: .post,
             path: "/api/v2/MoneyIn/initiate",
             headers: [payabliIdempotencyKeyHeader: idempotencyKey],
-            jsonBody: body
+            jsonBody: body,
+            isCallerRefusal: isFraudBlockAnswered401
         )
 
         // `customerData` is the caller's whole customer record, so the body is
@@ -66,6 +67,14 @@ package final class TTPTransactionClient: Sendable {
             status = response.statusCode
             if response.statusCode == 409, !Self.isJSONObject(response.body) {
                 throw ChargeKeyRefusal()
+            }
+            // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
+            if let code = fraudBlockCode(of: response) {
+                throw PayabliTTPError.paymentNotOpened(
+                    reason: Self.reason(of: response) ?? code,
+                    httpStatus: response.statusCode,
+                    rawCode: code
+                )
             }
             if response.statusCode == 404 {
                 throw PayabliTTPError.cardPresentNotEnabled(httpStatus: response.statusCode, rawCode: serviceCode(of: response))
@@ -109,6 +118,14 @@ package final class TTPTransactionClient: Sendable {
     private static func isAddressable(_ paymentTransId: String) -> Bool {
         let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
+    }
+
+    /// The words a refusal's body gives, when it gives any.
+    ///
+    /// - Parameter response: the refused answer.
+    /// - Returns: the body's `reason`, or nil when it names none or cannot be read.
+    private static func reason(of response: PayabliResponse) -> String? {
+        (try? JSONDecoder().decode(PayabliV2Envelope<InitiateData>.self, from: response.body))?.reason
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {

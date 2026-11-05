@@ -201,7 +201,7 @@ final class PayInPaymentFlowClient: Sendable {
                 query: request.queryItems(allowsACHValidation: allowsACHValidation),
                 idempotencyKey: idempotencyKey,
                 body: body,
-                isCallerRefusal: Self.isFraudBlockAnswered401
+                isCallerRefusal: isFraudBlockAnswered401
             )
             result = try await perform(
                 payabliRequest,
@@ -396,7 +396,7 @@ final class PayInPaymentFlowClient: Sendable {
             throw IdempotencyCheckRefusal()
         }
         // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
-        if let code = serviceCode(of: response), Self.fraudBlockCodes.contains(code) {
+        if let code = fraudBlockCode(of: response) {
             throw PayabliPayInError.Refused(failure: Self.fraudBlock(code, answeredBy: response))
         }
         // First, because the envelope decodes this body too and keeps none of the fields it names.
@@ -428,20 +428,6 @@ final class PayInPaymentFlowClient: Sendable {
         failure.code?.hasPrefix(declinedFamily) == true
             ? PayabliPayInError.Refused(failure: failure)
             : PayabliPayInError.ServiceError(failure: failure)
-    }
-
-    /// Fraud control's blocks: `E9005` is the blacklist and `E9051` the risk workflow.
-    private static let fraudBlockCodes: Set<String> = ["E9005", "E9051"]
-
-    /// Whether a 401 is fraud control refusing the payer rather than the service refusing the token, which a refresh
-    /// cannot fix and a replay would send again.
-    ///
-    /// - Parameter response: the answered request.
-    /// - Returns: true for a 401 whose body names a fraud block; false otherwise.
-    @Sendable
-    private static func isFraudBlockAnswered401(_ response: PayabliResponse) -> Bool {
-        guard response.statusCode == 401, let code = serviceCode(of: response) else { return false }
-        return fraudBlockCodes.contains(code)
     }
 
     /// The refusal a fraud block describes.
