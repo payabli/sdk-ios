@@ -7,11 +7,8 @@ final class PayabliPayInViewModel: ObservableObject {
     /// The method on screen. Written only through `selectedMethod`.
     @Published private(set) var methodOnScreen: PayabliPayInMethodType
 
-    /// The method the payer chose.
-    ///
-    /// While a submission is pending a switch is refused before anything is published, so the method on
-    /// screen stays the one being sent and nothing typed for it is dropped. Disabling the selector is not
-    /// enough on its own: it takes effect on the next draw, and a tap can land before then.
+    /// The method the payer chose. While a submission is pending a switch is refused before anything is
+    /// published: a disabled selector takes effect on the next draw, and a tap can land before then.
     var selectedMethod: PayabliPayInMethodType {
         get { methodOnScreen }
         set {
