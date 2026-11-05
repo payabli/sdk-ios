@@ -2,7 +2,8 @@
 @testable import PayabliSDKPayIn
 import XCTest
 
-/// A payer blocked by fraud control is a decline on every money route, decided by the code whatever the status.
+/// A payer blocked by fraud control is a decline on every money route, decided by the code; a payment or an
+/// authorization answered 401 with it is the caller's refusal.
 @MainActor
 final class PayInFraudBlockTests: XCTestCase {
     override func setUp() {
