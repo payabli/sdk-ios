@@ -393,7 +393,7 @@ mirrors no rule of its own. A refused request arrives as
 `PayabliPaymentError.validation`, whose `errors` names each parameter it refused,
 as it does for a capture or an authorization; the service's own text and code are
 on its `detail` and `rawCode`. A reversal that is declined arrives as
-`PayabliPayInError.transactionFailed`, which carries the service's own
+`PayabliPayInError.Refused`, which carries the service's own
 code and reason. A reversal answers `A0003` and calls itself canceled, where a capture
 answers `A0000`, so read the code rather than comparing against one literal.
 
@@ -479,8 +479,7 @@ let configuration = PayabliPayInFormConfiguration(
     ],
     hiddenValues: PayabliPayInHiddenValues(
         accountHolderType: .personal,
-        secCode: .web,
-        methodDescription: "iOS payment flow"
+        secCode: .web
     ),
     labelLayout: .placeholder,
     showsFieldLabels: false,
@@ -574,7 +573,6 @@ Default field labels:
 | `.accountHolderType` | Holder type |
 | `.secCode` | SEC code |
 | `.deviceId` | Device |
-| `.methodDescription` | Description |
 | `.firstName` | First name |
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
@@ -591,7 +589,6 @@ Default field labels:
 | `accountHolderType` | nil | account holder type submitted without rendering the field. |
 | `secCode` | `.web` | SEC code submitted without rendering the field. |
 | `deviceId` | nil | device ID submitted without rendering the field. |
-| `methodDescription` | nil | Stored-method description submitted without rendering the field. |
 | `customerData` | nil | Default customer data merged with visible customer fields. |
 
 ### `PayabliPayInFormatting`

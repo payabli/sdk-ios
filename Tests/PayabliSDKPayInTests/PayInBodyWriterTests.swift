@@ -202,8 +202,9 @@ final class PayInBodyWriterTests: XCTestCase {
         do {
             _ = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(data: nonAsciiCard)))
             XCTFail("Expected a refusal")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Card number contains unsupported characters.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.field, PayInFieldPath.method(.cardnumber))
+            XCTAssertEqual(refusal.reason, "Card number contains unsupported characters.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -214,8 +215,9 @@ final class PayInBodyWriterTests: XCTestCase {
                 data: nonAsciiAccount
             )))
             XCTFail("Expected a refusal")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Account number contains unsupported characters.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.field, PayInFieldPath.method(.achAccount))
+            XCTAssertEqual(refusal.reason, "Account number contains unsupported characters.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

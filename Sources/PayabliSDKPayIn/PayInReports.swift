@@ -155,8 +155,7 @@ final class PayInReports {
     /// - Returns: whether nothing was sent because the SDK refused it.
     static func isRefusedBeforeSending(_ error: any Error) -> Bool {
         switch error {
-        case PayabliPayInError.invalidInput, PayabliPayInError.submissionInProgress,
-             PayabliPayInTokenStorageError.invalidInput:
+        case is PayabliPayInError.InvalidInput, is PayabliPayInError.AlreadySubmitting:
             true
         default:
             false
@@ -164,18 +163,15 @@ final class PayInReports {
     }
 
     private static func isSingleFlightRefusal(_ error: any Error) -> Bool {
-        if case PayabliPayInError.submissionInProgress = error {
-            return true
-        }
-        return false
+        error is PayabliPayInError.AlreadySubmitting
     }
 
     private static func isCancellation(_ error: any Error) -> Bool {
         if PayInInterruption.isCancellation(error) {
             return true
         }
-        guard case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error else { return false }
-        return RedactedCause.simpleName(causeType) == "CancellationError"
+        guard let unsettled = error as? PayabliPayInError.Unsettled else { return false }
+        return unsettled.redactedCause.simpleTypeName == "CancellationError"
     }
 
     /// The simple name of the type the SDK converted or redacted, never a message or a cause chain.
@@ -184,8 +180,8 @@ final class PayInReports {
     /// - Returns: the converted or redacted type's name, or the thrown type's otherwise, a platform error by its Swift
     ///   type.
     static func failureType(of error: any Error) -> String {
-        if case let PayabliPayInError.submissionInterrupted(_, causeType, _, _) = error {
-            return RedactedCause.simpleName(causeType)
+        if let unsettled = error as? PayabliPayInError.Unsettled {
+            return unsettled.redactedCause.simpleTypeName
         }
         if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
             return redacted.simpleTypeName

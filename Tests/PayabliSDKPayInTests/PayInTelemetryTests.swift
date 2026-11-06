@@ -44,7 +44,7 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(event.properties["outcome"], "declined")
         XCTAssertEqual(event.properties["code"], "PAYMENT_DECLINED")
         XCTAssertEqual(event.properties["error_number"], String((told as? any PayabliError)?.code ?? -1))
-        XCTAssertEqual(event.properties["failure_type"], "PayabliPayInError")
+        XCTAssertEqual(event.properties["failure_type"], "Refused")
     }
 
     func testAFailedTokenProviderReportsTheTypeItThrewRatherThanTheSDKsWrapper() async throws {
@@ -105,9 +105,9 @@ final class PayInTelemetryTests: XCTestCase {
     }
 
     func testAConvertedTypeIsNamedAsItsOwnSourceSpellsIt() {
-        let interrupted = PayabliPayInError.submissionInterrupted(
+        let interrupted = PayabliPayInError.Unsettled(
             type: .unknown,
-            causeType: "Module.Wrap<Module.Inner>",
+            cause: Wrap<Inner>(),
             paymentTransId: nil,
             paymentReference: nil
         )
@@ -268,12 +268,12 @@ final class PayInTelemetryTests: XCTestCase {
 
         let told = await PayInFixture.failure { _ = try await viewModel.submit() }
 
-        guard case let .submissionInterrupted(type, causeType, _, reference) = told as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(told)")
+        guard let unsettled = told as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(told)")
         }
-        XCTAssertEqual(type, .userCancelled)
-        XCTAssertEqual(causeType, "Swift.CancellationError")
-        XCTAssertEqual(reference, "p1")
+        XCTAssertEqual(unsettled.type, .userCancelled)
+        XCTAssertEqual(unsettled.redactedCause.originalType, "Swift.CancellationError")
+        XCTAssertEqual(unsettled.paymentReference, "p1")
         XCTAssertEqual(viewModel.failureMessage, PayabliPayInFailureMessage.text(for: .outcomeUnknown, operation: .capture))
         let event = try await onlyEvent(of: flow)
         XCTAssertEqual(event.properties["origin"], "form")
@@ -525,6 +525,10 @@ final class PayInTelemetryTests: XCTestCase {
     {"PaymentTransId": "101-abc", "TransStatus": 5, "Method": "card", "TotalAmount": 1.10}
     """.utf8)
 }
+
+private struct Wrap<Wrapped>: Error {}
+
+private struct Inner {}
 
 /// Records every event the client sends.
 private actor RecordingTelemetryTransport: TelemetryTransport {

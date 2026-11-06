@@ -8,7 +8,13 @@ struct PayInFormCustomization: Hashable {
     /// Names this tab on every request it sends, a capture and a save alike.
     static let source = "ios-simple-capture"
     /// What a method stored from this screen is sent with.
-    static let storeOptions = PayabliPayInStoreOptions(forceCustomerCreation: true, source: source)
+    static var storeOptions: PayabliPayInStoreOptions {
+        PayabliPayInStoreOptions(
+            forceCustomerCreation: true,
+            methodDescription: QAIdentity.current.note("simple-save"),
+            source: source
+        )
+    }
 
     enum Preset: String, CaseIterable, Identifiable {
         case sdkDefault = "Default"
@@ -116,7 +122,6 @@ struct PayInFormCustomization: Hashable {
             bankSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
             hiddenValues: PayabliPayInHiddenValues(
                 accountHolderType: fixesHolderType ? .personal : nil,
-                methodDescription: QAIdentity.current.note(Self.note(for: operation)),
                 // A capture or an authorization names its customer on the request instead.
                 customerData: charges ? nil : PayInDemoCustomer.customerData
             ),
@@ -277,14 +282,6 @@ struct PayInFormCustomization: Hashable {
             fieldLabels: fieldLabels,
             fieldPlaceholders: placeholders
         )
-    }
-
-    private static func note(for operation: PayInOperation) -> String {
-        switch operation {
-        case .capture, .void: "simple-capture"
-        case .authorize: "simple-authorize"
-        case .storedMethod: "simple-save"
-        }
     }
 
     private static func customSubmitWording(for operation: PayInOperation) -> String {

@@ -484,7 +484,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 defaultMethod: .bankAccount,
                 requiredFields: [
                     .deviceId,
-                    .methodDescription,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -497,7 +496,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         viewModel.routingNumber = "123456780"
         viewModel.accountNumber = "1111111111"
         viewModel.deviceId = "terminal-1"
-        viewModel.methodDescription = "Business account"
         viewModel.firstName = "Jane"
 
         XCTAssertFalse(viewModel.canSubmit)

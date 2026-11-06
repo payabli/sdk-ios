@@ -98,8 +98,8 @@ final class TokenStorageBodyWriterTests: XCTestCase {
                     paymentMethod: paymentMethod
                 )
                 XCTFail("Expected validation error")
-            } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-                XCTAssertEqual(message, expectedMessage)
+            } catch let refusal as PayabliPayInError.InvalidInput {
+                XCTAssertEqual(refusal.reason, expectedMessage)
                 let requests = await transport.requests
                 XCTAssertTrue(requests.isEmpty)
             } catch {

@@ -121,27 +121,12 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
             accountNumber: "123456789",
             routingNumber: "021000021",
-            accountType: "Checking",
+            accountType: .checking,
             holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
+            holderType: .unspecified,
+            secCode: .unspecified,
             deviceId: nil
         ))
-    }
-
-    func testTheBankAccountFactoryRejectsAnInvalidHolderType() {
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "123456789",
-                routingNumber: "021000021",
-                accountType: "Checking",
-                holderName: "Jane Doe",
-                holderType: "company",
-                secCode: "WEB",
-                deviceId: nil
-            ),
-            "a holder type that names none of the kinds is refused before a request exists"
-        )
     }
 
     func testStoredMethodWrapperConvertsEachField() {
@@ -158,33 +143,6 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.method, "bankAccount")
         XCTAssertEqual(wrapper.methodReferenceId, "method-123")
         XCTAssertEqual(wrapper.customerId, 4440)
-    }
-
-    func testTheBankAccountFactoryRejectsInvalidArguments() {
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "111111111",
-                routingNumber: "123456780",
-                accountType: "Business",
-                holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
-                deviceId: nil
-            ),
-            "an account type that names none of the kinds is refused before a request exists"
-        )
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "111111111",
-                routingNumber: "123456780",
-                accountType: PayabliPayInAccountType.checking.rawValue,
-                holderName: "Jane Doe",
-                holderType: nil,
-                secCode: "POP",
-                deviceId: nil
-            ),
-            "an SEC code that names none of the kinds is refused before a request exists"
-        )
     }
 
     func testStoreMethodReturnsValidationErrorWithoutCallingTokenHandler() async throws {
@@ -335,10 +293,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "123456780",
-                accountType: PayabliPayInAccountType.checking.rawValue,
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: PayabliPayInAccountHolderType.personal.rawValue,
-                secCode: nil,
+                holderType: .personal,
+                secCode: .unspecified,
                 deviceId: nil
             ),
             "a bank account request whose named values are all real is a request"

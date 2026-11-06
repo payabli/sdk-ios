@@ -183,7 +183,7 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch PayabliPayInTokenStorageError.invalidInput {
+        } catch is PayabliPayInError.InvalidInput {
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -209,8 +209,9 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Card Postal Code is required.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Card Postal Code is required.")
+            XCTAssertEqual(refusal.field, "paymentMethod.cardzip")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -236,8 +237,8 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "CVV is required.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "CVV is required.")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -289,8 +290,8 @@ final class TokenStorageClientTests: XCTestCase {
                     paymentMethod: .card(paymentMethod)
                 )
                 XCTFail("Expected validation error")
-            } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-                XCTAssertEqual(message, expectedMessage)
+            } catch let refusal as PayabliPayInError.InvalidInput {
+                XCTAssertEqual(refusal.reason, expectedMessage)
                 let requests = await transport.requests
                 XCTAssertTrue(requests.isEmpty)
             } catch {
@@ -317,8 +318,8 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected validation error")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Expiry year must be four digits.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Expiry year must be four digits.")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -360,8 +361,8 @@ final class TokenStorageClientTests: XCTestCase {
                     paymentMethod: .bankAccount(paymentMethod)
                 )
                 XCTFail("Expected validation error")
-            } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-                XCTAssertEqual(message, expectedMessage)
+            } catch let refusal as PayabliPayInError.InvalidInput {
+                XCTAssertEqual(refusal.reason, expectedMessage)
                 let requests = await transport.requests
                 XCTAssertTrue(requests.isEmpty)
             } catch {
@@ -446,12 +447,11 @@ final class TokenStorageClientTests: XCTestCase {
                 ))
             )
             XCTFail("Expected payment method failure")
-        } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
-            XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(failure).type, .paymentDeclined)
-            XCTAssertEqual(failure.responseText, "Declined")
-            XCTAssertEqual(failure.resultCode, 2)
-            XCTAssertEqual(failure.resultText, "Account validation failed")
-            XCTAssertEqual(failure.reason, "Account validation failed")
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.type, .paymentDeclined)
+            XCTAssertEqual(error.failure.reason, "Account validation failed")
+            XCTAssertNil(error.failure.code)
+            XCTAssertEqual(error.reason, "Account validation failed")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -546,12 +546,11 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Hidden primary card")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
                 hiddenValues: PayabliPayInHiddenValues(
-                    methodDescription: "Hidden primary card",
                     customerData: PayabliPayInCustomerData(
                         billingEmail: "hidden@example.com",
                         customerNumber: "cust-hidden"
@@ -609,16 +608,15 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Primary card")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
-                requiredFields: [.billingEmail, .methodDescription]
+                requiredFields: [.billingEmail]
             )
         )
 
         XCTAssertTrue(viewModel.activeFields.contains(.billingEmail))
-        XCTAssertTrue(viewModel.activeFields.contains(.methodDescription))
 
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
@@ -628,9 +626,6 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertFalse(viewModel.canSubmit)
 
         viewModel.billingEmail = "jane@example.com"
-        XCTAssertFalse(viewModel.canSubmit)
-
-        viewModel.methodDescription = "Primary card"
         XCTAssertTrue(viewModel.canSubmit)
 
         _ = try await viewModel.submit()
@@ -723,9 +718,9 @@ final class TokenStorageClientTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("Expected payment method failure")
-        } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
-            XCTAssertEqual(failure.responseCode, 6000)
-            XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(failure).type, .paymentDeclined)
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.failure.explanation, "Invalid Card")
+            XCTAssertEqual(error.type, .paymentDeclined)
             XCTAssertEqual(viewModel.failureMessage, "This payment method couldn't be saved. Try another one.")
             XCTAssertEqual(viewModel.cardNumber, "")
             XCTAssertEqual(viewModel.cardExpiration, "")

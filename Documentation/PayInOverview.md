@@ -153,7 +153,6 @@ Supported fields:
 | `.accountHolderType` | Holder type | bank account input or hidden value |
 | `.secCode` | SEC code | Hidden by default |
 | `.deviceId` | Device | Optional bank account metadata |
-| `.methodDescription` | Description | Stored-method metadata |
 | `.firstName` | First name | Customer information |
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |

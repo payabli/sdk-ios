@@ -91,4 +91,21 @@ final class TapToPayErrorTests: XCTestCase {
         XCTAssertEqual(error.userInfo["refusal"] as? String, "customerDataRefused")
         XCTAssertEqual(error.userInfo["requiredFields"] as? [String], [])
     }
+
+    func testAnObjectiveCTapToPayErrorCarriesTheStatusAndCodeUnderTheirNames() {
+        let error = PayabliGenericError(type: .unknown, reason: "HTTP 418", httpStatus: 418, rawCode: "E1001")
+            .toPayabliNSError()
+
+        XCTAssertEqual(error.domain, "com.payabli.ttp")
+        XCTAssertEqual(error.userInfo["httpStatus"] as? NSNumber, 418)
+        XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "E1001")
+    }
+
+    func testAnObjectiveCTapToPayErrorWithNeitherCarriesNeitherKey() {
+        let error = TapToPayError(type: .deviceSetupUnsupported, reason: "r", detail: nil) as NSError
+
+        XCTAssertEqual(error.domain, "com.payabli.ttp")
+        XCTAssertNil(error.userInfo["httpStatus"])
+        XCTAssertNil(error.userInfo["rawCode"])
+    }
 }

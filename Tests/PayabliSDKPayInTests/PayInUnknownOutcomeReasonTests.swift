@@ -23,8 +23,8 @@ final class PayInUnknownOutcomeReasonTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard let error = failure as? PayabliPayInError, case .submissionInterrupted = error else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let error = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
 
         XCTAssertEqual(
@@ -43,8 +43,8 @@ final class PayInUnknownOutcomeReasonTests: XCTestCase {
             _ = try await flow.authorize(PayInFixture.request(cardOnly: true))
         })
 
-        guard let error = failure as? PayabliPayInError, case .submissionInterrupted = error else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let error = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
 
         XCTAssertEqual(
@@ -68,8 +68,8 @@ final class PayInUnknownOutcomeReasonTests: XCTestCase {
             )
         })
 
-        guard let error = failure as? PayabliPayInError, case .submissionInterrupted = error else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let error = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
 
         XCTAssertEqual(
@@ -90,8 +90,8 @@ final class PayInUnknownOutcomeReasonTests: XCTestCase {
             _ = try await flow.voidTransaction("trans-1")
         })
 
-        guard let error = failure as? PayabliPayInError, case .submissionInterrupted = error else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let error = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
 
         XCTAssertEqual(

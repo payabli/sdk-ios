@@ -3,7 +3,7 @@ import Foundation
 /// Stands in for a failure whose message cannot be allowed out, keeping only its type name, which carries
 /// no subject. A host-thrown error can name the host's endpoint or quote a rejected body, and as `underlying`
 /// that text reaches wherever the chain is walked, including a crash reporter the SDK does not scrub.
-package struct RedactedCause: Error, CustomStringConvertible, Equatable {
+package struct RedactedCause: CustomNSError, CustomStringConvertible, Equatable {
     /// The redacted failure's concrete type, module-qualified.
     package let originalType: String
 
@@ -49,5 +49,11 @@ package struct RedactedCause: Error, CustomStringConvertible, Equatable {
 
     package var localizedDescription: String {
         originalType
+    }
+
+    /// The type name as the bridged `NSError`'s description, which is also what `localizedDescription` reads through
+    /// `any Error`.
+    package var errorUserInfo: [String: Any] {
+        [NSLocalizedDescriptionKey: originalType]
     }
 }

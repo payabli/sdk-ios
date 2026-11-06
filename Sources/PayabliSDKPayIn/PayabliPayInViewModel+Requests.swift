@@ -135,16 +135,9 @@ extension PayabliPayInViewModel {
         return customer.payabliCaptureHasAnyValue ? customer : nil
     }
 
-    func mergedOrderDescription() -> String? {
-        methodDescription.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-    }
-
     func mergedStoreOptions() -> PayabliPayInStoreOptions {
         var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
-        options.methodDescription = mergedOrderDescription()
-            ?? options.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         return options
     }
 
@@ -244,9 +237,6 @@ extension PayabliPayInViewModel {
     }
 
     private func dropCustomerValues(_ dropped: Set<PayabliPayInField>) {
-        if dropped.contains(.methodDescription), !methodDescription.isEmpty {
-            methodDescription = ""
-        }
         if dropped.contains(.firstName), !firstName.isEmpty {
             firstName = ""
         }
@@ -271,7 +261,10 @@ extension PayabliPayInViewModel {
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(labels.label(for: field)) is required.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.form(field),
+                    reason: "\(labels.label(for: field)) is required."
+                )
             }
         }
     }
@@ -286,7 +279,7 @@ extension PayabliPayInViewModel {
             return cardFieldHasRequiredValue(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
+        case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
         case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
@@ -340,9 +333,6 @@ extension PayabliPayInViewModel {
 
     private func customerFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .methodDescription:
-            return !methodDescription.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
         case .firstName:
             return !firstName.payabliCaptureTrimmed.isEmpty
         case .lastName:

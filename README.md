@@ -310,17 +310,45 @@ retry.
 | Outcome | Card-not-present | Tap to Pay | Retry? |
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
-| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
-| **Unknown** | `PayabliPayInError.submissionInterrupted`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
+| **Not charged** | `PayabliPayInError.Refused`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
+| **Unknown** | `PayabliPayInError.Unsettled`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
 When the outcome is unknown, look the transaction up before you charge again. On card-not-present, call
 `readTransaction(_:)` and check its `status`. From your backend, use
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction).
-`TapToPayError` and `PayabliPayInError.submissionInterrupted` carry the `paymentTransId` to look up when there is
+`TapToPayError` and `PayabliPayInError.Unsettled` carry the `paymentTransId` to look up when there is
 one. When there isn't one, find the transaction in the
 Payabli portal before you charge again. On card-not-present, setting `orderId` on each request lets you find it
 by your own reference. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed.
+
+### What an error carries
+
+Every error the SDK throws, other than a cancellation, is a `PayabliError` with three fields to read:
+
+- `type` says what to do. Switch on it.
+- `httpStatus` is the status of the response the error came from. It is `nil` when no response came, for example
+  on a network failure or a value the SDK refused before sending.
+- `rawCode` is Payabli's own code for the condition, such as `D0329`, `E1001` or `9005`. It is `nil` when the
+  service named none, as on Tap to Pay setup and activation refusals.
+
+Most failures read from a response, Tap to Pay's included, don't fill either field yet, so on those a `nil` doesn't
+mean that no response or code came.
+
+Two declines share a status and a `type`; only `rawCode` tells them apart:
+
+```swift
+// Two declined charges
+error.type        // .paymentDeclined     .paymentDeclined
+error.httpStatus  // 402                  402
+error.rawCode     // "D0329"              "D0583"
+```
+
+From Objective-C the error is an `NSError`: `userInfo[@"httpStatus"]` is the status as an `NSNumber` and
+`userInfo[@"rawCode"]` is the code as an `NSString`, and each key is absent when its field is `nil`. A refused
+input's `field` is `userInfo[@"field"]`, also absent when `nil`. Where Swift's `underlying` names the failing type,
+`userInfo[NSUnderlyingErrorKey]` is an `NSError` whose `localizedDescription` is that type's name; its message is
+never included.
 
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).

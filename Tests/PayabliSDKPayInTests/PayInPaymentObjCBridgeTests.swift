@@ -233,16 +233,6 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
 
     func testAMethodKindTheFactoryDoesNotNameIsRefused() {
         XCTAssertNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "wallet", totalAmount: 1))
-        XCTAssertNil(PayabliPayInRequestObjC.bankAccount(
-            accountNumber: "1",
-            routingNumber: "021000021",
-            accountType: "Brokerage",
-            holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
-            deviceId: nil,
-            totalAmount: 1
-        ))
         XCTAssertNotNil(PayabliPayInRequestObjC.stored(storedMethodId: "s-1", method: "bankAccount", totalAmount: 1))
     }
 
@@ -282,10 +272,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "021000021",
-                accountType: "Checking",
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
+                holderType: .unspecified,
+                secCode: .unspecified,
                 deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
@@ -318,10 +308,10 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "021000021",
-                accountType: "Checking",
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
+                holderType: .unspecified,
+                secCode: .unspecified,
                 deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
@@ -418,5 +408,71 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         await withCheckedContinuation { continuation in
             start { result, error in continuation.resume(returning: (result, error)) }
         }
+    }
+
+    func testAnObjectiveCPayInErrorCarriesTheStatusAndCodeUnderTheirNames() {
+        let error = PayabliGenericError(type: .unknown, reason: "HTTP 418", httpStatus: 418, rawCode: "E1001")
+            .toPayabliPayInNSError(movesMoney: true)
+
+        XCTAssertEqual(error.domain, "com.payabli.payIn")
+        XCTAssertEqual(error.userInfo["httpStatus"] as? NSNumber, 418)
+        XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "E1001")
+    }
+
+    func testAnObjectiveCPayInErrorWithNeitherCarriesNeitherKey() {
+        let error = PayabliGenericError(type: .networkError, reason: "offline").toPayabliPayInNSError()
+
+        XCTAssertNil(error.userInfo["field"])
+        XCTAssertNil(error.userInfo["httpStatus"])
+        XCTAssertNil(error.userInfo["rawCode"])
+    }
+}
+
+/// What an Objective-C caller reads off a refused input and an unknown outcome beyond the code.
+final class PayInObjCErrorDetailTests: XCTestCase {
+    private struct HostFailure: LocalizedError {
+        static let message = "https://host.example/token?secret=1"
+
+        var errorDescription: String? {
+            Self.message
+        }
+    }
+
+    func testARefusedInputCarriesTheFieldUnderItsName() {
+        let error = PayabliPayInError.InvalidInput(field: "paymentMethod.achCode", reason: "r").toPayabliPayInNSError()
+
+        XCTAssertEqual(error.code, 1016)
+        XCTAssertEqual(error.userInfo["field"] as? NSString, "paymentMethod.achCode")
+    }
+
+    func testARefusedInputNamingNoFieldCarriesNoFieldKey() {
+        let error = PayabliPayInError.InvalidInput(field: nil, reason: "r").toPayabliPayInNSError()
+
+        XCTAssertEqual(error.code, 1016)
+        XCTAssertNil(error.userInfo["field"])
+    }
+
+    func testAnUnknownOutcomeCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let unsettled = PayabliPayInError.Unsettled(
+            type: .unknown,
+            cause: HostFailure(),
+            paymentTransId: nil,
+            paymentReference: nil
+        )
+
+        let error = unsettled.toPayabliPayInNSError(movesMoney: true)
+
+        let cause = try XCTUnwrap(error.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostFailure.self))
+        XCTAssertFalse("\(cause)".contains(HostFailure.message))
+        XCTAssertFalse("\(error)".contains(HostFailure.message))
+    }
+
+    func testAnUnexpectedFailureCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let error = try XCTUnwrap(HostFailure().payabliUnexpectedFailure).toPayabliPayInNSError()
+
+        let cause = try XCTUnwrap(error.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostFailure.self))
+        XCTAssertFalse("\(error)".contains(HostFailure.message))
     }
 }

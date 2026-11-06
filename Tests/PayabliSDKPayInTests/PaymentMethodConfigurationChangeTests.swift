@@ -225,31 +225,6 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         XCTAssertNotEqual(first, second)
     }
 
-    func testHiddenWordingThatForgesAnotherComponentIsStillAConfigurationChange() {
-        let first = PayInPaymentFlowConfigurationChange(
-            PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                hiddenValues: PayabliPayInHiddenValues(
-                    deviceId: "d1",
-                    methodDescription: "Terminal 2,methodDescription:Terminal 3"
-                )
-            ),
-            labels: PayabliPayInFormLabels()
-        )
-        let second = PayInPaymentFlowConfigurationChange(
-            PayabliPayInFormConfiguration(
-                allowedMethods: [.card],
-                hiddenValues: PayabliPayInHiddenValues(
-                    deviceId: "d1,methodDescription:Terminal 2",
-                    methodDescription: "Terminal 3"
-                )
-            ),
-            labels: PayabliPayInFormLabels()
-        )
-
-        XCTAssertNotEqual(first, second)
-    }
-
     func testAnUpdateToWordingThatCollidesWithTheWordingOnScreenStillApplies() {
         let component = captureComponent()
         let viewModel = PayabliPayInViewModel(

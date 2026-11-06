@@ -14,7 +14,6 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case accountHolderType
     case secCode
     case deviceId
-    case methodDescription
     case firstName
     case lastName
     case customerNumber
@@ -74,20 +73,17 @@ public struct PayabliPayInHiddenValues: Sendable {
     public let accountHolderType: PayabliPayInAccountHolderType?
     public let secCode: PayabliPayInSecCode?
     public let deviceId: String?
-    public let methodDescription: String?
     public let customerData: PayabliPayInCustomerData?
 
     public init(
         accountHolderType: PayabliPayInAccountHolderType? = nil,
         secCode: PayabliPayInSecCode? = .web,
         deviceId: String? = nil,
-        methodDescription: String? = nil,
         customerData: PayabliPayInCustomerData? = nil
     ) {
         self.accountHolderType = accountHolderType
         self.secCode = secCode
         self.deviceId = deviceId
-        self.methodDescription = methodDescription
         self.customerData = customerData
     }
 }
@@ -476,7 +472,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
     }
 
     private static let customerFields: [PayabliPayInField] = [
-        .methodDescription,
         .firstName,
         .lastName,
         .customerNumber,

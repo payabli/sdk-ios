@@ -63,7 +63,7 @@ final class PayInFormRetryTests: XCTestCase {
 
         let error = await PayInFixture.failure { _ = try await viewModel.submit() }
 
-        guard case PayabliPayInError.invalidInput = error else { return XCTFail("Wrong error: \(String(describing: error))") }
+        guard error is PayabliPayInError.InvalidInput else { return XCTFail("Wrong error: \(String(describing: error))") }
         XCTAssertTrue(transport.sentKeys.isEmpty, "the blank reference was refused before sending")
     }
 
@@ -94,7 +94,7 @@ final class PayInFormRetryTests: XCTestCase {
         }
 
         XCTAssertEqual(completions, 0)
-        guard case PayabliPayInError.invalidInput = try XCTUnwrap(failures.first) else {
+        guard try XCTUnwrap(failures.first) is PayabliPayInError.InvalidInput else {
             return XCTFail("Wrong error: \(failures)")
         }
         XCTAssertTrue(transport.sentKeys.isEmpty, "the blank reference was refused before sending")
