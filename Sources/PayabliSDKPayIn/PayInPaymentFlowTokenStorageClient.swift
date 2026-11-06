@@ -117,7 +117,8 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     private static func badRequest(from response: PayabliResponse) -> any Error {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
         let code = serviceCode(of: response)
-        if code == blockedByFraudControl || decoded?.responseCode.map(String.init) == blockedByFraudControl {
+        let responseCode = (try? JSONDecoder().decode(ResponseCodeOnly.self, from: response.body))?.responseCode
+        if code == blockedByFraudControl || responseCode.map(String.init) == blockedByFraudControl {
             let failure = decoded?.failure(httpStatusCode: response.statusCode, code: blockedByFraudControl)
                 ?? PayabliPayInFailure(
                     code: blockedByFraudControl,
@@ -137,6 +138,21 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
         guard let decoded, decoded.isSuccess == false else { return nil }
         return decoded.failure(httpStatusCode: response.statusCode)
+    }
+}
+
+/// The body's `responseCode` alone, so a display field the full answer requires cannot hide it.
+private struct ResponseCodeOnly: Decodable {
+    let responseCode: Int?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        responseCode = (try? container.decodeIfPresent(Int.self, forKey: .responseCode))
+            ?? (try? container.decodeIfPresent(String.self, forKey: .responseCode)).flatMap { Int($0) }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case responseCode
     }
 }
 
