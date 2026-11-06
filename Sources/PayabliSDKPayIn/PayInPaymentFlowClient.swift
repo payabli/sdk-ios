@@ -166,7 +166,7 @@ final class PayInPaymentFlowClient: Sendable {
             type: type,
             reason: PayabliGenericError(type: type, reason: "").message,
             httpStatus: response.statusCode,
-            rawCode: serviceCode(of: response)
+            rawCode: serviceCode(of: response) ?? legacyCode(of: response).map(String.init)
         )
     }
 
