@@ -155,6 +155,32 @@ final class PayInErrorStatusTests: XCTestCase {
         }
     }
 
+    func testA402WhoseOtherFieldsCannotBeReadKeepsItsCode() async throws {
+        let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+            statusCode: 402,
+            responseBody: #"{"code":"E1001","reason":42,"data":{"paymentTransId":"trans-bad"}}"#
+        ))
+
+        let error = await failure { _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-bad") }
+
+        let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "got \(error)")
+        XCTAssertEqual(refused.httpStatus, 402)
+        XCTAssertEqual(refused.rawCode, "E1001")
+        XCTAssertEqual(refused.failure.paymentTransId, "trans-bad")
+    }
+
+    func testA402WhoseOtherFieldsCannotBeReadStillLeavesAnOpenCodeOpen() async throws {
+        let body = #"{"code":"E9060","reason":42,"data":{"paymentTransId":"trans-bad"}}"#
+        let flow = PayInFixture.makeFlow(transport: RecordingIdempotencyTransport(body: Data(body.utf8), status: 402), key: "k-bad-open")
+
+        let error = await PayInFixture.failure(from: { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) })
+
+        let unsettled = try XCTUnwrap(error as? PayabliPayInError.Unsettled, "got \(error)")
+        XCTAssertEqual(unsettled.type, .unknown)
+        XCTAssertEqual(unsettled.rawCode, "E9060")
+        XCTAssertEqual(unsettled.paymentTransId, "trans-bad")
+    }
+
     func testAServiceErrorAnswered402WithAnOpenCodeIsTypedByTheCode() {
         let cases: [(code: String, type: PayabliErrorType)] = [("E9060", .unknown), ("E9999", .serverError), ("E1001", .paymentDeclined)]
         for answer in cases {
