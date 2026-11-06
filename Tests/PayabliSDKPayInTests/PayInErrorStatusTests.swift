@@ -250,6 +250,21 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertEqual(payabli.rawCode, "7001")
     }
 
+    func testAPascalCaseReadRefusalCarriesItsCode() async throws {
+        for (status, code, type) in [(401, 9001, PayabliErrorType.permissionDenied), (400, 7001, .transactionNotFound)] {
+            let client = PayInPaymentFlowClient(
+                transport: MockPaymentCaptureTransport(statusCode: status, responseBody: #"{"ResponseCode":\#(code)}"#)
+            )
+
+            let error = await failure { _ = try await client.details(transId: "trans-1") }
+
+            let payabli = try XCTUnwrap(error as? any PayabliError)
+            XCTAssertEqual(payabli.type, type)
+            XCTAssertEqual(payabli.httpStatus, status)
+            XCTAssertEqual(payabli.rawCode, String(code))
+        }
+    }
+
     func testAnUnclassifiedStatusOnACaptureLeavesTheOutcomeOpenWithItsStatusAndCode() async throws {
         let transport = RecordingIdempotencyTransport(body: Data(#"{"code":"E1001"}"#.utf8), status: 418)
         let flow = PayInFixture.makeFlow(transport: transport, key: "reserved-418")
