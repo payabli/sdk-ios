@@ -416,12 +416,15 @@ struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
         responseData = try? c.decodeIfPresent(PayabliPayInTokenStorageAPIResponseData.self, forKey: .responseData)
     }
 
-    /// The refusal this answer describes. It carries no code: the route answers one result code for every refusal.
+    /// The refusal this answer describes.
     ///
     /// - Parameter httpStatusCode: the status the answer came with.
+    /// - Parameter code: the code that names the refusal, or nil for a refusal answered with a success status, whose
+    ///   result code is the same for every refusal.
     /// - Returns: the refusal, its reason the result text or else the response text.
-    func failure(httpStatusCode: Int?) -> PayabliPayInFailure {
+    func failure(httpStatusCode: Int?, code: String? = nil) -> PayabliPayInFailure {
         PayabliPayInFailure(
+            code: code,
             reason: responseData?.resultText?.trimmed.nilIfEmpty ?? responseText.trimmed.nilIfEmpty
                 ?? "Unable to save payment method.",
             explanation: responseData?.explanation,

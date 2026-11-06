@@ -221,7 +221,12 @@ extension PayabliTTP {
         do {
             try await sequence()
         } catch let refused as PinnedTokenRefusal {
-            let expired = PayabliGenericError(type: refused.type, reason: refused.reason)
+            let expired = PayabliGenericError(
+                type: refused.type,
+                reason: refused.reason,
+                httpStatus: refused.httpStatus,
+                rawCode: refused.rawCode
+            )
             landIfAsked(expired, landsSecondRefusal)
             throw expired
         }

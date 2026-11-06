@@ -407,7 +407,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `captureAuthorizedTransaction` or `voidTransaction` carries `userInfo["capture"]`: `1` when the payment may have been
   taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
   When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
-  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
+  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. A refusal or a service
+  error also carries `userInfo["paymentTransId"]` when the service's answer named a transaction. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 
 ### Other technologies
 

@@ -435,7 +435,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .deviceSetupRefused(reason: "x"),
         .entryPointRefused(reason: "x"),
         .configFailed(reason: "x"),
-        .cardPresentNotEnabled,
+        .cardPresentNotEnabled(),
         .readerSetupFailed(reason: "x"),
         .readerCredentialsUnusable,
         .readerHardwareUnsupported,

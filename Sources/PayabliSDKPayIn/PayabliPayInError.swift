@@ -4,6 +4,9 @@ import PayabliSDKCore
 /// The response-code family the service answers a refused payment with, as `isApproved` reads `A`.
 let declinedFamily = "D"
 
+/// The codes that say the processor may have taken the payment, and the classification each reports.
+private let openOutcomeCodes: [String: PayabliErrorType] = ["E9060": .unknown, "E9999": .serverError]
+
 /// A card-not-present failure: a payment, a read-back or a stored method that did not complete.
 ///
 /// Catch the family with `catch let error as PayabliPayInError`, or one failure by its type, for example
@@ -70,13 +73,16 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
             )
         }
 
-        /// What a described failure amounts to. A `D` response code is a refusal and decides first, since a
-        /// money-moving route answers `200` with the outcome in the body; otherwise the envelope's status, then
-        /// the transport's, goes to ``mapPayabliHTTPError``, the one place a status becomes a classification.
+        /// What a described failure amounts to: a `402` whose code leaves the outcome open, then a `D` code (a
+        /// money-moving route answers `200` with the outcome in the body), then the envelope's status, else the
+        /// transport's, through ``mapPayabliHTTPError``, the one place a status becomes a classification.
         ///
         /// - Parameter failure: the failed attempt as the envelope read it, whose code and status decide.
         /// - Returns: the classification a caller branches on.
         static func classification(of failure: PayabliPayInFailure) -> PayabliErrorType {
+            if let open = openOutcome(of: failure) {
+                return open
+            }
             if failure.code?.hasPrefix(declinedFamily) == true {
                 return .paymentDeclined
             }
@@ -93,6 +99,15 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
             } catch {
                 return (error as? any PayabliError)?.type ?? .unknown
             }
+        }
+
+        /// The open outcome a declined status's code reports instead of a decline: the payment may have been taken.
+        ///
+        /// - Parameter failure: the failed attempt as the envelope read it.
+        /// - Returns: `.unknown` or `.serverError` for a `402` whose code leaves the outcome open; otherwise nil.
+        static func openOutcome(of failure: PayabliPayInFailure) -> PayabliErrorType? {
+            guard failure.httpStatusCode == 402, let code = failure.code else { return nil }
+            return openOutcomeCodes[code]
         }
     }
 
