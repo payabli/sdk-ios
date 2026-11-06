@@ -546,12 +546,11 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Hidden primary card")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
                 hiddenValues: PayabliPayInHiddenValues(
-                    methodDescription: "Hidden primary card",
                     customerData: PayabliPayInCustomerData(
                         billingEmail: "hidden@example.com",
                         customerNumber: "cust-hidden"
@@ -609,16 +608,15 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Primary card")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 cardFieldOrder: [.cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode],
-                requiredFields: [.billingEmail, .methodDescription]
+                requiredFields: [.billingEmail]
             )
         )
 
         XCTAssertTrue(viewModel.activeFields.contains(.billingEmail))
-        XCTAssertTrue(viewModel.activeFields.contains(.methodDescription))
 
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
@@ -628,9 +626,6 @@ final class TokenStorageClientTests: XCTestCase {
         XCTAssertFalse(viewModel.canSubmit)
 
         viewModel.billingEmail = "jane@example.com"
-        XCTAssertFalse(viewModel.canSubmit)
-
-        viewModel.methodDescription = "Primary card"
         XCTAssertTrue(viewModel.canSubmit)
 
         _ = try await viewModel.submit()

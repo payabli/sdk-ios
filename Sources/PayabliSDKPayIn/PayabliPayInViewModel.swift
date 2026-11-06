@@ -65,7 +65,6 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .deviceId) }
     }
 
-    @Published var methodDescription = ""
     @Published var firstName = "" {
         didSet { acceptEdit(of: .firstName) }
     }
@@ -417,8 +416,7 @@ final class PayabliPayInViewModel: ObservableObject {
         guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
             paymentMethod: paymentMethod(with: buffers),
-            customerData: mergedCustomerData(),
-            orderDescription: mergedOrderDescription()
+            customerData: mergedCustomerData()
         )
     }
 

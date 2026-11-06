@@ -368,13 +368,13 @@ final class PayabliPayInTests: XCTestCase {
         component.newIdempotencyKey = { "idem-form" }
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
-            defaultMethod: .card,
-            hiddenValues: PayabliPayInHiddenValues(methodDescription: "Configured description")
+            defaultMethod: .card
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+                orderDescription: "Configured description",
                 source: "ios-form-test",
                 achValidation: true,
                 forceCustomerCreation: false

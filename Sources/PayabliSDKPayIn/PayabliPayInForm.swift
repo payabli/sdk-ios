@@ -366,7 +366,7 @@ public struct PayabliPayInForm: View {
             cardFieldView(field)
         case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
             achFieldView(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
+        case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             customerFieldView(field)
         case .amount, .serviceFee, .surchargeFee:
             EmptyView()
@@ -440,8 +440,6 @@ public struct PayabliPayInForm: View {
     @ViewBuilder
     func customerFieldView(_ field: PayabliPayInField) -> some View {
         switch field {
-        case .methodDescription:
-            textField(field, text: $viewModel.methodDescription, autocapitalization: .sentences)
         case .firstName:
             textField(
                 field,

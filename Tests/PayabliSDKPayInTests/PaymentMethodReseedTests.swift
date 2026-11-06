@@ -209,12 +209,11 @@ final class PaymentMethodReseedTests: XCTestCase {
             transport: transport
         )
         let hiddenValues = PayabliPayInHiddenValues(
-            methodDescription: "Host description",
             customerData: PayabliPayInCustomerData(billingZip: "host-33139")
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Host description")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 hiddenValues: hiddenValues
@@ -231,7 +230,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         // drops typed values, not only by the initial build.
         viewModel.update(
             component: component,
-            operation: .storePaymentMethod(),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Host description")),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 hiddenValues: hiddenValues
@@ -295,7 +294,6 @@ final class PaymentMethodReseedTests: XCTestCase {
         viewModel.accountType = .savings
         viewModel.accountHolderType = .business
         viewModel.deviceId = "terminal-1"
-        viewModel.methodDescription = "Business account"
         viewModel.firstName = "Jane"
         viewModel.lastName = "Doe"
         viewModel.customerNumber = "cust-1"
@@ -315,7 +313,6 @@ final class PaymentMethodReseedTests: XCTestCase {
         XCTAssertEqual(viewModel.accountType, .savings)
         XCTAssertEqual(viewModel.accountHolderType, .personal, "a picked value survived its field going")
         XCTAssertEqual(viewModel.deviceId, "", "a typed value survived its field going")
-        XCTAssertEqual(viewModel.methodDescription, "", "a typed value survived its field going")
         XCTAssertEqual(viewModel.firstName, "", "a typed value survived its field going")
         XCTAssertEqual(viewModel.lastName, "", "a typed value survived its field going")
         XCTAssertEqual(viewModel.customerNumber, "", "a typed value survived its field going")
@@ -445,7 +442,7 @@ final class PaymentMethodReseedTests: XCTestCase {
                     ),
                     PayabliPayInFieldSection(
                         title: "Customer",
-                        fields: [.methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
+                        fields: [.firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
                     )
                 ]
                 : [

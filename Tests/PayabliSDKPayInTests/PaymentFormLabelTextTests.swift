@@ -16,7 +16,6 @@ final class PaymentFormLabelTextTests: XCTestCase {
         .accountHolderType: "Holder type",
         .secCode: "SEC code",
         .deviceId: "Device",
-        .methodDescription: "Description",
         .firstName: "First name",
         .lastName: "Last name",
         .customerNumber: "Customer number",

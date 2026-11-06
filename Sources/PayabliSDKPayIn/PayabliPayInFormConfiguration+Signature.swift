@@ -49,7 +49,6 @@ private extension PayabliPayInHiddenValues {
             "achHolderType:\(accountHolderType?.rawValue ?? "")",
             "achSecCode:\(secCode?.rawValue ?? "")",
             "achDevice:\(deviceId ?? "")",
-            "methodDescription:\(methodDescription ?? "")",
             "customerData:\(customerData.payabliJSONSignature)"
         ])
     }

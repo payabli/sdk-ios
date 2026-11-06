@@ -432,7 +432,6 @@ All `PayabliPayInField` values:
 | `.accountHolderType` | Holder type | Bank account |
 | `.secCode` | SEC code | bank account hidden value; not rendered by default |
 | `.deviceId` | Device | bank account, optional |
-| `.methodDescription` | Description | Customer/method metadata |
 | `.firstName` | First name | Customer |
 | `.lastName` | Last name | Customer |
 | `.customerNumber` | Customer number | Customer |
@@ -530,7 +529,6 @@ intentionally overrides the label.
 | `accountHolderType` | nil | Hidden account holder type. |
 | `secCode` | `.web` | Hidden SEC code. |
 | `deviceId` | nil | Hidden device ID. |
-| `methodDescription` | nil | Hidden stored-method description. |
 | `customerData` | nil | Hidden/default customer data merged into the request. |
 
 Hidden values are useful when the integrator does not want an input displayed

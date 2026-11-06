@@ -479,8 +479,7 @@ let configuration = PayabliPayInFormConfiguration(
     ],
     hiddenValues: PayabliPayInHiddenValues(
         accountHolderType: .personal,
-        secCode: .web,
-        methodDescription: "iOS payment flow"
+        secCode: .web
     ),
     labelLayout: .placeholder,
     showsFieldLabels: false,
@@ -574,7 +573,6 @@ Default field labels:
 | `.accountHolderType` | Holder type |
 | `.secCode` | SEC code |
 | `.deviceId` | Device |
-| `.methodDescription` | Description |
 | `.firstName` | First name |
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
@@ -591,7 +589,6 @@ Default field labels:
 | `accountHolderType` | nil | account holder type submitted without rendering the field. |
 | `secCode` | `.web` | SEC code submitted without rendering the field. |
 | `deviceId` | nil | device ID submitted without rendering the field. |
-| `methodDescription` | nil | Stored-method description submitted without rendering the field. |
 | `customerData` | nil | Default customer data merged with visible customer fields. |
 
 ### `PayabliPayInFormatting`

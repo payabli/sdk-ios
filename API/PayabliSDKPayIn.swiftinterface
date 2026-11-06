@@ -198,7 +198,6 @@ public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Ident
   case accountHolderType
   case secCode
   case deviceId
-  case methodDescription
   case firstName
   case lastName
   case customerNumber
@@ -268,9 +267,8 @@ public struct PayabliPayInHiddenValues : Swift::Sendable {
   public let accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
   public let secCode: PayabliSDKPayIn::PayabliPayInSecCode?
   public let deviceId: Swift::String?
-  public let methodDescription: Swift::String?
   public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
-  public init(accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, deviceId: Swift::String? = nil, methodDescription: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil)
+  public init(accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, deviceId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil)
 }
 public struct PayabliPayInInputSize : Swift::Sendable, Swift::Equatable {
   public let width: CoreFoundation::CGFloat?

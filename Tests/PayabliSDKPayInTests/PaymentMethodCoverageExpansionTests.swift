@@ -359,7 +359,6 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 defaultMethod: .bankAccount,
                 requiredFields: [
                     .deviceId,
-                    .methodDescription,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -381,7 +380,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertTrue(labels.contains("Routing number"))
         XCTAssertTrue(labels.contains("Account number"))
         XCTAssertTrue(labels.contains("Device"))
-        XCTAssertTrue(labels.contains("Description"))
+        XCTAssertFalse(labels.contains("Description"), "the form drew a description field")
         XCTAssertTrue(labels.contains("Billing email"))
     }
 

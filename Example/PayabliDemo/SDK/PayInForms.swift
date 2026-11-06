@@ -49,8 +49,7 @@ enum PayInForms {
                 ],
                 hiddenValues: PayabliPayInHiddenValues(
                     accountHolderType: .personal,
-                    secCode: .web,
-                    methodDescription: QAIdentity.current.note("save")
+                    secCode: .web
                 ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
@@ -70,6 +69,7 @@ enum PayInForms {
                 // `createAnonymous` and `temporary` stay unset so the paypoint decides them:
                 // the encoder omits only nil, so `false` would opt out of both.
                 forceCustomerCreation: true,
+                methodDescription: QAIdentity.current.note("save"),
                 source: "ios-payment-method-qa"
             )
         )
@@ -108,11 +108,7 @@ enum PayInForms {
                 ],
                 hiddenValues: PayabliPayInHiddenValues(
                     accountHolderType: .personal,
-                    secCode: .web,
-                    // What a transaction list shows as the note, and what names the device that sent it. Here
-                    // rather than only on the request configuration because this value wins over that one: the
-                    // component merges the form's description over the request's before it sends.
-                    methodDescription: QAIdentity.current.note("capture")
+                    secCode: .web
                 ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
