@@ -26,8 +26,6 @@ enum ErrorSummary {
     /// A decline and a server failure both name their kind by a structured value: the decline's wire
     /// code and the server's status. Neither is free text.
     ///
-    /// The server's status is read from the response before the body, which is not the authority on what was answered.
-    ///
     /// - Parameter error: the payment error to name for a log.
     /// - Returns: the error's kind, with its wire code or status where it carries one.
     static func of(_ error: PayabliPaymentError) -> String {
@@ -35,8 +33,7 @@ enum ErrorSummary {
         case let .decline(decline):
             return "decline(\(decline.rawCode ?? "no code"))"
         case let .server(server):
-            let status = server.httpStatus ?? server.status
-            return "server(\(status.map(String.init) ?? "no status"))"
+            return "server(\(server.httpStatus.map(String.init) ?? "no status"))"
         case let .validation(validation):
             return validation.type.rawValue
         case let .generic(generic):
