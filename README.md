@@ -332,6 +332,9 @@ Every error the SDK throws, other than a cancellation, is a `PayabliError` with 
 - `rawCode` is Payabli's own code for the condition, such as `D0329`, `E1001` or `9005`. It is `nil` when the
   service named none, as on Tap to Pay setup and activation refusals.
 
+Most failures read from a response, Tap to Pay's included, don't fill either field yet, so on those a `nil` doesn't
+mean that no response or code came.
+
 Two declines share a status and a `type`; only `rawCode` tells them apart:
 
 ```swift
