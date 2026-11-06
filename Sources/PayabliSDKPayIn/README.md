@@ -193,7 +193,7 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | `PayabliPayInError.Unsettled` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
 | `PayabliPayInError.InvalidInput` or `.Refused` from `storeMethod(_:)` | The method wasn't saved | `InvalidInput` was refused before sending; `Refused` is the service refusing it. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
-| A core `PayabliError` from `storeMethod(_:)` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
+| From `storeMethod(_:)` or a form storing a method: `PayabliPayInError.Undecodable`, a core `PayabliError` whose `type` is `.networkError` or `.serverError`, a `CancellationError`, or `PayabliPayInError.Interrupted` from the form | Unknown: the method may have been saved | Read the stored methods back before saving again |
 
 Catch the family with `catch let error as PayabliPayInError`, or one failure by its type, for example
 `catch let error as PayabliPayInError.Unsettled`.
