@@ -289,6 +289,19 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertEqual(refused.rawCode, "9005")
     }
 
+    func testAStoreBlockedByFraudControlInResponseCodeWithNoTextIsStillADecline() async throws {
+        let client = PayInPaymentFlowTokenStorageClient(transport: MockPaymentCaptureTransport(
+            statusCode: 400,
+            responseBody: #"{"code":"E1001","responseCode":9005}"#
+        ))
+
+        let error = await failure { _ = try await client.addMethod(entryPoint: "entry", paymentMethod: .card(Self.card)) }
+
+        let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "got \(error)")
+        XCTAssertEqual(refused.httpStatus, 400)
+        XCTAssertEqual(refused.rawCode, "9005")
+    }
+
     func testAStoreBadRequestWithNoTextKeepsItsCode() async throws {
         let client = PayInPaymentFlowTokenStorageClient(transport: MockPaymentCaptureTransport(
             statusCode: 400,
