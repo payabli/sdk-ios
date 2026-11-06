@@ -64,6 +64,18 @@ final class PayInErrorStatusTests: XCTestCase {
         }
     }
 
+    func testAnOlderEnvelopesDeclineAt402CarriesItsResponseCode() async throws {
+        let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+            statusCode: 402,
+            responseBody: #"{"isSuccess":false,"responseText":"Declined","responseCode":5001}"#
+        ))
+
+        let error = await failure { _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-legacy") }
+
+        let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "got \(error)")
+        XCTAssertEqual(refused.rawCode, "5001")
+    }
+
     func testARefusalNamesTheTransactionItsAnswerNamed() async throws {
         let answers: [(status: Int, body: String)] = [
             (402, #"{"code":"D0200","reason":"Insufficient Funds","data":{"paymentTransId":" trans-402 "}}"#),

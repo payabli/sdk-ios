@@ -594,7 +594,7 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
     }
 
     func failure(httpStatusCode: Int) -> PayabliPayInFailure {
-        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode)
+        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode, responseCode.map(String.init))
         let failureReason = Self.firstNonEmpty(
             reason,
             responseData?.resultText,
