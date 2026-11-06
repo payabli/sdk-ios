@@ -417,9 +417,11 @@ final class PayInPaymentFlowClient: Sendable {
             throw Self.unapproved(failure.naming(transaction))
         }
 
-        // A 402 is a decline whatever its body, so it never reaches the mapper's core decline.
+        // A 402 never reaches the mapper's core decline. Its code is read alone, since a field the envelope failed on
+        // can sit beside a code that leaves the outcome open.
         if response.statusCode == declinedStatus {
-            throw PayabliPayInError.Refused(failure: PayabliPayInFailure(httpStatusCode: response.statusCode))
+            let failure = PayabliPayInFailure(code: serviceCode(of: response), httpStatusCode: response.statusCode)
+            throw Self.unapproved(failure.naming(transaction))
         }
         try mapPayabliHTTPError(response: response)
         throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
