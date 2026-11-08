@@ -282,7 +282,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
     }
 
     @MainActor
-    func testACHViewModelDefaultsNilHiddenSecCodeToWeb() async throws {
+    func testACHViewModelSendsWEBAsTheSecCode() async throws {
         let transport = CoverageMockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -304,8 +304,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
-                defaultMethod: .bankAccount,
-                hiddenValues: PayabliPayInHiddenValues(secCode: nil)
+                defaultMethod: .bankAccount
             )
         )
         viewModel.accountHolder = "Jane Business"

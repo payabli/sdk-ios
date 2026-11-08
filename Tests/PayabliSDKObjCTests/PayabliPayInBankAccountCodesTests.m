@@ -29,8 +29,7 @@
                                                                                            accountType:PayabliPayInAccountTypeCodeChecking
                                                                                             holderName:@"Jane Doe"
                                                                                             holderType:PayabliPayInAccountHolderTypeCodeUnspecified
-                                                                                               secCode:PayabliPayInSecCodeCodeUnspecified
-                                                                                              deviceId:nil];
+                                                                                               secCode:PayabliPayInSecCodeCodeUnspecified];
     XCTAssertNotNil(request);
 }
 
@@ -41,7 +40,6 @@
                                                                                   holderName:@"Jane Doe"
                                                                                   holderType:PayabliPayInAccountHolderTypeCodeBusiness
                                                                                      secCode:PayabliPayInSecCodeCodePpd
-                                                                                    deviceId:nil
                                                                                  totalAmount:10];
     XCTAssertNotNil(request);
 }

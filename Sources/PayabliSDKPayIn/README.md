@@ -232,7 +232,8 @@ retried payment refused for a rate limit or a credential is still one that may h
 |---|---|
 | `allowedMethods`, `defaultMethod` | Card, bank account, or both, and which opens first |
 | `cardFieldOrder`, `bankFieldOrder`, `cardSections`, `bankSections` | The fields, their order, and their sections |
-| `requiredFields`, `hiddenValues`, `options` | Fields the payer must fill, values sent without a field, and form options |
+| `requiredFields`, `options` | Fields the payer must fill, and form options |
+| `accountHolderType` | The holder type sent when the form doesn't show that field |
 | `labelLayout`, `showsFieldLabels`, `hiddenFieldLabels` | Where labels sit, and whether they show |
 | `failureMessagePlacement`, `showsFailureMessage` | Where the form's failure message sits, and whether the form draws it; the marks a failure puts on fields stay |
 | `formatting`, `inputSizing`, `cardBrandIconPlacement` | Formatting, field sizes, and the card brand icon |

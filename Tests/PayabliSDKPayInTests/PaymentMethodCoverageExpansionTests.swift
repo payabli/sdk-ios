@@ -108,20 +108,19 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         ).validate(.default))
     }
 
-    func testTheStoreBodyTrimsTheOptionalACHDevice() throws {
+    func testTheStoreBodySendsWEBAndNoDevice() throws {
         let input = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             routingNumber: "123456780",
             accountType: .checking,
-            holderName: "Jane Doe",
-            deviceId: " terminal-1 "
+            holderName: "Jane Doe"
         ))
 
         let data = try Data(PayInBodyWriter.storeFragment(input).rawCopy())
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual(object["achCode"] as? String, "WEB")
-        XCTAssertEqual(object["device"] as? String, "terminal-1")
+        XCTAssertNil(object["device"])
     }
 
     func testPaymentMethodAPIResponseDecodesStringNumbers() throws {
@@ -358,7 +357,6 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .deviceId,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -379,7 +377,6 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertTrue(labels.contains("Account holder"))
         XCTAssertTrue(labels.contains("Routing number"))
         XCTAssertTrue(labels.contains("Account number"))
-        XCTAssertTrue(labels.contains("Device"))
         XCTAssertFalse(labels.contains("Description"), "the form drew a description field")
         XCTAssertTrue(labels.contains("Billing email"))
     }

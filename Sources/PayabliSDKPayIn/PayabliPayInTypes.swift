@@ -174,7 +174,7 @@ extension PayabliPayInPaymentDetails {
 /// A transaction to capture or authorize: the payment method, and the options for everything else.
 ///
 /// The options are the type a form is configured with. A form submits them with what the payer entered merged
-/// in, as ``PayabliPayInRequestConfiguration/request(paymentMethod:customerData:orderDescription:)`` describes.
+/// in, as ``PayabliPayInRequestConfiguration/request(paymentMethod:customerData:)`` describes.
 public struct PayabliPayInRequest: Sendable {
     public let paymentMethod: PayabliPayInPaymentMethod
     public let options: PayabliPayInRequestConfiguration
@@ -257,18 +257,13 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     ///
     /// - Parameter paymentMethod: the method the payer entered.
     /// - Parameter formCustomerData: what the form collected about the payer, merged over ``customerData``.
-    /// - Parameter formOrderDescription: the form's description, which replaces ``orderDescription`` when
-    ///   it is not blank.
     /// - Returns: the request to capture or authorize.
     public func request(
         paymentMethod: PayabliPayInPaymentMethod,
-        customerData formCustomerData: PayabliPayInCustomerData? = nil,
-        orderDescription formOrderDescription: String? = nil
+        customerData formCustomerData: PayabliPayInCustomerData? = nil
     ) -> PayabliPayInRequest {
         var options = self
         options.customerData = mergedCustomerData(formCustomerData)
-        options.orderDescription = formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? orderDescription
         return PayabliPayInRequest(paymentMethod: paymentMethod, options: options)
     }
 

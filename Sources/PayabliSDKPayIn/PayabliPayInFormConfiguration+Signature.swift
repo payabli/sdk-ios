@@ -33,23 +33,12 @@ extension PayabliPayInFormConfiguration {
             "default:\(defaultMethod.rawValue)",
             "cardFields:\(cardFieldOrder.map(\.rawValue).joined(separator: ","))",
             "achFields:\(bankFieldOrder.map(\.rawValue).joined(separator: ","))",
-            "hidden:\(hiddenValues.payabliViewModelSignature)",
+            "achHolderType:\(accountHolderType?.rawValue ?? "")",
             "formatting:\(formatting.payabliViewModelSignature)",
             "required:\(requiredFields.map(\.rawValue).sorted().joined(separator: ","))",
             "paymentSummary:\(paymentSummary.payabliViewModelSignature)",
             "showsBaseAmount:\(showsBaseAmount)",
             "showsFailureMessage:\(showsFailureMessage)"
-        ])
-    }
-}
-
-private extension PayabliPayInHiddenValues {
-    var payabliViewModelSignature: String {
-        payabliFramedSignature([
-            "achHolderType:\(accountHolderType?.rawValue ?? "")",
-            "achSecCode:\(secCode?.rawValue ?? "")",
-            "achDevice:\(deviceId ?? "")",
-            "customerData:\(customerData.payabliJSONSignature)"
         ])
     }
 }

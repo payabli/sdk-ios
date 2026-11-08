@@ -15,7 +15,6 @@ final class PaymentFormLabelTextTests: XCTestCase {
         .accountType: "Account type",
         .accountHolderType: "Holder type",
         .secCode: "SEC code",
-        .deviceId: "Device",
         .firstName: "First name",
         .lastName: "Last name",
         .customerNumber: "Customer number",
@@ -198,12 +197,11 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
     // MARK: - Strings sent on the wire are not covered
 
-    func testTheFormsOrderDescriptionIsStillTrimmedOnTheWire() {
+    func testARequestCarriesTheConfigurationsOrderDescription() {
         let options = PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, currency: "USD"),
-            orderDescription: "Configured"
+            orderDescription: "Coffee"
         )
-        XCTAssertEqual(options.request(paymentMethod: .cash, orderDescription: " Coffee ").options.orderDescription, "Coffee")
-        XCTAssertEqual(options.request(paymentMethod: .cash, orderDescription: "   ").options.orderDescription, "Configured")
+        XCTAssertEqual(options.request(paymentMethod: .cash).options.orderDescription, "Coffee")
     }
 }

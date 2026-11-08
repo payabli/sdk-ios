@@ -384,13 +384,12 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.secCode, .deviceId]
+                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.secCode]
             )
         )
         achForm.accountHolder = "Jane Doe"
         achForm.routingNumber = "021000021"
         achForm.accountNumber = "123456789"
-        achForm.deviceId = "device-1"
         _ = try await achForm.submit()
 
         var sent: Set<String> = []

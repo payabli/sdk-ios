@@ -83,8 +83,7 @@ final class PayInStoreObjCWrapperTests: XCTestCase {
             accountType: .checking,
             holderName: "Jane Doe",
             holderType: .unspecified,
-            secCode: .unspecified,
-            deviceId: nil
+            secCode: .unspecified
         )
     }
 

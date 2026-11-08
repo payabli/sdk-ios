@@ -124,8 +124,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             accountType: .checking,
             holderName: "Jane Doe",
             holderType: .unspecified,
-            secCode: .unspecified,
-            deviceId: nil
+            secCode: .unspecified
         ))
     }
 
@@ -296,8 +295,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
                 accountType: .checking,
                 holderName: "Jane Doe",
                 holderType: .personal,
-                secCode: .unspecified,
-                deviceId: nil
+                secCode: .unspecified
             ),
             "a bank account request whose named values are all real is a request"
         )

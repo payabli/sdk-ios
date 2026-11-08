@@ -98,7 +98,6 @@ public final class PayabliPayInRequestObjC: NSObject {
     /// - Parameter holderName: the account holder's name.
     /// - Parameter holderType: the holder's type; `unspecified` leaves it out.
     /// - Parameter secCode: the SEC code; `unspecified` sends `WEB`.
-    /// - Parameter deviceId: the device identifier, or nil.
     /// - Parameter totalAmount: the amount to debit.
     /// - Returns: the request, or nil when a value is a number that names no case of its enum.
     @objc public static func bankAccount(
@@ -108,7 +107,6 @@ public final class PayabliPayInRequestObjC: NSObject {
         holderName: String,
         holderType: PayabliPayInAccountHolderTypeCode,
         secCode: PayabliPayInSecCodeCode,
-        deviceId: String?,
         totalAmount: Double
     ) -> PayabliPayInRequestObjC? {
         guard let values = try? PayabliPayInObjC.validated(
@@ -122,8 +120,7 @@ public final class PayabliPayInRequestObjC: NSObject {
             accountType: values.accountType,
             holderName: holderName,
             holderType: values.holderType,
-            secCode: values.secCode ?? .web,
-            deviceId: deviceId
+            secCode: values.secCode ?? .web
         )
         let account = PayabliPayInPaymentMethod.BankAccount(data: data)
         return PayabliPayInRequestObjC(paymentMethod: .bankAccount(account), totalAmount: totalAmount)
@@ -257,7 +254,6 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
     /// - Parameter holderName: the account holder's name.
     /// - Parameter holderType: the holder's type; `unspecified` leaves it out.
     /// - Parameter secCode: the SEC code; `unspecified` sends `WEB`.
-    /// - Parameter deviceId: the device identifier, or nil.
     /// - Returns: the request, or nil when a value is a number that names no case of its enum.
     @objc public static func bankAccount(
         accountNumber: String,
@@ -265,8 +261,7 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
         accountType: PayabliPayInAccountTypeCode,
         holderName: String,
         holderType: PayabliPayInAccountHolderTypeCode,
-        secCode: PayabliPayInSecCodeCode,
-        deviceId: String?
+        secCode: PayabliPayInSecCodeCode
     ) -> PayabliPayInStoreRequestObjC? {
         guard let values = try? PayabliPayInObjC.validated(
             accountType: accountType,
@@ -279,8 +274,7 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
             accountType: values.accountType,
             holderName: holderName,
             holderType: values.holderType,
-            secCode: values.secCode ?? .web,
-            deviceId: deviceId
+            secCode: values.secCode ?? .web
         )
         return PayabliPayInStoreRequestObjC(instrument: .bankAccount(data))
     }

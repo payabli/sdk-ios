@@ -197,7 +197,6 @@ public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Ident
   case accountType
   case accountHolderType
   case secCode
-  case deviceId
   case firstName
   case lastName
   case customerNumber
@@ -263,13 +262,6 @@ public struct PayabliPayInFormatting : Swift::Sendable {
   public let masksAccountNumber: Swift::Bool
   public init(insertsCardNumberSpaces: Swift::Bool = true, expirationSeparator: Swift::String = "/", masksAccountNumber: Swift::Bool = true)
 }
-public struct PayabliPayInHiddenValues : Swift::Sendable {
-  public let accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
-  public let secCode: PayabliSDKPayIn::PayabliPayInSecCode?
-  public let deviceId: Swift::String?
-  public let customerData: PayabliSDKPayIn::PayabliPayInCustomerData?
-  public init(accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = .web, deviceId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil)
-}
 public struct PayabliPayInInputSize : Swift::Sendable, Swift::Equatable {
   public let width: CoreFoundation::CGFloat?
   public let height: CoreFoundation::CGFloat
@@ -318,7 +310,6 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public let defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType
   public let cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public let bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
-  public let hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues
   public let labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout
   public let showsFieldLabels: Swift::Bool
   public let hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField>
@@ -332,7 +323,8 @@ public struct PayabliPayInFormConfiguration : Swift::Sendable {
   public let paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration
   public let showsBaseAmount: Swift::Bool
   public let showsFailureMessage: Swift::Bool
-  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, hiddenValues: PayabliSDKPayIn::PayabliPayInHiddenValues = PayabliPayInHiddenValues(), labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true, showsFailureMessage: Swift::Bool = true)
+  public let accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
+  public init(allowedMethods: [PayabliSDKPayIn::PayabliPayInMethodType] = [.card, .bankAccount], defaultMethod: PayabliSDKPayIn::PayabliPayInMethodType = .card, cardFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultCardFieldOrder, bankFieldOrder: [PayabliSDKPayIn::PayabliPayInField] = Self.defaultBankFieldOrder, cardSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, bankSections: [PayabliSDKPayIn::PayabliPayInFieldSection]? = nil, labelLayout: PayabliSDKPayIn::PayabliPayInLabelLayout = .external, showsFieldLabels: Swift::Bool? = nil, hiddenFieldLabels: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], formatting: PayabliSDKPayIn::PayabliPayInFormatting = PayabliPayInFormatting(), inputSizing: PayabliSDKPayIn::PayabliPayInInputSizing = PayabliPayInInputSizing(), cardBrandIconPlacement: PayabliSDKPayIn::PayabliPayInCardBrandIconPlacement = .trailing, failureMessagePlacement: PayabliSDKPayIn::PayabliPayInFailureMessagePlacement = .aboveSubmitButton, requiredFields: Swift::Set<PayabliSDKPayIn::PayabliPayInField> = [], paymentSummary: PayabliSDKPayIn::PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(), showsBaseAmount: Swift::Bool = true, showsFailureMessage: Swift::Bool = true, accountHolderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil)
   public static let defaultCardFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
   public static let defaultBankFieldOrder: [PayabliSDKPayIn::PayabliPayInField]
 }
@@ -475,8 +467,7 @@ public struct PayabliPayInBankAccountData : Swift::CustomStringConvertible, Swif
   public var holderName: Swift::String
   public var holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType?
   public var secCode: PayabliSDKPayIn::PayabliPayInSecCode?
-  public var deviceId: Swift::String?
-  public init(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = nil, deviceId: Swift::String? = nil)
+  public init(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountType, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderType? = nil, secCode: PayabliSDKPayIn::PayabliPayInSecCode? = nil)
   public var description: Swift::String {
     get
   }
@@ -753,7 +744,7 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc deinit
   @objc public static func stored(storedMethodId: Swift::String, method: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func card(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
-  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode, deviceId: Swift::String?, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
+  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC?
   @objc public static func cloudDevice(device: Swift::String, saveIfSuccess: Swift::Bool, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func check(holderName: Swift::String, totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
   @objc public static func cash(totalAmount: Swift::Double) -> PayabliSDKPayIn::PayabliPayInRequestObjC
@@ -775,7 +766,7 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc final public var validatesRoutingNumberChecksum: Swift::Bool
   @objc deinit
   @objc public static func card(cardNumber: Swift::String, expiryMonth: Swift::Int, expiryYear: Swift::Int, securityCode: Swift::String, holderName: Swift::String, postalCode: Swift::String) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC
-  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode, deviceId: Swift::String?) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?
+  @objc public static func bankAccount(accountNumber: Swift::String, routingNumber: Swift::String, accountType: PayabliSDKPayIn::PayabliPayInAccountTypeCode, holderName: Swift::String, holderType: PayabliSDKPayIn::PayabliPayInAccountHolderTypeCode, secCode: PayabliSDKPayIn::PayabliPayInSecCodeCode) -> PayabliSDKPayIn::PayabliPayInStoreRequestObjC?
 }
 @objc(PayabliPayInAuthorizedRequestObjC) final public class PayabliPayInAuthorizedRequestObjC : ObjectiveC::NSObject {
   @objc final public let transId: Swift::String
@@ -990,7 +981,7 @@ public struct PayabliPayInRequestConfiguration : Swift::Sendable {
   public let forceCustomerCreation: Swift::Bool?
   public let validation: PayabliSDKPayIn::PayabliPayInValidation
   public init(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails, accountId: Swift::String? = nil, customerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, ipAddress: Swift::String? = nil, orderDescription: Swift::String? = nil, orderId: Swift::String? = nil, source: Swift::String? = nil, subdomain: Swift::String? = nil, subscriptionId: Swift::Int64? = nil, paymentReference: Swift::String? = nil, attempt: PayabliSDKCore::PayabliAttempt = .newPayment, achValidation: Swift::Bool? = nil, forceCustomerCreation: Swift::Bool? = nil, validation: PayabliSDKPayIn::PayabliPayInValidation = .default)
-  public func request(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, customerData formCustomerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil, orderDescription formOrderDescription: Swift::String? = nil) -> PayabliSDKPayIn::PayabliPayInRequest
+  public func request(paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod, customerData formCustomerData: PayabliSDKPayIn::PayabliPayInCustomerData? = nil) -> PayabliSDKPayIn::PayabliPayInRequest
 }
 public struct PayabliPayInAuthorizedRequest : Swift::Sendable {
   public let transId: Swift::String

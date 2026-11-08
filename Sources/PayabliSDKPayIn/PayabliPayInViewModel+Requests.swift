@@ -87,9 +87,7 @@ extension PayabliPayInViewModel {
                 routingNumber: routingNumber,
                 accountType: accountType,
                 holderName: accountHolder,
-                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                secCode: configuration.hiddenValues.secCode,
-                deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.accountHolderType
             ))
         }
     }
@@ -114,9 +112,7 @@ extension PayabliPayInViewModel {
                     routingNumber: routingNumber,
                     accountType: accountType,
                     holderName: accountHolder,
-                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                    secCode: configuration.hiddenValues.secCode,
-                    deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.accountHolderType
                 )
             ))
         }
@@ -126,7 +122,6 @@ extension PayabliPayInViewModel {
         var customer = operation.requestConfiguration?.customerData
             ?? operation.storeOptions?.customerData
             ?? PayabliPayInCustomerData()
-        customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
         customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
         customer.payabliCaptureApply(\.lastName, lastName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
         customer.payabliCaptureApply(\.customerNumber, customerNumber.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
@@ -161,7 +156,7 @@ extension PayabliPayInViewModel {
     }
 
     /// Drops what the payer typed into a field the configuration no longer offers, writing nothing when
-    /// nothing was held. Host-supplied hidden values are untouched.
+    /// nothing was held. Values the host supplies are untouched.
     func dropValuesWithoutAField() {
         dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
@@ -231,9 +226,6 @@ extension PayabliPayInViewModel {
         if dropped.contains(.secCode), secCode != .web {
             secCode = .web
         }
-        if dropped.contains(.deviceId), !deviceId.isEmpty {
-            deviceId = ""
-        }
     }
 
     private func dropCustomerValues(_ dropped: Set<PayabliPayInField>) {
@@ -277,7 +269,7 @@ extension PayabliPayInViewModel {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode:
             return achFieldHasRequiredValue(field)
         case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
@@ -320,12 +312,9 @@ extension PayabliPayInViewModel {
         case .accountType:
             return true
         case .accountHolderType:
-            return fieldIsVisible(.accountHolderType) || configuration.hiddenValues.accountHolderType != nil
+            return fieldIsVisible(.accountHolderType) || configuration.accountHolderType != nil
         case .secCode:
             return true
-        case .deviceId:
-            return !deviceId.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.deviceId?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
         default:
             return true
         }

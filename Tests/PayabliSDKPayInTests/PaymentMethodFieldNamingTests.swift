@@ -4,12 +4,12 @@ import XCTest
 final class PaymentMethodFieldNamingTests: XCTestCase {
     func testBankAccountFieldsTakeTheBankAccountWords() {
         let bankAccountFields: [PayabliPayInField] = [
-            .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId
+            .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode
         ]
 
         XCTAssertEqual(
             bankAccountFields.map(\.rawValue),
-            ["accountHolder", "routingNumber", "accountNumber", "accountType", "accountHolderType", "secCode", "deviceId"]
+            ["accountHolder", "routingNumber", "accountNumber", "accountType", "accountHolderType", "secCode"]
         )
     }
 

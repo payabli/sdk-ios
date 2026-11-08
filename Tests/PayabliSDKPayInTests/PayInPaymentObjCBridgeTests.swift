@@ -276,7 +276,6 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
                 holderName: "Jane Doe",
                 holderType: .unspecified,
                 secCode: .unspecified,
-                deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
             return wrapper.paymentMethod.sensitiveDigits
@@ -312,7 +311,6 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
                 holderName: "Jane Doe",
                 holderType: .unspecified,
                 secCode: .unspecified,
-                deviceId: nil,
                 totalAmount: 10
             ) else { return [] }
             return wrapper.toSwift().paymentMethod.sensitiveDigits

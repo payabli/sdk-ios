@@ -57,10 +57,6 @@ enum PayInBodyWriter {
                 try writer.string(
                     CaptureKeys.achRouting.stringValue, method.data.routingNumber.payabliCaptureDigitsOnly
                 )
-                try writer.optionalString(
-                    CaptureKeys.device.stringValue,
-                    method.data.deviceId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-                )
                 try writer.string(CaptureKeys.method.stringValue, "ach")
 
             case let .stored(method):
@@ -121,7 +117,6 @@ enum PayInBodyWriter {
                 try writer.string(StoreKeys.achRouting.stringValue, data.routingNumber.digitsOnly)
                 try writer.string(StoreKeys.achCode.stringValue, (data.secCode ?? .web).rawValue)
                 try writer.optionalString(StoreKeys.achHolderType.stringValue, data.holderType?.rawValue)
-                try writer.optionalString(StoreKeys.device.stringValue, data.deviceId.map(\.trimmed)?.nilIfEmpty)
             }
         }
     }

@@ -47,16 +47,13 @@ enum PayInForms {
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
-                hiddenValues: PayabliPayInHiddenValues(
-                    accountHolderType: .personal,
-                    secCode: .web
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
                 formatting: PayInSharedConfiguration.formatting,
                 inputSizing: PayInSharedConfiguration.inputSizing,
-                cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement
+                cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement,
+                accountHolderType: .personal
             ),
             labels: PayabliPayInFormLabels(
                 title: "Save Payment Method",
@@ -106,10 +103,6 @@ enum PayInForms {
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)
                 ],
-                hiddenValues: PayabliPayInHiddenValues(
-                    accountHolderType: .personal,
-                    secCode: .web
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
@@ -126,7 +119,8 @@ enum PayInForms {
                         color: .primary
                     ),
                     rowSpacing: 6
-                )
+                ),
+                accountHolderType: .personal
             ),
             labels: PayabliPayInFormLabels(
                 title: "Payment Capture",

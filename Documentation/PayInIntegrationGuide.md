@@ -477,10 +477,6 @@ let configuration = PayabliPayInFormConfiguration(
             style: .summary
         )
     ],
-    hiddenValues: PayabliPayInHiddenValues(
-        accountHolderType: .personal,
-        secCode: .web
-    ),
     labelLayout: .placeholder,
     showsFieldLabels: false,
     hiddenFieldLabels: Set(placeholderFields),
@@ -498,7 +494,8 @@ let configuration = PayabliPayInFormConfiguration(
     cardBrandIconPlacement: .trailing,
     failureMessagePlacement: .aboveSubmitButton,
     requiredFields: [.firstName, .lastName, .billingEmail],
-    paymentSummary: PayabliPayInPaymentSummaryConfiguration(rowSpacing: 6)
+    paymentSummary: PayabliPayInPaymentSummaryConfiguration(rowSpacing: 6),
+    accountHolderType: .personal
 )
 ```
 
@@ -517,7 +514,7 @@ The wording is not part of the configuration: pass `labels` to `PayabliPayInForm
 | `bankFieldOrder` | holder, routing, account, account type, holder type | Flat bank account order used when `bankSections` is nil. |
 | `cardSections` | nil | Custom card sections. Required and payment summary fields are appended if missing. |
 | `bankSections` | nil | Custom bank account sections. `secCode` is not rendered. Required and payment summary fields are appended if missing. |
-| `hiddenValues` | default hidden values | Non-editable values submitted with the hosted form. |
+| `accountHolderType` | nil | The holder type sent when the form doesn't show `.accountHolderType`. When it does, the payer's choice is sent. |
 | `labelLayout` | `.external` | `.external` for visible labels, `.placeholder` for placeholder-first UI. |
 | `showsFieldLabels` | nil | Optional global visible-label override. Nil follows `labelLayout`. |
 | `hiddenFieldLabels` | `[]` | Hide visible labels for specific fields. Accessibility labels remain. |
@@ -572,7 +569,6 @@ Default field labels:
 | `.accountType` | Account type |
 | `.accountHolderType` | Holder type |
 | `.secCode` | SEC code |
-| `.deviceId` | Device |
 | `.firstName` | First name |
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |
@@ -581,15 +577,6 @@ Default field labels:
 | `.amount` | Amount |
 | `.serviceFee` | Fee |
 | `.surchargeFee` | Surcharge |
-
-### `PayabliPayInHiddenValues`
-
-| Field | Default | Description |
-| --- | --- | --- |
-| `accountHolderType` | nil | account holder type submitted without rendering the field. |
-| `secCode` | `.web` | SEC code submitted without rendering the field. |
-| `deviceId` | nil | device ID submitted without rendering the field. |
-| `customerData` | nil | Default customer data merged with visible customer fields. |
 
 ### `PayabliPayInFormatting`
 

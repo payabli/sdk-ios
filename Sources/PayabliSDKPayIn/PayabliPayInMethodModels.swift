@@ -701,6 +701,5 @@ extension PayabliPayInMethodInput {
         case achHolder
         case achHolderType
         case achRouting
-        case device
     }
 }

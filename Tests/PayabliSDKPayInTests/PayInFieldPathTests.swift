@@ -16,7 +16,6 @@ final class PayInFieldPathTests: XCTestCase {
             .accountType: "paymentMethod.achAccountType",
             .accountHolderType: "paymentMethod.achHolderType",
             .secCode: "paymentMethod.achCode",
-            .deviceId: "paymentMethod.device",
             .firstName: "customerData.firstName",
             .lastName: "customerData.lastName",
             .customerNumber: "customerData.customerNumber",

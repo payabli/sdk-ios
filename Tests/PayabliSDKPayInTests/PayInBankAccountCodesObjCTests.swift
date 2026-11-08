@@ -127,8 +127,7 @@ final class PayInBankAccountCodesObjCTests: XCTestCase {
             accountType: accountType,
             holderName: "Jane Doe",
             holderType: holderType,
-            secCode: secCode,
-            deviceId: nil
+            secCode: secCode
         )
     }
 }

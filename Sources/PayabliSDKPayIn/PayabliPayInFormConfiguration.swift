@@ -13,7 +13,6 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case accountType
     case accountHolderType
     case secCode
-    case deviceId
     case firstName
     case lastName
     case customerNumber
@@ -66,25 +65,6 @@ public struct PayabliPayInFormatting: Sendable {
         self.insertsCardNumberSpaces = insertsCardNumberSpaces
         self.expirationSeparator = expirationSeparator.isEmpty ? "/" : expirationSeparator
         self.masksAccountNumber = masksAccountNumber
-    }
-}
-
-public struct PayabliPayInHiddenValues: Sendable {
-    public let accountHolderType: PayabliPayInAccountHolderType?
-    public let secCode: PayabliPayInSecCode?
-    public let deviceId: String?
-    public let customerData: PayabliPayInCustomerData?
-
-    public init(
-        accountHolderType: PayabliPayInAccountHolderType? = nil,
-        secCode: PayabliPayInSecCode? = .web,
-        deviceId: String? = nil,
-        customerData: PayabliPayInCustomerData? = nil
-    ) {
-        self.accountHolderType = accountHolderType
-        self.secCode = secCode
-        self.deviceId = deviceId
-        self.customerData = customerData
     }
 }
 
@@ -213,7 +193,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
     public let defaultMethod: PayabliPayInMethodType
     public let cardFieldOrder: [PayabliPayInField]
     public let bankFieldOrder: [PayabliPayInField]
-    public let hiddenValues: PayabliPayInHiddenValues
     public let labelLayout: PayabliPayInLabelLayout
     public let showsFieldLabels: Bool
     public let hiddenFieldLabels: Set<PayabliPayInField>
@@ -229,6 +208,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
     /// Whether the form draws its failure message; the marks a failure puts on fields stay whatever
     /// this holds.
     public let showsFailureMessage: Bool
+    /// The holder type sent for a bank account when the form doesn't show the field.
+    public let accountHolderType: PayabliPayInAccountHolderType?
 
     public init(
         allowedMethods: [PayabliPayInMethodType] = [.card, .bankAccount],
@@ -237,7 +218,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         bankFieldOrder: [PayabliPayInField] = Self.defaultBankFieldOrder,
         cardSections: [PayabliPayInFieldSection]? = nil,
         bankSections: [PayabliPayInFieldSection]? = nil,
-        hiddenValues: PayabliPayInHiddenValues = PayabliPayInHiddenValues(),
         labelLayout: PayabliPayInLabelLayout = .external,
         showsFieldLabels: Bool? = nil,
         hiddenFieldLabels: Set<PayabliPayInField> = [],
@@ -248,7 +228,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         requiredFields: Set<PayabliPayInField> = [],
         paymentSummary: PayabliPayInPaymentSummaryConfiguration = PayabliPayInPaymentSummaryConfiguration(),
         showsBaseAmount: Bool = true,
-        showsFailureMessage: Bool = true
+        showsFailureMessage: Bool = true,
+        accountHolderType: PayabliPayInAccountHolderType? = nil
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
         let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
@@ -273,7 +254,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.bankFieldOrder = normalizedBankSections.flatMap(\.fields)
         self.cardSections = normalizedCardSections
         self.bankSections = normalizedBankSections
-        self.hiddenValues = hiddenValues
         self.labelLayout = labelLayout
         self.showsFieldLabels = showsFieldLabels ?? (labelLayout == .external)
         self.hiddenFieldLabels = hiddenFieldLabels
@@ -285,6 +265,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.paymentSummary = paymentSummary
         self.showsBaseAmount = showsBaseAmount
         self.showsFailureMessage = showsFailureMessage
+        self.accountHolderType = accountHolderType
     }
 
     public static let defaultCardFieldOrder: [PayabliPayInField] = [
@@ -467,7 +448,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
     private static func bankRequiredFields(
         from fields: Set<PayabliPayInField>
     ) -> [PayabliPayInField] {
-        let supported = Set(defaultBankFieldOrder + [.deviceId] + customerFields + paymentDetailFields)
+        let supported = Set(defaultBankFieldOrder + customerFields + paymentDetailFields)
         return PayabliPayInField.allCases.filter { fields.contains($0) && supported.contains($0) }
     }
 

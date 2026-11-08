@@ -50,7 +50,7 @@ final class PayInFormCustomizationTests: XCTestCase {
             configuration.bankSections.map(\.fields),
             PayabliPayInFormConfiguration().bankSections.map(\.fields)
         )
-        XCTAssertNil(configuration.hiddenValues.accountHolderType)
+        XCTAssertNil(configuration.accountHolderType)
         let style = customization.style
         XCTAssertEqual(style.accentColor, PayabliPayInFormStyle.default.accentColor)
         XCTAssertEqual(style.input.backgroundColor, PayabliPayInFormStyle.default.input.backgroundColor)
@@ -169,7 +169,6 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(configuration.allowedMethods, [.card])
         XCTAssertEqual(configuration.defaultMethod, .card)
-        XCTAssertNil(configuration.hiddenValues.customerData)
     }
 
     func testAnAuthorizationsCustomWordingPlacesAHold() {

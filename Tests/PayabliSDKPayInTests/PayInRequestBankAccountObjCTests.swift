@@ -66,7 +66,6 @@ final class PayInRequestBankAccountObjCTests: XCTestCase {
             holderName: "Jane Doe",
             holderType: holderType,
             secCode: secCode,
-            deviceId: nil,
             totalAmount: 10
         )
     }

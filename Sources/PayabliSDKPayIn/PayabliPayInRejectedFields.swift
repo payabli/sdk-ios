@@ -32,7 +32,6 @@ enum PayabliPayInRejectedFields {
             (MethodKey.achAccountType.stringValue, .accountType),
             (MethodKey.achHolderType.stringValue, .accountHolderType),
             (MethodKey.achCode.stringValue, .secCode),
-            (MethodKey.device.stringValue, .deviceId),
             ("firstName", .firstName),
             ("lastName", .lastName),
             ("customerNumber", .customerNumber),

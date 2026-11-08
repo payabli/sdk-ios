@@ -546,16 +546,16 @@ final class TokenStorageClientTests: XCTestCase {
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
-            operation: .storePaymentMethod(PayabliPayInStoreOptions(methodDescription: "Hidden primary card")),
+            operation: .storePaymentMethod(PayabliPayInStoreOptions(
+                customerData: PayabliPayInCustomerData(
+                    billingEmail: "hidden@example.com",
+                    customerNumber: "cust-hidden"
+                ),
+                methodDescription: "Hidden primary card"
+            )),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
-                cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName],
-                hiddenValues: PayabliPayInHiddenValues(
-                    customerData: PayabliPayInCustomerData(
-                        billingEmail: "hidden@example.com",
-                        customerNumber: "cust-hidden"
-                    )
-                )
+                cardFieldOrder: [.cardNumber, .cardExpiration, .cardholderName]
             )
         )
         viewModel.cardNumber = "4111 1111 1111 1111"
@@ -638,7 +638,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     @MainActor
-    func testACHSecCodeIsHiddenAndSubmittedFromHiddenValues() async throws {
+    func testACHSecCodeIsHiddenAndSentAsWEB() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -663,10 +663,7 @@ final class TokenStorageClientTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 bankFieldOrder: [.accountHolder, .routingNumber, .accountNumber, .accountType, .secCode],
-                hiddenValues: PayabliPayInHiddenValues(
-                    accountHolderType: .business,
-                    secCode: .ccd
-                )
+                accountHolderType: .business
             )
         )
 
@@ -683,7 +680,7 @@ final class TokenStorageClientTests: XCTestCase {
         let request = try await firstRequest(from: transport)
         let body = try parseBody(request)
         let paymentMethod = try XCTUnwrap(body["paymentMethod"] as? [String: Any])
-        XCTAssertEqual(paymentMethod["achCode"] as? String, "CCD")
+        XCTAssertEqual(paymentMethod["achCode"] as? String, "WEB")
         XCTAssertEqual(paymentMethod["achHolderType"] as? String, "business")
     }
 
