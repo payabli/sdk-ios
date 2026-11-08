@@ -76,6 +76,27 @@ final class PayInErrorStatusTests: XCTestCase {
         XCTAssertEqual(refused.rawCode, "5001")
     }
 
+    func testAnOlderEnvelopesCodeIsItsResponseCodeAndNeverItsNestedResult() async throws {
+        let answers: [(body: String, rawCode: String?)] = [
+            (#"{"isSuccess":false,"responseText":"Declined","responseCode":5001,"responseData":{"resultCode":3}}"#, "5001"),
+            (#"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":3}}"#, nil)
+        ]
+        for answer in answers {
+            let client = PayInPaymentFlowClient(transport: MockPaymentCaptureTransport(
+                statusCode: 402,
+                responseBody: answer.body
+            ))
+
+            let error = await failure {
+                _ = try await client.capture(entryPoint: "entry", request: Self.request, idempotencyKey: "k-nested")
+            }
+
+            let refused = try XCTUnwrap(error as? PayabliPayInError.Refused, "body \(answer.body): got \(error)")
+            XCTAssertEqual(refused.rawCode, answer.rawCode, "body \(answer.body)")
+            XCTAssertEqual(refused.failure.code, answer.rawCode, "body \(answer.body)")
+        }
+    }
+
     func testARefusalNamesTheTransactionItsAnswerNamed() async throws {
         let answers: [(status: Int, body: String)] = [
             (402, #"{"code":"D0200","reason":"Insufficient Funds","data":{"paymentTransId":" trans-402 "}}"#),

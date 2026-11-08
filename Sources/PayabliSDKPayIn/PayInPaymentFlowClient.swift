@@ -594,7 +594,7 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
     }
 
     func failure(httpStatusCode: Int) -> PayabliPayInFailure {
-        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode, responseCode.map(String.init))
+        let failureCode = Self.firstNonEmpty(code, responseCode.map(String.init))
         let failureReason = Self.firstNonEmpty(
             reason,
             responseData?.resultText,
@@ -649,14 +649,12 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
 }
 
 private struct PayInPaymentFlowFailureResponseData: Decodable {
-    let resultCode: String?
     let resultText: String?
     let explanation: String?
     let todoAction: String?
     let detail: String?
 
     enum CodingKeys: String, CodingKey {
-        case resultCode
         case resultText
         case explanation
         case todoAction
@@ -665,7 +663,6 @@ private struct PayInPaymentFlowFailureResponseData: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        resultCode = c.decodeLossyStringIfPresent(forKey: .resultCode)
         resultText = try c.decodeIfPresent(String.self, forKey: .resultText)
         explanation = try c.decodeIfPresent(String.self, forKey: .explanation)
         todoAction = try c.decodeIfPresent(String.self, forKey: .todoAction)
