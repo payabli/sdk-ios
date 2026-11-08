@@ -638,7 +638,7 @@ final class TokenStorageClientTests: XCTestCase {
     }
 
     @MainActor
-    func testACHSecCodeIsHiddenAndSentAsWEB() async throws {
+    func testABankSaveThroughTheFormSendsWEB() async throws {
         let transport = MockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -662,12 +662,10 @@ final class TokenStorageClientTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                bankFieldOrder: [.accountHolder, .routingNumber, .accountNumber, .accountType, .secCode],
+                bankFieldOrder: [.accountHolder, .routingNumber, .accountNumber, .accountType],
                 accountHolderType: .business
             )
         )
-
-        XCTAssertFalse(viewModel.activeFields.contains(PayabliPayInField.secCode))
 
         viewModel.accountHolder = "Jane Business"
         viewModel.routingNumber = "123456780"

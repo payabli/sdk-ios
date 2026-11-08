@@ -57,10 +57,6 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .accountHolderType) }
     }
 
-    @Published var secCode: PayabliPayInSecCode = .web {
-        didSet { acceptEdit(of: .secCode) }
-    }
-
     @Published var firstName = "" {
         didSet { acceptEdit(of: .firstName) }
     }

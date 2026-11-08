@@ -311,36 +311,6 @@ final class PaymentMethodReseedTests: XCTestCase {
         XCTAssertEqual(viewModel.billingZip, "", "a typed value survived its field going")
     }
 
-    /// A picked SEC code in a section the configuration takes away and returns starts empty.
-    ///
-    /// A card section can carry the SEC field, and its picker writes the same storage the hidden
-    /// value replaces at submission, so a picked code goes with the field like every other value.
-    func testAPickedSecCodeInASectionTheConfigurationTakesAwayAndReturnsStartsEmpty() {
-        let component = makeComponent()
-        let viewModel = PayabliPayInViewModel(
-            component: component,
-            operation: .storePaymentMethod(),
-            configuration: Self.cardConfiguration(showingSecCode: true)
-        )
-        viewModel.secCode = .ppd
-
-        viewModel.update(
-            component: component,
-            operation: .storePaymentMethod(),
-            configuration: Self.cardConfiguration(showingSecCode: false),
-            labels: PayabliPayInFormLabels()
-        )
-        XCTAssertEqual(viewModel.secCode, .web, "a picked value survived its field going")
-
-        viewModel.update(
-            component: component,
-            operation: .storePaymentMethod(),
-            configuration: Self.cardConfiguration(showingSecCode: true),
-            labels: PayabliPayInFormLabels()
-        )
-        XCTAssertEqual(viewModel.secCode, .web, "a dropped value returned with its field")
-    }
-
     /// A method the update withdraws takes its fields' values with it.
     ///
     /// The withdrawn method's tab is gone, so its boxes are gone with it: the values the payer
@@ -409,15 +379,6 @@ final class PaymentMethodReseedTests: XCTestCase {
             allowedMethods: [.card],
             cardSections: showingBillingZip
                 ? [PayabliPayInFieldSection(title: "Customer", fields: [.billingPostalCode])]
-                : nil
-        )
-    }
-
-    private static func cardConfiguration(showingSecCode: Bool) -> PayabliPayInFormConfiguration {
-        PayabliPayInFormConfiguration(
-            allowedMethods: [.card],
-            cardSections: showingSecCode
-                ? [PayabliPayInFieldSection(fields: [.secCode])]
                 : nil
         )
     }

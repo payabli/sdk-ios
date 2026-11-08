@@ -164,7 +164,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             bankSections: [
                 PayabliPayInFieldSection(
                     title: "Hidden",
-                    fields: [.secCode]
+                    fields: []
                 )
             ]
         )

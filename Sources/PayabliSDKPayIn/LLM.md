@@ -399,7 +399,7 @@ display.
 | `allowedMethods` | `[.card, .bankAccount]` | Which hosted methods can be selected. Authorize is normalized to card only. |
 | `defaultMethod` | `.card` | Initial selected method when it is included in `allowedMethods`. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Legacy flat field order for card. Used when custom sections are not supplied. |
-| `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. `secCode` is hidden from the form. |
+| `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. The form never asks for a SEC code and sends `WEB`. |
 | `cardSections` | card fields, then an untitled summary | Section grouping for card UI. Section titles are configurable; an untitled summary is headed "Payment". |
 | `bankSections` | bank account fields, then an untitled summary | Section grouping for the bank account form. Section titles are configurable; an untitled summary is headed "Payment". |
 | `accountHolderType` | nil | The holder type sent when the form doesn't show `.accountHolderType`. When it does, the payer's choice is sent. |
@@ -429,7 +429,6 @@ All `PayabliPayInField` values:
 | `.accountNumber` | Account number | Bank account |
 | `.accountType` | Account type | Bank account |
 | `.accountHolderType` | Holder type | Bank account |
-| `.secCode` | SEC code | bank account; not rendered by default |
 | `.firstName` | First name | Customer |
 | `.lastName` | Last name | Customer |
 | `.customerNumber` | Customer number | Customer |

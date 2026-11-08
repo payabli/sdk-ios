@@ -196,7 +196,6 @@ public enum PayabliPayInField : Swift::String, Swift::CaseIterable, Swift::Ident
   case accountNumber
   case accountType
   case accountHolderType
-  case secCode
   case firstName
   case lastName
   case customerNumber

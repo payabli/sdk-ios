@@ -406,7 +406,7 @@ This configuration creates:
 - separate `Customer Information` and `Payment Information` sections
 - read-only amount and fee rows
 - visible card brand icons
-- hidden SEC code and holder type defaults
+- a holder type sent without showing the field
 
 ```swift
 let placeholderFields: [PayabliPayInField] = [
@@ -513,7 +513,7 @@ The wording is not part of the configuration: pass `labels` to `PayabliPayInForm
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Flat card order used when `cardSections` is nil. |
 | `bankFieldOrder` | holder, routing, account, account type, holder type | Flat bank account order used when `bankSections` is nil. |
 | `cardSections` | nil | Custom card sections. Required and payment summary fields are appended if missing. |
-| `bankSections` | nil | Custom bank account sections. `secCode` is not rendered. Required and payment summary fields are appended if missing. |
+| `bankSections` | nil | Custom bank account sections. Required and payment summary fields are appended if missing. |
 | `accountHolderType` | nil | The holder type sent when the form doesn't show `.accountHolderType`. When it does, the payer's choice is sent. |
 | `labelLayout` | `.external` | `.external` for visible labels, `.placeholder` for placeholder-first UI. |
 | `showsFieldLabels` | nil | Optional global visible-label override. Nil follows `labelLayout`. |
@@ -568,7 +568,6 @@ Default field labels:
 | `.accountNumber` | Account number |
 | `.accountType` | Account type |
 | `.accountHolderType` | Holder type |
-| `.secCode` | SEC code |
 | `.firstName` | First name |
 | `.lastName` | Last name |
 | `.customerNumber` | Customer number |

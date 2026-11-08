@@ -384,7 +384,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.secCode]
+                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder
             )
         )
         achForm.accountHolder = "Jane Doe"

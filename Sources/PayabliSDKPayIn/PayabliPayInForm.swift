@@ -364,7 +364,7 @@ public struct PayabliPayInForm: View {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             cardFieldView(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType:
             achFieldView(field)
         case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             customerFieldView(field)
@@ -428,8 +428,6 @@ public struct PayabliPayInForm: View {
             pickerField(field, selection: $viewModel.accountType, values: PayabliPayInAccountType.allCases)
         case .accountHolderType:
             pickerField(field, selection: $viewModel.accountHolderType, values: PayabliPayInAccountHolderType.allCases)
-        case .secCode:
-            pickerField(field, selection: $viewModel.secCode, values: PayabliPayInSecCode.allCases)
         default:
             EmptyView()
         }

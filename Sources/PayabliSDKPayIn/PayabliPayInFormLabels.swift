@@ -133,7 +133,6 @@ public struct PayabliPayInFormLabels: Sendable {
         .accountNumber: "Account number",
         .accountType: "Account type",
         .accountHolderType: "Holder type",
-        .secCode: "SEC code",
         .firstName: "First name",
         .lastName: "Last name",
         .customerNumber: "Customer number",

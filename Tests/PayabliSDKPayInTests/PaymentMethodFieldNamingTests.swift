@@ -4,13 +4,17 @@ import XCTest
 final class PaymentMethodFieldNamingTests: XCTestCase {
     func testBankAccountFieldsTakeTheBankAccountWords() {
         let bankAccountFields: [PayabliPayInField] = [
-            .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode
+            .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType
         ]
 
         XCTAssertEqual(
             bankAccountFields.map(\.rawValue),
-            ["accountHolder", "routingNumber", "accountNumber", "accountType", "accountHolderType", "secCode"]
+            ["accountHolder", "routingNumber", "accountNumber", "accountType", "accountHolderType"]
         )
+    }
+
+    func testTheFormHasNoSecCodeField() {
+        XCTAssertFalse(PayabliPayInField.allCases.map(\.rawValue).contains("secCode"))
     }
 
     func testNoFieldIsSpelledWithTheRailName() {

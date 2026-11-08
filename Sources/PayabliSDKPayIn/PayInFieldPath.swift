@@ -36,7 +36,6 @@ enum PayInFieldPath {
         case .accountNumber: storedMethod(.achAccount)
         case .accountType: storedMethod(.achAccountType)
         case .accountHolderType: storedMethod(.achHolderType)
-        case .secCode: storedMethod(.achCode)
         case .firstName, .lastName, .customerNumber, .billingEmail: "customerData.\(field.rawValue)"
         case .billingPostalCode: "customerData.billingZip"
         case .amount: totalAmount

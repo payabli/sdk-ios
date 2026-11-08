@@ -223,9 +223,6 @@ extension PayabliPayInViewModel {
         if dropped.contains(.accountHolderType), accountHolderType != .personal {
             accountHolderType = .personal
         }
-        if dropped.contains(.secCode), secCode != .web {
-            secCode = .web
-        }
     }
 
     private func dropCustomerValues(_ dropped: Set<PayabliPayInField>) {
@@ -269,7 +266,7 @@ extension PayabliPayInViewModel {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType:
             return achFieldHasRequiredValue(field)
         case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
@@ -313,8 +310,6 @@ extension PayabliPayInViewModel {
             return true
         case .accountHolderType:
             return fieldIsVisible(.accountHolderType) || configuration.accountHolderType != nil
-        case .secCode:
-            return true
         default:
             return true
         }

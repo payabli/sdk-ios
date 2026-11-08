@@ -81,6 +81,35 @@ final class PaymentMethodAccountHolderTypeTests: XCTestCase {
         XCTAssertNil(paymentMethod["device"], "a stored method sent a device ID")
     }
 
+    func testTheFormSendsWEBForAPersonalAndABusinessAccount() async throws {
+        for holderType in [PayabliPayInAccountHolderType.personal, .business] {
+            let configuration = PayabliPayInFormConfiguration(
+                allowedMethods: [.bankAccount],
+                defaultMethod: .bankAccount,
+                bankFieldOrder: Self.fieldsWithoutHolderType,
+                accountHolderType: holderType
+            )
+            let stored = try await storedBankMethod(configuration: configuration)
+
+            let transport = MockPaymentCaptureTransport(statusCode: 200, responseBody: Self.approvedPayment)
+            let viewModel = PayabliPayInViewModel(
+                component: PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport),
+                operation: .capture(PayabliPayInRequestConfiguration(
+                    paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34)
+                )),
+                configuration: configuration
+            )
+            fillBankAccount(viewModel)
+            _ = try await viewModel.submit()
+            let paid = try await sentPaymentMethod(transport)
+
+            for paymentMethod in [stored, paid] {
+                XCTAssertEqual(paymentMethod["achCode"] as? String, "WEB", "\(holderType)")
+                XCTAssertEqual(paymentMethod["achHolderType"] as? String, holderType.rawValue)
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private static let fieldsWithoutHolderType: [PayabliPayInField] = [

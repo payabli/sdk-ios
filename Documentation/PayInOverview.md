@@ -150,7 +150,6 @@ Supported fields:
 | `.accountNumber` | Account number | bank account input |
 | `.accountType` | Account type | bank account input |
 | `.accountHolderType` | Holder type | bank account input, or `accountHolderType` on the configuration |
-| `.secCode` | SEC code | Hidden by default |
 | `.firstName` | First name | Customer information |
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |

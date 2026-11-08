@@ -12,7 +12,6 @@ public enum PayabliPayInField: String, CaseIterable, Identifiable, Sendable {
     case accountNumber
     case accountType
     case accountHolderType
-    case secCode
     case firstName
     case lastName
     case customerNumber
@@ -232,9 +231,8 @@ public struct PayabliPayInFormConfiguration: Sendable {
         accountHolderType: PayabliPayInAccountHolderType? = nil
     ) {
         let methods = allowedMethods.isEmpty ? [defaultMethod] : allowedMethods
-        let visibleRequiredFields = Self.visibleRequiredFields(from: requiredFields)
-        let requiredCardFields = Self.requiredCardFields + Self.cardRequiredFields(from: visibleRequiredFields)
-        let requiredBankFields = Self.requiredBankFields + Self.bankRequiredFields(from: visibleRequiredFields)
+        let requiredCardFields = Self.requiredCardFields + Self.cardRequiredFields(from: requiredFields)
+        let requiredBankFields = Self.requiredBankFields + Self.bankRequiredFields(from: requiredFields)
         let normalizedCardSections = Self.normalizedSections(
             cardSections,
             defaultSections: Self.defaultCardSections(cardFieldOrder: cardFieldOrder),
@@ -245,8 +243,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
             bankSections,
             defaultSections: Self.defaultBankSections(bankFieldOrder: bankFieldOrder),
             required: requiredBankFields,
-            appendedFields: Self.paymentDetailFields,
-            hiddenFields: [.secCode]
+            appendedFields: Self.paymentDetailFields
         )
         self.allowedMethods = methods
         self.defaultMethod = methods.contains(defaultMethod) ? defaultMethod : methods[0]
@@ -261,7 +258,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         self.inputSizing = inputSizing
         self.cardBrandIconPlacement = cardBrandIconPlacement
         self.failureMessagePlacement = failureMessagePlacement
-        self.requiredFields = visibleRequiredFields.union(Self.requiredPaymentFields)
+        self.requiredFields = requiredFields.union(Self.requiredPaymentFields)
         self.paymentSummary = paymentSummary
         self.showsBaseAmount = showsBaseAmount
         self.showsFailureMessage = showsFailureMessage
@@ -317,7 +314,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         bankFieldOrder: [PayabliPayInField]
     ) -> [PayabliPayInFieldSection] {
         [
-            PayabliPayInFieldSection(fields: visibleBankFields(from: bankFieldOrder)),
+            PayabliPayInFieldSection(fields: bankFieldOrder),
             PayabliPayInFieldSection(fields: paymentDetailFields, style: .summary)
         ]
     }
@@ -326,8 +323,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
         _ sections: [PayabliPayInFieldSection]?,
         defaultSections: [PayabliPayInFieldSection],
         required: [PayabliPayInField],
-        appendedFields: [PayabliPayInField],
-        hiddenFields: Set<PayabliPayInField> = []
+        appendedFields: [PayabliPayInField]
     ) -> [PayabliPayInFieldSection] {
         let sourceSections = sections?.isEmpty == false ? sections ?? [] : defaultSections
         var seenFields = Set<PayabliPayInField>()
@@ -344,7 +340,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
                 if section.style == .summary, index != drawnSummary, paymentDetailFields.contains(field) {
                     return false
                 }
-                guard !hiddenFields.contains(field) else { return false }
                 if section.style == .summary, !paymentDetailFields.contains(field) {
                     displaced.append(field)
                     return false
@@ -364,7 +359,7 @@ public struct PayabliPayInFormConfiguration: Sendable {
             seenFields.insert(field)
         }
 
-        for field in required + appendedFields where !hiddenFields.contains(field) && !seenFields.contains(field) {
+        for field in required + appendedFields where !seenFields.contains(field) {
             append(field, to: &output)
             seenFields.insert(field)
         }
@@ -424,18 +419,6 @@ public struct PayabliPayInFormConfiguration: Sendable {
 
         let section = sections[targetIndex]
         sections[targetIndex] = section.replacingFields(section.fields + [field])
-    }
-
-    private static func visibleBankFields(
-        from fields: [PayabliPayInField]
-    ) -> [PayabliPayInField] {
-        fields.filter { $0 != .secCode }
-    }
-
-    private static func visibleRequiredFields(
-        from fields: Set<PayabliPayInField>
-    ) -> Set<PayabliPayInField> {
-        fields.subtracting([.secCode])
     }
 
     private static func cardRequiredFields(
