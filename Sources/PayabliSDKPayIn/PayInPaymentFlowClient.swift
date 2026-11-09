@@ -32,7 +32,7 @@ final class PayInPaymentFlowClient: Sendable {
         idempotencyKey: String
     ) async throws -> PayabliPayInResult {
         guard request.paymentMethod.isAuthorizable else {
-            throw PayabliPayInError.invalidInput("This payment method cannot be authorized.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.paymentMethod, reason: "This payment method cannot be authorized.")
         }
         return try await performTransaction(
             path: "/api/v2/MoneyIn/authorize",
@@ -49,7 +49,7 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let transId = request.transId.payabliCaptureTrimmed
         guard !transId.isEmpty else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         try request.paymentDetails.validate()
 
@@ -79,11 +79,11 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let transId = transId.payabliCaptureTrimmed
         guard !transId.isEmpty else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         // `.` and `..` are unreserved, so the encoder passes them through and the path would name another route.
         guard transId != ".", transId != ".." else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
 
         let payabliRequest = try buildRequest(
@@ -105,7 +105,7 @@ final class PayInPaymentFlowClient: Sendable {
     func details(transId: String) async throws -> PayabliPayInTransaction {
         let transId = transId.payabliCaptureTrimmed
         guard !transId.isEmpty, transId != ".", transId != ".." else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         let request = PayabliRequest(
             method: .get,
@@ -168,7 +168,7 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let entry = entryPoint.payabliCaptureTrimmed
         guard !entry.isEmpty else {
-            throw PayabliPayInError.invalidInput("Entrypoint is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.entryPoint, reason: "Entrypoint is required.")
         }
         try request.paymentDetails.validate()
         try request.paymentMethod.validate(request.options.validation)
@@ -278,15 +278,17 @@ final class PayInPaymentFlowClient: Sendable {
     ///
     /// - Parameter key: the key as the caller set it.
     /// - Returns: the trimmed key, as the `idempotencyKey` header carries it.
-    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the key is blank once trimmed or cannot sit in a header.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when the key is blank once trimmed or cannot sit in a header.
     private static func sendableKey(_ key: String) throws -> String {
         let trimmed = key.payabliCaptureTrimmed
         guard !trimmed.isBlank else {
-            throw PayabliPayInError.invalidInput("The idempotency key cannot be blank.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.idempotencyKey, reason: "The idempotency key cannot be blank.")
         }
         guard trimmed.isHeaderSafe else {
-            throw PayabliPayInError
-                .invalidInput("The idempotency key may contain printable ASCII only.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.idempotencyKey,
+                reason: "The idempotency key may contain printable ASCII only."
+            )
         }
         return trimmed
     }
@@ -346,9 +348,9 @@ final class PayInPaymentFlowClient: Sendable {
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
             // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, conflict || Self.leavesOutcomeUnknown(failure) else { throw failure }
-            let interruption = PayabliPayInError.submissionInterrupted(
+            let interruption = PayabliPayInError.Unsettled(
                 type: conflict ? .conflict : PayInInterruption.type(of: failure),
-                causeType: RedactedCause(failure).originalType,
+                cause: failure,
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil
             )
@@ -378,20 +380,28 @@ final class PayInPaymentFlowClient: Sendable {
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
             guard decoded.isApproved, response.statusCode != 409 else {
-                throw PayabliPayInError.transactionFailed(decoded.failure(httpStatusCode: response.statusCode))
+                throw Self.unapproved(decoded.failure(httpStatusCode: response.statusCode))
             }
             return PayabliPayInResult(apiResponse: decoded)
         }
 
         if let failure = decodeFailure(from: response, decoder: decoder) {
-            throw PayabliPayInError.transactionFailed(failure)
+            throw Self.unapproved(failure)
         }
 
         try mapPayabliHTTPError(response: response)
-        throw PayabliGenericError(
-            type: .decodingError,
-            reason: "Failed to decode payment capture response"
-        )
+        throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
+    }
+
+    /// The failure an unapproved answer is: a decline when its code is in the `D` family, otherwise the service's
+    /// own failure.
+    ///
+    /// - Parameter failure: the answer as the envelope read it.
+    /// - Returns: the error a caller receives.
+    private static func unapproved(_ failure: PayabliPayInFailure) -> PayabliPayInError {
+        failure.code?.hasPrefix(declinedFamily) == true
+            ? PayabliPayInError.Refused(failure: failure)
+            : PayabliPayInError.ServiceError(failure: failure)
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {
@@ -428,7 +438,7 @@ private struct IdempotencyCheckRefusal: Error {}
 /// A money-moving request whose outcome is open, for the facade to report once it knows which key was sent.
 struct PayInOpenOutcome: Error {
     /// The failure as a caller receives it when nothing else applies.
-    let interruption: PayabliPayInError
+    let interruption: PayabliPayInError.Unsettled
     /// What failed, before it was read as an open outcome.
     let cause: any Error
     /// The service refused the key because it had already seen it.

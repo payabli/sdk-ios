@@ -46,7 +46,7 @@ enum PayabliPayInFailureMessage {
     /// - Parameter error: The failure the submission threw.
     /// - Returns: The category that picks the message.
     static func messageCategory(for error: any Error) -> PayabliErrorCategory {
-        if case .submissionInterrupted = error as? PayabliPayInError {
+        if error is PayabliPayInError.Unsettled {
             return .outcomeUnknown
         }
         return (error as? any PayabliError)?.category ?? PayabliErrorType.unknown.category

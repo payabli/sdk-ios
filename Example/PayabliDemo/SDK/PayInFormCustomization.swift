@@ -8,7 +8,15 @@ struct PayInFormCustomization: Hashable {
     /// Names this tab on every request it sends, a capture and a save alike.
     static let source = "ios-simple-capture"
     /// What a method stored from this screen is sent with.
-    static let storeOptions = PayabliPayInStoreOptions(forceCustomerCreation: true, source: source)
+    static var storeOptions: PayabliPayInStoreOptions {
+        PayabliPayInStoreOptions(
+            forceCustomerCreation: true,
+            // A capture or an authorization names its customer on the request instead.
+            customerData: PayInDemoCustomer.customerData,
+            methodDescription: QAIdentity.current.note("simple-save"),
+            source: source
+        )
+    }
 
     enum Preset: String, CaseIterable, Identifiable {
         case sdkDefault = "Default"
@@ -118,18 +126,11 @@ struct PayInFormCustomization: Hashable {
         // An authorization holds funds on a card and nothing else.
         let offered: [PayabliPayInMethodType] = operation == .authorize ? [.card] : allowedMethods
         let methods = operation == .storedMethod ? offered : held.map { [$0] } ?? offered
-        let charges = operation != .storedMethod
         return PayabliPayInFormConfiguration(
             allowedMethods: methods,
             defaultMethod: methods.count > 1 ? startOn : methods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
             bankSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
-            hiddenValues: PayabliPayInHiddenValues(
-                accountHolderType: fixesHolderType ? .personal : nil,
-                methodDescription: QAIdentity.current.note(Self.note(for: operation)),
-                // A capture or an authorization names its customer on the request instead.
-                customerData: charges ? nil : PayInDemoCustomer.customerData
-            ),
             labelLayout: labelsInsideFields ? .placeholder : .external,
             showsFieldLabels: !hidesLabels,
             formatting: PayabliPayInFormatting(
@@ -141,7 +142,8 @@ struct PayInFormCustomization: Hashable {
             cardBrandIconPlacement: cardBrandIconPlacement,
             failureMessagePlacement: failureMessagePlacement,
             requiredFields: requiresCustomerNumber ? [.customerNumber] : [],
-            paymentSummary: paymentSummary
+            paymentSummary: paymentSummary,
+            accountHolderType: fixesHolderType ? .personal : nil
         )
     }
 
@@ -221,7 +223,7 @@ struct PayInFormCustomization: Hashable {
         .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode
     ]
 
-    /// A holder type supplied as a hidden value takes the place of its picker.
+    /// A holder type the configuration supplies takes the place of its picker.
     private var bankFields: [PayabliPayInField] {
         let fields = PayabliPayInFormConfiguration.defaultBankFieldOrder
         return fixesHolderType ? fields.filter { $0 != .accountHolderType } : fields
@@ -287,14 +289,6 @@ struct PayInFormCustomization: Hashable {
             fieldLabels: fieldLabels,
             fieldPlaceholders: placeholders
         )
-    }
-
-    private static func note(for operation: PayInOperation) -> String {
-        switch operation {
-        case .capture, .void: "simple-capture"
-        case .authorize: "simple-authorize"
-        case .storedMethod: "simple-save"
-        }
     }
 
     private static func customSubmitWording(for operation: PayInOperation) -> String {

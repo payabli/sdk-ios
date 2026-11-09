@@ -12,13 +12,10 @@ enum PayInFixture {
     static func interruption(
         _ failure: any Error
     ) -> (type: PayabliErrorType, causeType: String)? {
-        guard
-            case let .submissionInterrupted(type, causeType, _, _) =
-            failure as? PayabliPayInError
-        else {
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
             return nil
         }
-        return (type, causeType)
+        return (unsettled.type, unsettled.redactedCause.originalType)
     }
 
     static func makeFlow(

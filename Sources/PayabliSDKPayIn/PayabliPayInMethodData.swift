@@ -80,7 +80,6 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
     public var holderName: String
     public var holderType: PayabliPayInAccountHolderType?
     public var secCode: PayabliPayInSecCode?
-    public var deviceId: String?
 
     /// Bank account data for a payment or a stored method. The account number is copied into a buffer
     /// the SDK overwrites, and can't be read back from the value.
@@ -91,15 +90,13 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
     /// - Parameter holderName: the account holder's name.
     /// - Parameter holderType: personal or business, when known.
     /// - Parameter secCode: the ACH entry class; `WEB` is sent when none is given.
-    /// - Parameter deviceId: the device identifier, when one is sent.
     public init(
         accountNumber: String,
         routingNumber: String,
         accountType: PayabliPayInAccountType,
         holderName: String,
         holderType: PayabliPayInAccountHolderType? = nil,
-        secCode: PayabliPayInSecCode? = nil,
-        deviceId: String? = nil
+        secCode: PayabliPayInSecCode? = nil
     ) {
         self.init(
             accountNumber: SensitiveDigits.ofString(accountNumber),
@@ -107,8 +104,7 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
             accountType: accountType,
             holderName: holderName,
             holderType: holderType,
-            secCode: secCode,
-            deviceId: deviceId
+            secCode: secCode
         )
     }
 
@@ -118,8 +114,7 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
         accountType: PayabliPayInAccountType,
         holderName: String,
         holderType: PayabliPayInAccountHolderType? = nil,
-        secCode: PayabliPayInSecCode? = nil,
-        deviceId: String? = nil
+        secCode: PayabliPayInSecCode? = nil
     ) {
         self.accountNumber = accountNumber
         self.routingNumber = routingNumber
@@ -127,7 +122,6 @@ public struct PayabliPayInBankAccountData: CustomStringConvertible, CustomDebugS
         self.holderName = holderName
         self.holderType = holderType
         self.secCode = secCode
-        self.deviceId = deviceId
     }
 
     /// The account's kind alone: an interpolated value reaches a crash report, which does not redact,

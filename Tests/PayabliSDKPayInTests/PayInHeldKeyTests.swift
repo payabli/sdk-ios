@@ -53,7 +53,9 @@ final class PayInHeldKeyTests: XCTestCase {
     func testABlankReferenceIsRefusedUnsent() async {
         let refused = await failure { try await self.flow.capture(self.request(.newPayment, reference: " ")) }
 
-        XCTAssertEqual(refused as? PayabliPayInError, .invalidInput("The paymentReference cannot be blank."))
+        let invalid = refused as? PayabliPayInError.InvalidInput
+        XCTAssertEqual(invalid?.reason, "The paymentReference cannot be blank.")
+        XCTAssertEqual(invalid?.field, "paymentReference")
         XCTAssertEqual(transport.sentKeys, [])
     }
 
@@ -63,10 +65,9 @@ final class PayInHeldKeyTests: XCTestCase {
 
         let refused = await failure { try await self.flow.capture(self.request(.retry, reference: nil)) }
 
-        XCTAssertEqual(
-            refused as? PayabliPayInError,
-            .invalidInput("A retry must name the paymentReference of the payment it repeats.")
-        )
+        let invalid = refused as? PayabliPayInError.InvalidInput
+        XCTAssertEqual(invalid?.reason, "A retry must name the paymentReference of the payment it repeats.")
+        XCTAssertEqual(invalid?.field, "paymentReference")
         XCTAssertEqual(transport.sentKeys, [])
         XCTAssertEqual(minted.next(), 1, "no reference is minted for a retry")
     }
@@ -74,10 +75,9 @@ final class PayInHeldKeyTests: XCTestCase {
     func testAnAuthorizationRetryNamingNoReferenceIsRefusedUnsent() async {
         let refused = await failure { try await self.flow.authorize(self.request(.retry, reference: nil)) }
 
-        XCTAssertEqual(
-            refused as? PayabliPayInError,
-            .invalidInput("A retry must name the paymentReference of the payment it repeats.")
-        )
+        let invalid = refused as? PayabliPayInError.InvalidInput
+        XCTAssertEqual(invalid?.reason, "A retry must name the paymentReference of the payment it repeats.")
+        XCTAssertEqual(invalid?.field, "paymentReference")
         XCTAssertEqual(transport.sentKeys, [])
     }
 
@@ -656,8 +656,7 @@ final class PayInHeldKeyTests: XCTestCase {
     }
 
     private static func reference(in failure: any Error) -> String? {
-        guard case let .submissionInterrupted(_, _, _, reference) = failure as? PayabliPayInError else { return nil }
-        return reference
+        (failure as? PayabliPayInError.Unsettled)?.paymentReference
     }
 
     private func failure(_ block: () async throws -> PayabliPayInResult) async -> any Error {

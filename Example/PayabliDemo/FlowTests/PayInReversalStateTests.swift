@@ -206,11 +206,8 @@ final class PayInReversalStateTests: XCTestCase {
 
     func testAReversalCancelledInFlightIsWithheldUntilARead() {
         let cancellations: [Error] = [
-            PayabliPayInError.submissionInterrupted(
-                type: .userCancelled,
-                causeType: "PayabliSDKCore.PayabliGenericError",
-                paymentTransId: nil,
-                paymentReference: nil
+            PayabliPayInError.Unsettled(
+                cause: PayabliGenericError(type: .userCancelled, reason: "userCancelled")
             ),
             CancellationError()
         ]
@@ -229,11 +226,8 @@ final class PayInReversalStateTests: XCTestCase {
 
     private var interrupted: PayInFailure {
         PayInFailure(
-            PayabliPayInError.submissionInterrupted(
-                type: .networkError,
-                causeType: "PayabliSDKCore.PayabliGenericError",
-                paymentTransId: nil,
-                paymentReference: nil
+            PayabliPayInError.Unsettled(
+                cause: PayabliGenericError(type: .networkError, reason: "networkError")
             ),
             operation: .void
         )
@@ -241,8 +235,8 @@ final class PayInReversalStateTests: XCTestCase {
 
     private var refused: PayInFailure {
         PayInFailure(
-            PayabliPayInError.transactionFailed(
-                PayabliPayInFailure(
+            PayabliPayInError.Refused(
+                failure: PayabliPayInFailure(
                     code: "D0001",
                     reason: "Declined",
                     explanation: nil,
@@ -255,6 +249,6 @@ final class PayInReversalStateTests: XCTestCase {
     }
 
     private var refusedForAnotherSubmission: PayInFailure {
-        PayInFailure(PayabliPayInError.submissionInProgress, operation: .void)
+        PayInFailure(PayabliPayInError.AlreadySubmitting(), operation: .void)
     }
 }

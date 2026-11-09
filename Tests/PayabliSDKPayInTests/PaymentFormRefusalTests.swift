@@ -21,8 +21,9 @@ final class PaymentFormRefusalTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a fee equal to the total is refused")
-        } catch let PayabliPayInError.invalidInput(reason) {
-            XCTAssertEqual(reason, "Service fee and surcharge must be less than the total amount.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Service fee and surcharge must be less than the total amount.")
+            XCTAssertEqual(refusal.field, "paymentDetails.totalAmount")
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
@@ -45,8 +46,9 @@ final class PaymentFormRefusalTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a retry naming no payment is refused")
-        } catch let PayabliPayInError.invalidInput(reason) {
-            XCTAssertEqual(reason, "A retry must name the paymentReference of the payment it repeats.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "A retry must name the paymentReference of the payment it repeats.")
+            XCTAssertEqual(refusal.field, "paymentReference")
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
@@ -65,7 +67,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a surcharge above the total is refused")
-        } catch PayabliPayInError.invalidInput {}
+        } catch is PayabliPayInError.InvalidInput {}
         XCTAssertEqual(viewModel.routingNumber, "123456780")
         XCTAssertEqual(viewModel.accountNumber, "1111111111")
     }
@@ -83,8 +85,9 @@ final class PaymentFormRefusalTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a blank entry point is refused")
-        } catch let PayabliPayInError.invalidInput(reason) {
-            XCTAssertEqual(reason, "Entrypoint is required.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Entrypoint is required.")
+            XCTAssertEqual(refusal.field, "entryPoint")
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
@@ -157,8 +160,9 @@ final class PaymentFormRefusalTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a missing first name is refused")
-        } catch let PayabliPayInError.invalidInput(reason) {
-            XCTAssertEqual(reason, "First name is required.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "First name is required.")
+            XCTAssertEqual(refusal.field, "customerData.firstName")
         }
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)

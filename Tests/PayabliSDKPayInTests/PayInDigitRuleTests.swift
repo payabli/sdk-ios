@@ -123,7 +123,7 @@ final class PayInDigitRuleTests: XCTestCase {
 
         XCTAssertEqual(transport.count, 0, "the value reached the service", file: file, line: line)
         XCTAssertTrue(
-            "\(String(describing: refusal))".contains("contains unsupported characters"),
+            (refusal as? PayabliPayInError.InvalidInput)?.reason.contains("contains unsupported characters") == true,
             "refused for another reason: \(String(describing: refusal))",
             file: file,
             line: line

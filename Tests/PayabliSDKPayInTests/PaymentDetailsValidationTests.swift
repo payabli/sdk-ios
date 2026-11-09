@@ -6,8 +6,8 @@ final class PaymentDetailsValidationTests: XCTestCase {
         do {
             try details.validate()
             return nil
-        } catch let PayabliPayInError.invalidInput(message) {
-            return message
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            return refusal.reason
         } catch {
             return "unexpected \(error)"
         }
@@ -98,7 +98,9 @@ final class PaymentDetailsValidationTests: XCTestCase {
         let body: [String: Any] = ["paymentDetails": ["totalAmount": 1e30]]
 
         XCTAssertThrowsError(try PayInPaymentFlowJSONBody.normalizingCurrencyFields(in: body)) { error in
-            XCTAssertEqual(error as? PayabliPayInError, .invalidInput("paymentDetails.totalAmount is out of range."))
+            let refusal = error as? PayabliPayInError.InvalidInput
+            XCTAssertEqual(refusal?.reason, "paymentDetails.totalAmount is out of range.")
+            XCTAssertEqual(refusal?.field, "paymentDetails.totalAmount")
         }
     }
 

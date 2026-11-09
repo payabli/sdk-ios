@@ -51,7 +51,7 @@ final class PayInFormCustomizationTests: XCTestCase {
             configuration.bankSections.map(\.fields),
             PayabliPayInFormConfiguration().bankSections.map(\.fields)
         )
-        XCTAssertNil(configuration.hiddenValues.accountHolderType)
+        XCTAssertNil(configuration.accountHolderType)
         let style = customization.style
         XCTAssertEqual(style.accentColor, PayabliPayInFormStyle.default.accentColor)
         XCTAssertEqual(style.input.backgroundColor, PayabliPayInFormStyle.default.input.backgroundColor)
@@ -170,7 +170,6 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(configuration.allowedMethods, [.card])
         XCTAssertEqual(configuration.defaultMethod, .card)
-        XCTAssertNil(configuration.hiddenValues.customerData)
     }
 
     func testAnAuthorizationsCustomWordingPlacesAHold() {
@@ -232,7 +231,8 @@ final class PayInFormCustomizationTests: XCTestCase {
         let answers: [Error] = try [
             PayabliPaymentError.decline(JSONDecoder().decode(PayabliDeclineError.self, from: body)),
             PayabliPaymentError.validation(JSONDecoder().decode(PayabliValidationError.self, from: body)),
-            PayabliPayInError.transactionFailed(PayabliPayInFailure(code: "D0001", reason: "Declined", httpStatusCode: 402))
+            PayabliPayInError.Refused(failure: PayabliPayInFailure(code: "D0001", reason: "Declined", httpStatusCode: 402)),
+            PayabliPayInError.ServiceError(failure: PayabliPayInFailure(reason: "Invalid amount", status: 400))
         ]
 
         for error in answers {
@@ -249,8 +249,9 @@ final class PayInFormCustomizationTests: XCTestCase {
             Reason(type: .retryNotSamePayment),
             Reason(type: .serverError),
             Reason(type: .paymentReferenceOpen),
-            PayabliPayInError.invalidInput("amount"),
-            PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+            PayabliPayInError.InvalidInput(field: "paymentDetails.totalAmount", reason: "amount"),
+            PayabliPayInError.InvalidInput(field: nil, reason: "Card number failed validation."),
+            PayabliPayInError.ServiceError(failure: PayabliPayInFailure(reason: "Unavailable", status: 503))
         ]
 
         for error in failures {
@@ -268,9 +269,7 @@ final class PayInFormCustomizationTests: XCTestCase {
     }
 
     private static let unresolved = PayInFailure(
-        PayabliPayInError.submissionInterrupted(
-            type: .networkError, causeType: "URLError", paymentTransId: nil, paymentReference: nil
-        ),
+        PayabliPayInError.Unsettled(cause: Reason(type: .networkError)),
         operation: .capture
     )
 }

@@ -29,9 +29,9 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
 
     func testAnInterruptedSubmissionWarnsWhateverItsCausesCategory() {
         for type in [PayabliErrorType.rateLimited, .tokenExpired, .tokenProviderFailed, .validation] {
-            let interrupted = PayabliPayInError.submissionInterrupted(
+            let interrupted = PayabliPayInError.Unsettled(
                 type: type,
-                causeType: "test",
+                cause: PayabliGenericError(type: type, reason: "test"),
                 paymentTransId: nil,
                 paymentReference: "p1"
             )

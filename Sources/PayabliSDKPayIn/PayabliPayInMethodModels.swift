@@ -157,91 +157,6 @@ public enum PayabliPayInSecCode: String, CaseIterable, Identifiable, Codable, Se
     }
 }
 
-public enum PayabliPayInTokenStorageError: PayabliError {
-    case invalidInput(String)
-    case missingAccessToken
-    case saveFailed(PayabliPayInSaveFailure)
-
-    public var type: PayabliErrorType {
-        switch self {
-        case .invalidInput:
-            return .validation
-        case .missingAccessToken:
-            return .missingToken
-        case .saveFailed:
-            return .paymentDeclined
-        }
-    }
-
-    public var reason: String {
-        switch self {
-        case let .invalidInput(message):
-            return message
-        case .missingAccessToken:
-            return "Missing access token"
-        case let .saveFailed(failure):
-            return failure.reason
-        }
-    }
-
-    public var detail: String? {
-        switch self {
-        case .invalidInput, .missingAccessToken:
-            return nil
-        case let .saveFailed(failure):
-            return failure.detail
-        }
-    }
-}
-
-public struct PayabliPayInSaveFailure: Codable, Sendable, Equatable {
-    public let isSuccess: Bool?
-    public let responseText: String
-    public let responseCode: Int?
-    public let resultCode: Int?
-    public let resultText: String?
-    public let explanation: String?
-    public let todoAction: String?
-    public let httpStatusCode: Int?
-
-    public init(
-        isSuccess: Bool? = nil,
-        responseText: String,
-        responseCode: Int? = nil,
-        resultCode: Int? = nil,
-        resultText: String? = nil,
-        explanation: String? = nil,
-        todoAction: String? = nil,
-        httpStatusCode: Int? = nil
-    ) {
-        self.isSuccess = isSuccess
-        self.responseText = responseText
-        self.responseCode = responseCode
-        self.resultCode = resultCode
-        self.resultText = resultText
-        self.explanation = explanation
-        self.todoAction = todoAction
-        self.httpStatusCode = httpStatusCode
-    }
-
-    public var reason: String {
-        if let explanation = explanation?.trimmed.nilIfEmpty {
-            return explanation
-        }
-        if let resultText = resultText?.trimmed.nilIfEmpty {
-            return resultText
-        }
-        if let httpStatusCode, httpStatusCode >= 500 {
-            return "Unable to save payment method right now. Please try again."
-        }
-        return responseText.trimmed.nilIfEmpty ?? "Unable to save payment method."
-    }
-
-    public var detail: String? {
-        todoAction?.trimmed.nilIfEmpty
-    }
-}
-
 public enum PayabliPayInMethodInput: Sendable {
     case card(PayabliPayInCardData)
     case bankAccount(PayabliPayInBankAccountData)
@@ -501,15 +416,16 @@ struct PayabliPayInTokenStorageAPIResponse: Codable, Sendable, Equatable {
         responseData = try? c.decodeIfPresent(PayabliPayInTokenStorageAPIResponseData.self, forKey: .responseData)
     }
 
-    func failure(httpStatusCode: Int? = nil) -> PayabliPayInSaveFailure {
-        PayabliPayInSaveFailure(
-            isSuccess: isSuccess,
-            responseText: responseText,
-            responseCode: responseCode,
-            resultCode: responseData?.resultCode,
-            resultText: responseData?.resultText,
+    /// The refusal this answer describes. It carries no code: the route answers one result code for every refusal.
+    ///
+    /// - Parameter httpStatusCode: the status the answer came with.
+    /// - Returns: the refusal, its reason the result text or else the response text.
+    func failure(httpStatusCode: Int?) -> PayabliPayInFailure {
+        PayabliPayInFailure(
+            reason: responseData?.resultText?.trimmed.nilIfEmpty ?? responseText.trimmed.nilIfEmpty
+                ?? "Unable to save payment method.",
             explanation: responseData?.explanation,
-            todoAction: responseData?.todoAction,
+            action: responseData?.todoAction,
             httpStatusCode: httpStatusCode
         )
     }
@@ -547,39 +463,57 @@ public extension PayabliPayInMethodInput {
 
 extension PayabliPayInCardData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        try cardNumber.useDigitBytes(field: "Card number") { pan in
+        try cardNumber.useDigitBytes(field: PayInFieldPath.storedMethod(.cardnumber), label: "Card number") { pan in
             guard (PayabliPayInInputLimits.minimumCardNumberDigits ... PayabliPayInInputLimits.maximumCardNumberDigits)
                 .contains(pan.count)
             else {
-                throw PayabliPayInTokenStorageError.invalidInput("Card number must be 12 to 19 digits.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.storedMethod(.cardnumber),
+                    reason: "Card number must be 12 to 19 digits."
+                )
             }
             if validation.requiresLuhnCheck, !Self.passesLuhn(pan) {
-                throw PayabliPayInTokenStorageError.invalidInput("Card number failed validation.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.storedMethod(.cardnumber),
+                    reason: "Card number failed validation."
+                )
             }
         }
         try validateExpiry()
         let trimmedCardholderName = holderName.trimmed
         guard !trimmedCardholderName.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("Cardholder name is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(.cardHolder), reason: "Cardholder name is required.")
         }
         guard trimmedCardholderName.count <= PayabliPayInInputLimits.maximumCardholderNameCharacters else {
-            throw PayabliPayInTokenStorageError.invalidInput("Cardholder name must be 60 characters or fewer.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardHolder),
+                reason: "Cardholder name must be 60 characters or fewer."
+            )
         }
         let trimmedBillingZip = postalCode.trimmed
         guard !trimmedBillingZip.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(.cardzip), reason: "Card Postal Code is required.")
         }
         guard trimmedBillingZip.count <= PayabliPayInInputLimits.maximumPostalCodeCharacters else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card Postal Code must be 12 characters or fewer.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardzip),
+                reason: "Card Postal Code must be 12 characters or fewer."
+            )
         }
-        try securityCode.useDigitBytes(field: "CVV") { cvv in
+        try securityCode.useDigitBytes(field: PayInFieldPath.storedMethod(.cardcvv), label: "CVV") { cvv in
             guard !cvv.isEmpty else {
-                throw PayabliPayInTokenStorageError.invalidInput("CVV is required.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.storedMethod(.cardcvv),
+                    reason: "CVV is required."
+                )
             }
             guard (PayabliPayInInputLimits.minimumCardCvvDigits ... PayabliPayInInputLimits.maximumCardCvvDigits)
                 .contains(cvv.count)
             else {
-                throw PayabliPayInTokenStorageError.invalidInput("CVV must be 3 or 4 digits.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.storedMethod(.cardcvv),
+                    reason: "CVV must be 3 or 4 digits."
+                )
             }
         }
     }
@@ -590,19 +524,31 @@ extension PayabliPayInCardData {
     /// - Parameter now: the moment the current month is read at.
     func validateExpiry(at now: Date = Date()) throws {
         guard (1 ... 12).contains(expiryMonth) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiry month must be between 1 and 12.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardexp),
+                reason: "Expiry month must be between 1 and 12."
+            )
         }
         guard (1000 ... 9999).contains(expiryYear) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be four digits.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardexp),
+                reason: "Expiry year must be four digits."
+            )
         }
         // The request carries two digits of the year, so only 2000 to 2099 can be sent as given.
         guard Self.expiryYears.contains(expiryYear) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Expiry year must be between 2000 and 2099.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardexp),
+                reason: "Expiry year must be between 2000 and 2099."
+            )
         }
         let today = Self.expiryCalendar.dateComponents([.year, .month], from: now)
         guard let year = today.year, let month = today.month else { return }
         guard (expiryYear, expiryMonth) >= (year, month) else {
-            throw PayabliPayInTokenStorageError.invalidInput("Card is expired.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.cardexp),
+                reason: "Card is expired."
+            )
         }
     }
 
@@ -644,36 +590,54 @@ extension PayabliPayInCardData {
 
 extension PayabliPayInBankAccountData {
     func validate(_ validation: PayabliPayInValidation) throws {
-        try accountNumber.useDigitBytes(field: "Account number") { account in
+        try accountNumber.useDigitBytes(field: PayInFieldPath.storedMethod(.achAccount), label: "Account number") { account in
             let minimumDigits = PayabliPayInInputLimits.minimumAccountNumberDigits
             let maximumDigits = PayabliPayInInputLimits.maximumAccountNumberDigits
             guard (minimumDigits ... maximumDigits).contains(account.count)
             else {
-                throw PayabliPayInTokenStorageError.invalidInput("Account number must be 4 to 17 digits.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.storedMethod(.achAccount),
+                    reason: "Account number must be 4 to 17 digits."
+                )
             }
         }
         guard let routing = routingNumber.payabliInstrumentDigits else {
-            throw PayabliPayInTokenStorageError.invalidInput("Routing number contains unsupported characters.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.achRouting),
+                reason: "Routing number contains unsupported characters."
+            )
         }
         guard routing.count == PayabliPayInInputLimits.routingNumberDigits else {
-            throw PayabliPayInTokenStorageError.invalidInput("Routing number must be 9 digits.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.achRouting),
+                reason: "Routing number must be 9 digits."
+            )
         }
         if validation.validatesRoutingNumberChecksum, !Self.passesABAChecksum(routing) {
-            throw PayabliPayInTokenStorageError.invalidInput("Routing number failed validation.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.achRouting),
+                reason: "Routing number failed validation."
+            )
         }
         let trimmedHolderName = holderName.trimmed
         guard !trimmedHolderName.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account holder is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(.achHolder), reason: "Account holder is required.")
         }
         guard trimmedHolderName.count <= PayabliPayInInputLimits.maximumAccountHolderNameCharacters else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account holder must be 60 characters or fewer.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.achHolder),
+                reason: "Account holder must be 60 characters or fewer."
+            )
         }
         let allowed = trimmedHolderName.range(
             of: #"^[A-Za-z0-9 .'\-]+$"#,
             options: .regularExpression
         ) != nil
         guard allowed else {
-            throw PayabliPayInTokenStorageError.invalidInput("Account holder contains unsupported characters.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.storedMethod(.achHolder),
+                reason: "Account holder contains unsupported characters."
+            )
         }
     }
 
@@ -737,6 +701,5 @@ extension PayabliPayInMethodInput {
         case achHolder
         case achHolderType
         case achRouting
-        case device
     }
 }

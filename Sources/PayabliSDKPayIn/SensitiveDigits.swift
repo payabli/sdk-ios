@@ -79,17 +79,18 @@ final class SensitiveDigits: @unchecked Sendable, CustomStringConvertible, Custo
     /// the filtered copy wiped before returning. A non-digit ASCII byte is dropped; a non-ASCII byte
     /// is refused, because a digit-shaped character from another script is not the digit it resembles.
     ///
-    /// - Parameter field: the field's name, carried by the refusal when the bytes are not ASCII.
+    /// - Parameter field: where the value sits in the request, carried by the refusal when the bytes are not ASCII.
+    /// - Parameter label: the field's name in the refusal's reason.
     /// - Parameter body: the rule to run over the filtered digits.
     /// - Returns: what `body` returned.
-    /// - Throws: ``PayabliPayInTokenStorageError/invalidInput(_:)`` when the digits hold a non-ASCII byte.
-    func useDigitBytes<T>(field: String, _ body: ([UInt8]) throws -> T) throws -> T {
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when the digits hold a non-ASCII byte.
+    func useDigitBytes<T>(field: String, label: String, _ body: ([UInt8]) throws -> T) throws -> T {
         var filtered: [UInt8] = []
         filtered.reserveCapacity(digits.count)
         defer { MemoryWipe.overwrite(&filtered) }
         for byte in read() {
             guard byte < 0x80 else {
-                throw PayabliPayInTokenStorageError.invalidInput("\(field) contains unsupported characters.")
+                throw PayabliPayInError.InvalidInput(field: field, reason: "\(label) contains unsupported characters.")
             }
             if (0x30 ... 0x39).contains(byte) {
                 filtered.append(byte)

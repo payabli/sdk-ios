@@ -35,7 +35,10 @@ enum PayInPaymentFlowJSONBody {
                 return
             }
             guard let sent = PayInAmount.sendable(number.doubleValue) else {
-                throw PayabliPayInError.invalidInput("paymentDetails.\(pair.key) is out of range.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.details(pair.key),
+                    reason: "paymentDetails.\(pair.key) is out of range."
+                )
             }
             result[pair.key] = RawNumber(text: formattedCurrencyAmount(sent))
         }

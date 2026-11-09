@@ -254,24 +254,22 @@ extension PayInFailure {
         switch error {
         case PayabliPaymentError.decline, PayabliPaymentError.validation:
             return true
-        case PayabliPayInError.transactionFailed:
-            let type = (error as? any PayabliError)?.type
-            return type == .paymentDeclined || type == .validation
+        case is PayabliPayInError.Refused:
+            return true
+        case let failure as PayabliPayInError.ServiceError:
+            return failure.type == .paymentDeclined || failure.type == .validation
         default:
             return false
         }
     }
 
     private static func refusedForAnotherSubmission(_ error: Error) -> Bool {
-        if case .submissionInProgress = error as? PayabliPayInError {
-            return true
-        }
-        return false
+        error is PayabliPayInError.AlreadySubmitting
     }
 
     /// Whether the request may have reached the service, so sending it again is not safe to offer.
     private static func leavesOutcomeUnknown(_ error: Error) -> Bool {
-        if case .submissionInterrupted = error as? PayabliPayInError {
+        if error is PayabliPayInError.Unsettled {
             return true
         }
         // A request cancelled in flight may already have reached the service.
@@ -279,9 +277,8 @@ extension PayInFailure {
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
-        if case let PayabliPayInError.transactionFailed(failure) = error,
-           failure.httpStatusCode == 409
-        {
+        let answered = (error as? PayabliPayInError.Refused)?.failure ?? (error as? PayabliPayInError.ServiceError)?.failure
+        if answered?.httpStatusCode == 409 {
             return true
         }
         // An empty body carries no code of its own, so the status mapping supplies one. The code says

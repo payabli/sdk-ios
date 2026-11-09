@@ -26,10 +26,16 @@ enum PayInBodyWriter {
             switch method {
             case let .card(method):
                 try writer.string(CaptureKeys.cardHolder.stringValue, method.data.holderName.payabliCaptureTrimmed)
-                try writer.digits(CaptureKeys.cardcvv.stringValue, field: "CVV", method.data.securityCode)
+                try writer.digits(
+                    CaptureKeys.cardcvv.stringValue,
+                    field: PayInFieldPath.method(.cardcvv),
+                    label: "CVV",
+                    method.data.securityCode
+                )
                 try writer.string(CaptureKeys.cardexp.stringValue, method.data.wireExpiry)
                 try writer.digits(
-                    CaptureKeys.cardnumber.stringValue, field: "Card number", method.data.cardNumber
+                    CaptureKeys.cardnumber.stringValue, field: PayInFieldPath.method(.cardnumber), label: "Card number",
+                    method.data.cardNumber
                 )
                 try writer.string(CaptureKeys.cardzip.stringValue, method.data.postalCode.payabliCaptureTrimmed)
                 try writer.optionalString(
@@ -41,7 +47,8 @@ enum PayInBodyWriter {
 
             case let .bankAccount(method):
                 try writer.digits(
-                    CaptureKeys.achAccount.stringValue, field: "Account number", method.data.accountNumber
+                    CaptureKeys.achAccount.stringValue, field: PayInFieldPath.method(.achAccount), label: "Account number",
+                    method.data.accountNumber
                 )
                 try writer.string(CaptureKeys.achAccountType.stringValue, method.data.accountType.rawValue)
                 try writer.string(CaptureKeys.achCode.stringValue, (method.data.secCode ?? .web).rawValue)
@@ -49,10 +56,6 @@ enum PayInBodyWriter {
                 try writer.optionalString(CaptureKeys.achHolderType.stringValue, method.data.holderType?.rawValue)
                 try writer.string(
                     CaptureKeys.achRouting.stringValue, method.data.routingNumber.payabliCaptureDigitsOnly
-                )
-                try writer.optionalString(
-                    CaptureKeys.device.stringValue,
-                    method.data.deviceId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
                 )
                 try writer.string(CaptureKeys.method.stringValue, "ach")
 
@@ -87,19 +90,33 @@ enum PayInBodyWriter {
                 try writer.string(StoreKeys.method.stringValue, PayabliPayInMethodType.card.rawValue)
                 try writer.string(StoreKeys.cardexp.stringValue, data.wireExpiry)
                 try writer.string(StoreKeys.cardHolder.stringValue, data.holderName.trimmed)
-                try writer.digits(StoreKeys.cardnumber.stringValue, field: "Card number", data.cardNumber)
-                try writer.digits(StoreKeys.cardcvv.stringValue, field: "CVV", data.securityCode)
+                try writer.digits(
+                    StoreKeys.cardnumber.stringValue,
+                    field: PayInFieldPath.storedMethod(.cardnumber),
+                    label: "Card number",
+                    data.cardNumber
+                )
+                try writer.digits(
+                    StoreKeys.cardcvv.stringValue,
+                    field: PayInFieldPath.storedMethod(.cardcvv),
+                    label: "CVV",
+                    data.securityCode
+                )
                 try writer.string(StoreKeys.cardzip.stringValue, data.postalCode.trimmed)
 
             case let .bankAccount(data):
                 try writer.string(StoreKeys.method.stringValue, PayabliPayInMethodType.bankAccount.rawValue)
-                try writer.digits(StoreKeys.achAccount.stringValue, field: "Account number", data.accountNumber)
+                try writer.digits(
+                    StoreKeys.achAccount.stringValue,
+                    field: PayInFieldPath.storedMethod(.achAccount),
+                    label: "Account number",
+                    data.accountNumber
+                )
                 try writer.string(StoreKeys.achAccountType.stringValue, data.accountType.rawValue)
                 try writer.string(StoreKeys.achHolder.stringValue, data.holderName.trimmed)
                 try writer.string(StoreKeys.achRouting.stringValue, data.routingNumber.digitsOnly)
                 try writer.string(StoreKeys.achCode.stringValue, (data.secCode ?? .web).rawValue)
                 try writer.optionalString(StoreKeys.achHolderType.stringValue, data.holderType?.rawValue)
-                try writer.optionalString(StoreKeys.device.stringValue, data.deviceId.map(\.trimmed)?.nilIfEmpty)
             }
         }
     }
@@ -270,10 +287,10 @@ private final class FragmentWriter {
 
     /// A member whose value is buffered digits: filtered to the ASCII digits a request can write by
     /// the one rule the validators and this writer share, then written raw between quotes.
-    func digits(_ name: String, field: String, _ value: SensitiveDigits) throws {
+    func digits(_ name: String, field: String, label: String, _ value: SensitiveDigits) throws {
         try key(name)
         buffer.write(PayInBodyWriter.quotationMark)
-        try value.useDigitBytes(field: field) { digits in
+        try value.useDigitBytes(field: field, label: label) { digits in
             buffer.write(digits)
         }
         buffer.write(PayInBodyWriter.quotationMark)

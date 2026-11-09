@@ -92,8 +92,8 @@ final class PayInAuthorizeClientTests: XCTestCase {
         do {
             _ = try await authorize(method, on: transport)
             XCTFail("\(method.method) must be refused", file: file, line: line)
-        } catch let PayabliPayInError.invalidInput(message) {
-            XCTAssertEqual(message, expected, file: file, line: line)
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, expected, file: file, line: line)
         } catch {
             XCTFail("Wrong error: \(error)", file: file, line: line)
         }
