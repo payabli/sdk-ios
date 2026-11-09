@@ -32,8 +32,8 @@ When summarizing the component, describe the overall capabilities as:
 - Hosted capture for SDK-collected card or bank account payment details.
 - Authorization of a card, stored card, or cloud device, and follow-up capture
   of a prior authorization.
-- Configurable fields, sections, labels, placeholders, hidden values, payment
-  summary rows, validation, and visual styling.
+- Configurable fields, sections, labels, placeholders, the account holder type,
+  payment summary rows, validation, and visual styling.
 - A security model that lets hosted-form integrations avoid host-app access to
   clear PAN while keeping direct APIs available for PCI-ready hosts.
 - Stable accessibility identifiers, Dynamic Type support,
@@ -276,7 +276,6 @@ let storedBankAccount = try await paymentFlow.storeMethod(PayabliPayInStoreReque
 | `holderName` | Required account holder name. |
 | `holderType` | Optional `.personal` or `.business`. |
 | `secCode` | Optional; `WEB` is sent when none is given. Values: `.ppd`, `.web`, `.tel`, `.ccd`, `.boc`. |
-| `deviceId` | Optional device identifier for bank account request payloads. |
 
 `cardNumber`, `securityCode` and `accountNumber` are passed as `String` and copied into buffers the SDK overwrites once each request is written. They can be set, and never read back from the value.
 
@@ -320,15 +319,15 @@ authorize forms:
 | --- | --- |
 | `paymentDetails` | Required amount/fee/currency details. |
 | `accountId` | Optional account identifier. |
-| `customerData` | Defaults or hidden customer data merged with form customer fields. |
+| `customerData` | Customer data merged with the form's customer fields. |
 | `ipAddress` | Optional customer IP address. |
-| `orderDescription` | Optional order description; hosted form order description can override this. |
+| `orderDescription` | Optional order description. |
 | `orderId` | Optional merchant order ID. |
 | `source` | Optional integration source string. |
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
-| `paymentReference` | Optional. Your app's own name for the payment, kept on the device and never sent. Left unset on a new payment, the SDK names the payment and returns the name on `submissionInterrupted`. A call your app cancels throws `CancellationError`, whose outcome is unknown and which carries no name, so an app that cancels charges names each payment. A blank one is refused with `invalidInput("The paymentReference cannot be blank.")`. The SDK makes and keeps every idempotency key; the app never sets one. |
-| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `submissionInterrupted`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `submissionInterrupted` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. A retry that names no `paymentReference` is refused unsent with `invalidInput("A retry must name the paymentReference of the payment it repeats.")`; a retry naming a reference with nothing held sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`, as is any call, a retry included, on a payment or transaction another `PayabliPayIn` is still sending. Every `PayabliPayIn` for the same entry point and environment shares the held keys. |
+| `paymentReference` | Optional. Your app's own name for the payment, kept on the device and never sent. Left unset on a new payment, the SDK names the payment and returns the name on `PayabliPayInError.Unsettled`. A call your app cancels throws `CancellationError`, whose outcome is unknown and which carries no name, so an app that cancels charges names each payment. A blank one is refused with `PayabliPayInError.InvalidInput`, field `paymentReference`, reason "The paymentReference cannot be blank.". The SDK makes and keeps every idempotency key; the app never sets one. |
+| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `Unsettled`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `Unsettled` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. A retry that names no `paymentReference` is refused unsent with `InvalidInput`, field `paymentReference`; a retry naming a reference with nothing held sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`, as is any call, a retry included, on a payment or transaction another `PayabliPayIn` is still sending. Every `PayabliPayIn` for the same entry point and environment shares the held keys. |
 | `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
 | `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client validation toggles. |
@@ -392,7 +391,7 @@ let captured = try await paymentFlow.captureAuthorizedTransaction(
 ## Form Configuration Reference
 
 `PayabliPayInFormConfiguration` controls method availability, field
-layout, labels, placeholders, hidden defaults, validation, and payment summary
+layout, labels, placeholders, the holder type, validation, and payment summary
 display.
 
 | Field | Default | Purpose |
@@ -400,10 +399,10 @@ display.
 | `allowedMethods` | `[.card, .bankAccount]` | Which hosted methods can be selected. Authorize is normalized to card only. |
 | `defaultMethod` | `.card` | Initial selected method when it is included in `allowedMethods`. |
 | `cardFieldOrder` | cardholder, number, expiration, CVV, postal code | Legacy flat field order for card. Used when custom sections are not supplied. |
-| `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. `secCode` is hidden from the form. |
+| `bankFieldOrder` | holder, routing, account, account type, holder type | Legacy flat field order for the bank account. The form never asks for a SEC code and sends `WEB`. |
 | `cardSections` | card fields, then an untitled summary | Section grouping for card UI. Section titles are configurable; an untitled summary is headed "Payment". |
 | `bankSections` | bank account fields, then an untitled summary | Section grouping for the bank account form. Section titles are configurable; an untitled summary is headed "Payment". |
-| `hiddenValues` | defaults with `secCode = .web` | Values included in submissions without rendering editable fields. |
+| `accountHolderType` | nil | The holder type sent when the form doesn't show `.accountHolderType`. When it does, the payer's choice is sent. |
 | `options` | empty options | Token-storage options for hosted store-payment-method submissions. |
 | `labelLayout` | `.external` | High-level label mode: `.external` or `.placeholder`. |
 | `showsFieldLabels` | follows `labelLayout` | Global visible-label switch. Set false for placeholder-only UI. |
@@ -430,9 +429,6 @@ All `PayabliPayInField` values:
 | `.accountNumber` | Account number | Bank account |
 | `.accountType` | Account type | Bank account |
 | `.accountHolderType` | Holder type | Bank account |
-| `.secCode` | SEC code | bank account hidden value; not rendered by default |
-| `.deviceId` | Device | bank account, optional |
-| `.methodDescription` | Description | Customer/method metadata |
 | `.firstName` | First name | Customer |
 | `.lastName` | Last name | Customer |
 | `.customerNumber` | Customer number | Customer |
@@ -520,21 +516,6 @@ let configuration = PayabliPayInFormConfiguration(
 
 Use `Postal code` for postal-code user-facing copy unless an integrator
 intentionally overrides the label.
-
-## Hidden Values
-
-`PayabliPayInHiddenValues`:
-
-| Field | Default | Purpose |
-| --- | --- | --- |
-| `accountHolderType` | nil | Hidden account holder type. |
-| `secCode` | `.web` | Hidden SEC code. |
-| `deviceId` | nil | Hidden device ID. |
-| `methodDescription` | nil | Hidden stored-method description. |
-| `customerData` | nil | Hidden/default customer data merged into the request. |
-
-Hidden values are useful when the integrator does not want an input displayed
-but must still send a value.
 
 ## Formatting And Sizing
 

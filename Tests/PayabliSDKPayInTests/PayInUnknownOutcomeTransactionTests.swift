@@ -21,11 +21,11 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertEqual(type, .serverError)
-        XCTAssertEqual(paymentTransId, "101-abc")
+        XCTAssertEqual(unsettled.type, .serverError)
+        XCTAssertEqual(unsettled.paymentTransId, "101-abc")
     }
 
     func testAnUnknownOutcomeKeepsTheTransactionWhenAnotherFieldIsMalformed() async {
@@ -39,10 +39,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertEqual(paymentTransId, "101-abc")
+        XCTAssertEqual(unsettled.paymentTransId, "101-abc")
     }
 
     func testAnUnknownOutcomeKeepsTheTransactionWhenTheAnswerCarriesNoCode() async {
@@ -56,10 +56,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertEqual(paymentTransId, "101-abc")
+        XCTAssertEqual(unsettled.paymentTransId, "101-abc")
     }
 
     func testAnAnswerThatCannotBeReadKeepsTheTransactionItNames() async {
@@ -73,11 +73,11 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertEqual(type, .decodingError)
-        XCTAssertEqual(paymentTransId, "101-abc")
+        XCTAssertEqual(unsettled.type, .decodingError)
+        XCTAssertEqual(unsettled.paymentTransId, "101-abc")
     }
 
     func testAServerErrorNamingOnlyATransactionKeepsIt() async {
@@ -91,11 +91,11 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(type, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertEqual(type, .serverError)
-        XCTAssertEqual(paymentTransId, "101-abc")
+        XCTAssertEqual(unsettled.type, .serverError)
+        XCTAssertEqual(unsettled.paymentTransId, "101-abc")
     }
 
     func testAnUnknownOutcomeWithNoAnswerCarriesNoTransaction() async {
@@ -108,10 +108,10 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertNil(paymentTransId)
+        XCTAssertNil(unsettled.paymentTransId)
     }
 
     func testAnUnknownOutcomeWhoseAnswerNamedNoTransactionCarriesNone() async {
@@ -125,9 +125,9 @@ final class PayInUnknownOutcomeTransactionTests: XCTestCase {
             _ = try await flow.capture(PayInFixture.request())
         })
 
-        guard case let .submissionInterrupted(_, _, paymentTransId, _) = failure as? PayabliPayInError else {
-            return XCTFail("expected submissionInterrupted, got \(failure)")
+        guard let unsettled = failure as? PayabliPayInError.Unsettled else {
+            return XCTFail("expected Unsettled, got \(failure)")
         }
-        XCTAssertNil(paymentTransId)
+        XCTAssertNil(unsettled.paymentTransId)
     }
 }

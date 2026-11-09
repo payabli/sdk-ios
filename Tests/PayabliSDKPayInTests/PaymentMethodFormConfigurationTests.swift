@@ -164,7 +164,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             bankSections: [
                 PayabliPayInFieldSection(
                     title: "Hidden",
-                    fields: [.secCode]
+                    fields: []
                 )
             ]
         )
@@ -194,12 +194,12 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                     fields: [.accountHolder]
                 )
             ],
-            requiredFields: [.billingPostalCode, .deviceId]
+            requiredFields: [.billingPostalCode, .billingEmail]
         )
 
         XCTAssertEqual(configuration.bankSections[0].fields, [
             .firstName,
-            .deviceId,
+            .billingEmail,
             .billingPostalCode
         ])
         XCTAssertEqual(configuration.bankSections[1].fields, [
@@ -483,8 +483,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .deviceId,
-                    .methodDescription,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -496,8 +494,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         viewModel.accountHolder = "Jane Business"
         viewModel.routingNumber = "123456780"
         viewModel.accountNumber = "1111111111"
-        viewModel.deviceId = "terminal-1"
-        viewModel.methodDescription = "Business account"
         viewModel.firstName = "Jane"
 
         XCTAssertFalse(viewModel.canSubmit)

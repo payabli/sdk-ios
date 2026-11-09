@@ -126,7 +126,7 @@ final class SensitiveDigitsTests: XCTestCase {
         let value = SensitiveDigits.ofString("4111 1111 1111 1111")
         var lent: [UInt8]?
 
-        let length = try? value.useDigitBytes(field: "Card number") { digits -> Int in
+        let length = try? value.useDigitBytes(field: PayInFieldPath.storedMethod(.cardnumber), label: "Card number") { digits -> Int in
             lent = digits
             return digits.count
         }
@@ -142,12 +142,13 @@ final class SensitiveDigitsTests: XCTestCase {
         let value = SensitiveDigits.ofString("٤" + String(repeating: "١", count: 15))
 
         do {
-            _ = try value.useDigitBytes(field: "Card number") { _ in
+            _ = try value.useDigitBytes(field: PayInFieldPath.storedMethod(.cardnumber), label: "Card number") { _ in
                 XCTFail("A refused value never runs the rule")
             }
             XCTFail("Expected a refusal")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Card number contains unsupported characters.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.field, PayInFieldPath.storedMethod(.cardnumber))
+            XCTAssertEqual(refusal.reason, "Card number contains unsupported characters.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -159,7 +160,7 @@ final class SensitiveDigitsTests: XCTestCase {
     func testUseDigitBytesRethrowsAndLeavesTheValueUntouched() {
         let value = SensitiveDigits.ofString(pan)
 
-        XCTAssertThrowsError(try value.useDigitBytes(field: "Card number") { _ in
+        XCTAssertThrowsError(try value.useDigitBytes(field: PayInFieldPath.storedMethod(.cardnumber), label: "Card number") { _ in
             throw Sentinel()
         })
 

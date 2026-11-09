@@ -212,7 +212,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             return XCTFail("one failure, not \(recorder.failures.count)")
         }
         let failure = recorder.failures[0]
-        guard case PayabliPayInError.transactionFailed = failure else {
+        guard failure is PayabliPayInError.Refused else {
             return XCTFail("Wrong error: \(failure)")
         }
         XCTAssertEqual(failure.type, .paymentDeclined)
@@ -260,7 +260,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
             return XCTFail("one failure, not \(recorder.failures.count)")
         }
         let failure = recorder.failures[0]
-        guard case PayabliPayInTokenStorageError.saveFailed = failure else {
+        guard failure is PayabliPayInError.Refused else {
             return XCTFail("Wrong error: \(failure)")
         }
         XCTAssertEqual(failure.category, .declined)

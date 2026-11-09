@@ -19,7 +19,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     ) async throws -> PayabliPayInStoredMethod {
         let entry = entryPoint.trimmed
         guard !entry.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("Entrypoint is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.entryPoint, reason: "Entrypoint is required.")
         }
         try paymentMethod.validate(options.validation)
         let storedMethod = paymentMethod.storedMethodType
@@ -39,11 +39,6 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             response = try await transport.perform(request)
         } catch {
             PayInBodyWriter.wipe(&body)
-            // The chain refuses an empty credential in the capture surface's error type. Translated,
-            // so this surface answers in its own.
-            if case PayabliPayInError.missingAccessToken = error {
-                throw PayabliPayInTokenStorageError.missingAccessToken
-            }
             throw error
         }
         PayInBodyWriter.wipe(&body)
@@ -54,7 +49,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             status == 400 ? PayabliPaymentError.validation(Self.badRequest(from: response)) : nil
         }
         if let failure = decodePaymentMethodFailure(from: response) {
-            throw PayabliPayInTokenStorageError.saveFailed(failure)
+            throw PayabliPayInError.Refused(failure: failure)
         }
         return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
@@ -96,7 +91,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             let decoded = try decoder.decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
             let approved = decoded.isSuccess == true || decoded.responseData?.resultCode == 1
             guard approved else {
-                throw PayabliPayInTokenStorageError.saveFailed(decoded.failure(httpStatusCode: response.statusCode))
+                throw PayabliPayInError.Refused(failure: decoded.failure(httpStatusCode: response.statusCode))
             }
             return PayabliPayInStoredMethod(
                 storedMethodId: decoded.responseData?.referenceId,
@@ -104,13 +99,12 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
                 methodReferenceId: decoded.responseData?.methodReferenceId,
                 customerId: decoded.responseData?.customerId
             )
-        } catch let error as PayabliPayInTokenStorageError {
+        } catch let error as PayabliPayInError {
             throw error
         } catch {
-            throw PayabliGenericError(
-                type: .decodingError,
+            throw PayabliPayInError.Undecodable(
                 reason: "Failed to decode payment method response",
-                underlying: error
+                httpStatus: response.statusCode
             )
         }
     }
@@ -124,7 +118,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
         return PayabliValidationError(detail: decoded?.responseText.trimmed.nilIfEmpty)
     }
 
-    private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInSaveFailure? {
+    private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInFailure? {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
         guard let decoded, decoded.isSuccess == false else { return nil }
         return decoded.failure(httpStatusCode: response.statusCode)

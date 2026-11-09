@@ -57,15 +57,6 @@ final class PayabliPayInViewModel: ObservableObject {
         didSet { acceptEdit(of: .accountHolderType) }
     }
 
-    @Published var secCode: PayabliPayInSecCode = .web {
-        didSet { acceptEdit(of: .secCode) }
-    }
-
-    @Published var deviceId = "" {
-        didSet { acceptEdit(of: .deviceId) }
-    }
-
-    @Published var methodDescription = ""
     @Published var firstName = "" {
         didSet { acceptEdit(of: .firstName) }
     }
@@ -317,7 +308,7 @@ final class PayabliPayInViewModel: ObservableObject {
         drawnFailure = nil
         clearMarks()
         guard !isSubmitting else {
-            let error = PayabliPayInError.submissionInProgress
+            let error = PayabliPayInError.AlreadySubmitting()
             component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
             drawFailureMessage(for: error, operation: operation.kind)
             throw error
@@ -417,8 +408,7 @@ final class PayabliPayInViewModel: ObservableObject {
         guard let requestConfiguration = operation.requestConfiguration else { return nil }
         return requestConfiguration.request(
             paymentMethod: paymentMethod(with: buffers),
-            customerData: mergedCustomerData(),
-            orderDescription: mergedOrderDescription()
+            customerData: mergedCustomerData()
         )
     }
 

@@ -140,7 +140,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         switch operation {
         case .storePaymentMethod:
             try await reported(.storeMethod, origin: origin, method: PayInReports.method(of: request.paymentMethod)) {
-                throw PayabliPayInError.invalidInput("A payment method input is required for storePaymentMethod.")
+                throw PayabliPayInError.InvalidInput(field: nil, reason: "A payment method input is required for storePaymentMethod.")
             }
         case .capture:
             try await capture(request, origin: origin)
@@ -166,7 +166,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 origin: origin,
                 method: PayInReports.method(of: request.instrument.method)
             ) {
-                throw PayabliPayInError.invalidInput("storePaymentMethod operation is required to store a payment method.")
+                throw PayabliPayInError.InvalidInput(
+                    field: nil,
+                    reason: "storePaymentMethod operation is required to store a payment method."
+                )
             }
         }
 
@@ -350,7 +353,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reads a transaction back by its identifier, to learn what a payment did.
     ///
     /// Moves no money, so it runs while a submission is in flight and leaves ``lastResult`` alone. A failed
-    /// read is never ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)``.
+    /// read is never ``PayabliPayInError/Unsettled``.
     /// `TRANSACTION_NOT_FOUND` means nothing is visible under the identifier yet, and `PERMISSION_DENIED` that
     /// this session may not read it.
     ///
@@ -393,9 +396,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
                 error: error,
                 refusedLocally: refusal.wasRefused
             )
-            // Converted after the report: the report names the type that failed, not the wrapper.
+            // Converted after the report: the report names the type that failed, not the wrapper. A direct call keeps its
+            // cancellation; the form reports one as its own failure.
             if PayInInterruption.isCancellation(error) {
-                throw CancellationError()
+                throw origin == .form ? PayabliPayInError.Interrupted() : CancellationError()
             }
             throw error.payabliUnexpectedFailure ?? error
         }
@@ -479,12 +483,12 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         if let open, open.refusedKey {
             return reused ? .repeatRefused : .answered
         }
-        switch open?.interruption ?? error as? PayabliPayInError {
-        case let .submissionInterrupted(type, _, _, _):
-            return type == .conflict ? .answered : .unknown
-        case .invalidInput, .submissionInProgress, .missingAccessToken:
+        switch open?.interruption ?? error {
+        case let unsettled as PayabliPayInError.Unsettled:
+            return unsettled.type == .conflict ? .answered : .unknown
+        case is PayabliPayInError.InvalidInput, is PayabliPayInError.AlreadySubmitting:
             return .notAnswered
-        case .transactionFailed, nil:
+        default:
             break
         }
         switch (error as? any PayabliError)?.type {
@@ -496,7 +500,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     }
 
     /// Throws a failure as the caller receives it: a definite outcome as itself, a direct call's cancellation as
-    /// `CancellationError`, and ``PayabliPayInError/submissionInterrupted(type:causeType:paymentTransId:paymentReference:)``
+    /// `CancellationError`, and ``PayabliPayInError/Unsettled``
     /// for any other failure once a send of this payment may have run.
     ///
     /// - Parameter error: what the attempt threw.
@@ -519,19 +523,17 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         }
         if let open = error as? PayInOpenOutcome {
             guard reused || mayHaveLeft else { throw open.cause }
-            guard case let .submissionInterrupted(type, causeType, paymentTransId, _) = open.interruption
-            else { throw open.interruption }
-            throw PayabliPayInError.submissionInterrupted(
-                type: open.refusedKey && outcome == .repeatRefused ? .retryRefused : type,
-                causeType: causeType,
-                paymentTransId: paymentTransId,
+            let interruption = open.interruption
+            throw PayabliPayInError.Unsettled(
+                interruption,
+                type: open.refusedKey && outcome == .repeatRefused ? .retryRefused : interruption.type,
                 paymentReference: reference
             )
         }
         guard reused, outcome != .answered else { throw error }
-        throw PayabliPayInError.submissionInterrupted(
+        throw PayabliPayInError.Unsettled(
             type: PayInInterruption.type(of: error),
-            causeType: RedactedCause(error).originalType,
+            cause: error,
             paymentTransId: nil,
             paymentReference: reference
         )
@@ -542,17 +544,20 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     ///
     /// - Parameter request: the request whose options carry the host's payment reference.
     /// - Returns: the reference to hold the payment's key under.
-    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the host's reference is blank, or when a retry names
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when the host's reference is blank, or when a retry names
     ///   none.
     private func paymentReference(of request: PayabliPayInRequest) throws -> String {
         guard let named = request.options.paymentReference else {
             guard request.options.attempt == .newPayment else {
-                throw PayabliPayInError.invalidInput("A retry must name the paymentReference of the payment it repeats.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.paymentReference,
+                    reason: "A retry must name the paymentReference of the payment it repeats."
+                )
             }
             return newPaymentReference()
         }
         guard let trimmed = named.payabliCaptureTrimmed.payabliCaptureNilIfEmpty else {
-            throw PayabliPayInError.invalidInput("The paymentReference cannot be blank.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.paymentReference, reason: "The paymentReference cannot be blank.")
         }
         return trimmed
     }
@@ -592,7 +597,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
 
     private func beginSubmission() throws {
         guard activeSubmissionCount == 0 else {
-            throw PayabliPayInError.submissionInProgress
+            throw PayabliPayInError.AlreadySubmitting()
         }
         activeSubmissionCount = 1
         isSubmitting = true

@@ -47,17 +47,13 @@ enum PayInForms {
                     ]),
                     sectionTitled("Customer Information", fields: storedMethodCustomerFields)
                 ],
-                hiddenValues: PayabliPayInHiddenValues(
-                    accountHolderType: .personal,
-                    secCode: .web,
-                    methodDescription: QAIdentity.current.note("save")
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
                 formatting: PayInSharedConfiguration.formatting,
                 inputSizing: PayInSharedConfiguration.inputSizing,
-                cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement
+                cardBrandIconPlacement: PayInSharedConfiguration.cardBrandIconPlacement,
+                accountHolderType: .personal
             ),
             labels: PayabliPayInFormLabels(
                 title: "Save Payment Method",
@@ -70,6 +66,7 @@ enum PayInForms {
                 // `createAnonymous` and `temporary` stay unset so the paypoint decides them:
                 // the encoder omits only nil, so `false` would opt out of both.
                 forceCustomerCreation: true,
+                methodDescription: QAIdentity.current.note("save"),
                 source: "ios-payment-method-qa"
             )
         )
@@ -106,14 +103,6 @@ enum PayInForms {
                     sectionTitled("Customer Information", fields: captureCustomerFields),
                     sectionTitled("Payment Information", fields: [.amount, .serviceFee], style: .summary)
                 ],
-                hiddenValues: PayabliPayInHiddenValues(
-                    accountHolderType: .personal,
-                    secCode: .web,
-                    // What a transaction list shows as the note, and what names the device that sent it. Here
-                    // rather than only on the request configuration because this value wins over that one: the
-                    // component merges the form's description over the request's before it sends.
-                    methodDescription: QAIdentity.current.note("capture")
-                ),
                 labelLayout: PayInSharedConfiguration.labelLayout,
                 showsFieldLabels: PayInSharedConfiguration.showsFieldLabels,
                 hiddenFieldLabels: Set(PayInSharedConfiguration.fieldsWithHiddenLabels),
@@ -130,7 +119,8 @@ enum PayInForms {
                         color: .primary
                     ),
                     rowSpacing: 6
-                )
+                ),
+                accountHolderType: .personal
             ),
             labels: PayabliPayInFormLabels(
                 title: "Payment Capture",

@@ -28,8 +28,7 @@ final class PayInBodyWriterTests: XCTestCase {
         holder: String = " John Doe ",
         routing: String = "123-456780",
         accountType: PayabliPayInAccountType = .checking,
-        holderType: PayabliPayInAccountHolderType? = .personal,
-        device: String? = " dev-1 "
+        holderType: PayabliPayInAccountHolderType? = .personal
     ) -> PayabliPayInBankAccountData {
         PayabliPayInBankAccountData(
             accountNumber: SensitiveDigits.ofString(account),
@@ -37,8 +36,7 @@ final class PayInBodyWriterTests: XCTestCase {
             accountType: accountType,
             holderName: holder,
             holderType: holderType,
-            secCode: .web,
-            deviceId: device
+            secCode: .web
         )
     }
 
@@ -85,11 +83,11 @@ final class PayInBodyWriterTests: XCTestCase {
         XCTAssertEqual(
             try text(full.rawCopy()),
             #"{"achAccount":"123456789","achAccountType":"Checking","achCode":"WEB","achHolder":"John Doe","achHolderType":"personal","#
-                + #""achRouting":"123456780","device":"dev-1","method":"ach"}"#
+                + #""achRouting":"123456780","method":"ach"}"#
         )
 
         let bare = try PayInBodyWriter.captureFragment(.bankAccount(PayabliPayInPaymentMethod.BankAccount(
-            data: bankData(accountType: .savings, holderType: nil, device: nil)
+            data: bankData(accountType: .savings, holderType: nil)
         )))
         XCTAssertEqual(
             try text(bare.rawCopy()),
@@ -162,10 +160,10 @@ final class PayInBodyWriterTests: XCTestCase {
         XCTAssertEqual(
             try text(full.rawCopy()),
             #"{"method":"ach","achAccount":"123456789","achAccountType":"Checking","achHolder":"John Doe","#
-                + #""achRouting":"123456780","achCode":"WEB","achHolderType":"business","device":"dev-1"}"#
+                + #""achRouting":"123456780","achCode":"WEB","achHolderType":"business"}"#
         )
 
-        let bare = try PayInBodyWriter.storeFragment(.bankAccount(bankData(holderType: nil, device: nil)))
+        let bare = try PayInBodyWriter.storeFragment(.bankAccount(bankData(holderType: nil)))
         XCTAssertEqual(
             try text(bare.rawCopy()),
             #"{"method":"ach","achAccount":"123456789","achAccountType":"Checking","achHolder":"John Doe","achRouting":"123456780","achCode":"WEB"}"#
@@ -202,8 +200,9 @@ final class PayInBodyWriterTests: XCTestCase {
         do {
             _ = try PayInBodyWriter.captureFragment(.card(PayabliPayInPaymentMethod.Card(data: nonAsciiCard)))
             XCTFail("Expected a refusal")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Card number contains unsupported characters.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.field, PayInFieldPath.method(.cardnumber))
+            XCTAssertEqual(refusal.reason, "Card number contains unsupported characters.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -214,8 +213,9 @@ final class PayInBodyWriterTests: XCTestCase {
                 data: nonAsciiAccount
             )))
             XCTFail("Expected a refusal")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Account number contains unsupported characters.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.field, PayInFieldPath.method(.achAccount))
+            XCTAssertEqual(refusal.reason, "Account number contains unsupported characters.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

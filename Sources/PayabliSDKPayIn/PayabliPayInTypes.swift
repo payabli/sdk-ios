@@ -174,7 +174,7 @@ extension PayabliPayInPaymentDetails {
 /// A transaction to capture or authorize: the payment method, and the options for everything else.
 ///
 /// The options are the type a form is configured with. A form submits them with what the payer entered merged
-/// in, as ``PayabliPayInRequestConfiguration/request(paymentMethod:customerData:orderDescription:)`` describes.
+/// in, as ``PayabliPayInRequestConfiguration/request(paymentMethod:customerData:)`` describes.
 public struct PayabliPayInRequest: Sendable {
     public let paymentMethod: PayabliPayInPaymentMethod
     public let options: PayabliPayInRequestConfiguration
@@ -257,18 +257,13 @@ public struct PayabliPayInRequestConfiguration: Sendable {
     ///
     /// - Parameter paymentMethod: the method the payer entered.
     /// - Parameter formCustomerData: what the form collected about the payer, merged over ``customerData``.
-    /// - Parameter formOrderDescription: the form's description, which replaces ``orderDescription`` when
-    ///   it is not blank.
     /// - Returns: the request to capture or authorize.
     public func request(
         paymentMethod: PayabliPayInPaymentMethod,
-        customerData formCustomerData: PayabliPayInCustomerData? = nil,
-        orderDescription formOrderDescription: String? = nil
+        customerData formCustomerData: PayabliPayInCustomerData? = nil
     ) -> PayabliPayInRequest {
         var options = self
         options.customerData = mergedCustomerData(formCustomerData)
-        options.orderDescription = formOrderDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? orderDescription
         return PayabliPayInRequest(paymentMethod: paymentMethod, options: options)
     }
 
@@ -325,6 +320,9 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
     public let status: Int?
     public let detail: String?
     public let httpStatusCode: Int?
+    /// The transaction the service recorded for this failure, which a host reconciles a decline by; nil when the
+    /// answer named none.
+    public let paymentTransId: String?
 
     public init(
         code: String? = nil,
@@ -333,7 +331,8 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
         action: String? = nil,
         status: Int? = nil,
         detail: String? = nil,
-        httpStatusCode: Int? = nil
+        httpStatusCode: Int? = nil,
+        paymentTransId: String? = nil
     ) {
         self.code = code
         self.reason = reason
@@ -342,6 +341,7 @@ public struct PayabliPayInFailure: Codable, Sendable, Equatable {
         self.status = status
         self.detail = detail
         self.httpStatusCode = httpStatusCode
+        self.paymentTransId = paymentTransId
     }
 
     public var reasonText: String {
@@ -568,66 +568,6 @@ public struct PayabliPayInResponseData: Codable, Sendable, Equatable {
         self.customerVaultId = customerVaultId
         self.emvAuthResponseData = emvAuthResponseData
         self.type = type
-    }
-}
-
-extension PayabliPayInPaymentMethod {
-    func validate(_ validation: PayabliPayInValidation) throws {
-        switch self {
-        case let .card(method):
-            try PayabliPayInMethodInput.card(method.data).validate(validation)
-        case let .bankAccount(method):
-            try PayabliPayInMethodInput.bankAccount(method.data).validate(validation)
-        case let .stored(method):
-            guard !method.storedMethodId.payabliCaptureTrimmed.isEmpty else {
-                throw PayabliPayInError.invalidInput("Stored payment method ID is required.")
-            }
-        case let .cloudDevice(method):
-            guard !method.device.payabliCaptureTrimmed.isEmpty else {
-                throw PayabliPayInError.invalidInput("Cloud device is required.")
-            }
-        case let .check(method):
-            guard !method.holderName.payabliCaptureTrimmed.isEmpty else {
-                throw PayabliPayInError.invalidInput("Check account holder is required.")
-            }
-        case .cash:
-            break
-        }
-    }
-}
-
-extension PayabliPayInPaymentDetails {
-    /// Each amount is checked as it is sent, at two places, so a total of `0.001`, sent as `0.00`, is refused.
-    ///
-    /// A negative surcharge, or a service fee and surcharge that together reach the total, cannot be charged,
-    /// so it is refused before sending, from the form and from a direct call.
-    func validate() throws {
-        guard let total = PayInAmount.sendable(totalAmount) else {
-            throw PayabliPayInError.invalidInput("Total amount is out of range.")
-        }
-        guard total > 0 else {
-            throw PayabliPayInError.invalidInput("Total amount must be greater than 0.")
-        }
-        if let serviceFee {
-            guard let fee = PayInAmount.sendable(serviceFee) else {
-                throw PayabliPayInError.invalidInput("Service fee is out of range.")
-            }
-            guard fee >= 0 else {
-                throw PayabliPayInError.invalidInput("Service fee cannot be negative.")
-            }
-        }
-        if let surchargeFee {
-            guard let surcharge = PayInAmount.sendable(surchargeFee) else {
-                throw PayabliPayInError.invalidInput("Surcharge is out of range.")
-            }
-            guard surcharge >= 0 else {
-                throw PayabliPayInError.invalidInput("Surcharge cannot be negative.")
-            }
-        }
-        let fees = (serviceFee.flatMap(PayInAmount.sendable) ?? 0) + (surchargeFee.flatMap(PayInAmount.sendable) ?? 0)
-        guard fees < total else {
-            throw PayabliPayInError.invalidInput("Service fee and surcharge must be less than the total amount.")
-        }
     }
 }
 

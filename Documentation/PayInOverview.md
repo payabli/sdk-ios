@@ -124,8 +124,7 @@ The hosted form supports:
 - per-section vertical and horizontal input spacing
 - per-field vertical spacing after specific inputs
 - required optional customer fields
-- hidden values for account holder type, SEC code, device ID, method description,
-  and customer data
+- an account holder type sent without showing the field
 - card brand detection with leading, trailing, or hidden brand icons
 - read-only amount and fee summary rows for capture and authorize
 - configurable fonts, colors, borders, input sizing, button styling, and layout
@@ -150,10 +149,7 @@ Supported fields:
 | `.routingNumber` | Routing number | bank account input |
 | `.accountNumber` | Account number | bank account input |
 | `.accountType` | Account type | bank account input |
-| `.accountHolderType` | Holder type | bank account input or hidden value |
-| `.secCode` | SEC code | Hidden by default |
-| `.deviceId` | Device | Optional bank account metadata |
-| `.methodDescription` | Description | Stored-method metadata |
+| `.accountHolderType` | Holder type | bank account input, or `accountHolderType` on the configuration |
 | `.firstName` | First name | Customer information |
 | `.lastName` | Last name | Customer information |
 | `.customerNumber` | Customer number | Customer information |

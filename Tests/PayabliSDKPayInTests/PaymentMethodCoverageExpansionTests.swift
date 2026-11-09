@@ -42,20 +42,19 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     func testPaymentMethodErrorMetadataAndValidationBranches() throws {
-        let fallbackFailure = PayabliPayInSaveFailure(responseText: "   ")
-        let detailedFailure = PayabliPayInSaveFailure(
+        let detailedFailure = PayabliPayInTokenStorageAPIResponse(
+            isSuccess: false,
             responseText: "Gateway response",
-            explanation: "Gateway declined",
-            todoAction: "Use another account."
-        )
+            responseData: PayabliPayInTokenStorageAPIResponseData(
+                explanation: "Gateway declined",
+                todoAction: "Use another account."
+            )
+        ).failure(httpStatusCode: nil)
+        let refused = PayabliPayInError.Refused(failure: detailedFailure)
 
-        XCTAssertEqual(fallbackFailure.reason, "Unable to save payment method.")
-        XCTAssertNil(PayabliPayInTokenStorageError.missingAccessToken.detail)
-        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.type, .missingToken)
-        XCTAssertEqual(PayabliPayInTokenStorageError.missingAccessToken.reason, "Missing access token")
-        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).type, .paymentDeclined)
-        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).reason, "Gateway declined")
-        XCTAssertEqual(PayabliPayInTokenStorageError.saveFailed(detailedFailure).detail, "Use another account.")
+        XCTAssertEqual(refused.type, .paymentDeclined)
+        XCTAssertEqual(refused.reason, "Gateway declined")
+        XCTAssertEqual(refused.detail, "Use another account.")
 
         XCTAssertThrowsError(try PayabliPayInCardData(
             cardNumber: "4111111111111111",
@@ -79,11 +78,12 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             accountType: .checking,
             holderName: "Jane Doe"
         ).validate(.default)) { error in
-            guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
+            guard let refusal = error as? PayabliPayInError.InvalidInput else {
                 XCTFail("Expected invalid input error")
                 return
             }
-            XCTAssertEqual(message, "Routing number failed validation.")
+            XCTAssertEqual(refusal.reason, "Routing number failed validation.")
+            XCTAssertEqual(refusal.field, "paymentMethod.achRouting")
         }
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
@@ -92,11 +92,12 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             accountType: .checking,
             holderName: " "
         ).validate(PayabliPayInValidation(validatesRoutingNumberChecksum: false))) { error in
-            guard case let PayabliPayInTokenStorageError.invalidInput(message) = error else {
+            guard let refusal = error as? PayabliPayInError.InvalidInput else {
                 XCTFail("Expected invalid input error")
                 return
             }
-            XCTAssertEqual(message, "Account holder is required.")
+            XCTAssertEqual(refusal.reason, "Account holder is required.")
+            XCTAssertEqual(refusal.field, "paymentMethod.achHolder")
         }
 
         XCTAssertThrowsError(try PayabliPayInBankAccountData(
@@ -107,20 +108,19 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         ).validate(.default))
     }
 
-    func testTheStoreBodyTrimsTheOptionalACHDevice() throws {
+    func testTheStoreBodySendsWEBAndNoDevice() throws {
         let input = PayabliPayInMethodInput.bankAccount(PayabliPayInBankAccountData(
             accountNumber: "1111111111",
             routingNumber: "123456780",
             accountType: .checking,
-            holderName: "Jane Doe",
-            deviceId: " terminal-1 "
+            holderName: "Jane Doe"
         ))
 
         let data = try Data(PayInBodyWriter.storeFragment(input).rawCopy())
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
 
         XCTAssertEqual(object["achCode"] as? String, "WEB")
-        XCTAssertEqual(object["device"] as? String, "terminal-1")
+        XCTAssertNil(object["device"])
     }
 
     func testPaymentMethodAPIResponseDecodesStringNumbers() throws {
@@ -161,9 +161,10 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
     }
 
     func testPaymentMethodFailureFallbackReasonUsesResponseText() {
-        let failure = PayabliPayInSaveFailure(responseText: "Gateway declined")
+        let failure = PayabliPayInTokenStorageAPIResponse(isSuccess: false, responseText: "Gateway declined")
+            .failure(httpStatusCode: nil)
 
-        XCTAssertEqual(failure.reason, "Gateway declined")
+        XCTAssertEqual(PayabliPayInError.Refused(failure: failure).reason, "Gateway declined")
     }
 
     func testSheetDismissButtonMetadata() {
@@ -186,10 +187,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             payIn: component,
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
-            labels: PayabliPayInFormLabels(
-                title: "Inline title",
-                subtitle: "Inline subtitle"
-            ),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: "Sheet title",
                 subtitle: "Sheet subtitle",
@@ -221,10 +219,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
             payIn: component,
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
-            labels: PayabliPayInFormLabels(
-                title: "Inline title",
-                subtitle: "Inline subtitle"
-            ),
+            labels: PayabliPayInFormLabels(title: "Inline title", subtitle: "Inline subtitle"),
             sheetConfiguration: PayabliPayInSheetConfiguration(
                 title: "Sheet title",
                 subtitle: "Sheet subtitle",
@@ -362,8 +357,6 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .deviceId,
-                    .methodDescription,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -384,8 +377,7 @@ final class PaymentMethodCoverageExpansionTests: XCTestCase {
         XCTAssertTrue(labels.contains("Account holder"))
         XCTAssertTrue(labels.contains("Routing number"))
         XCTAssertTrue(labels.contains("Account number"))
-        XCTAssertTrue(labels.contains("Device"))
-        XCTAssertTrue(labels.contains("Description"))
+        XCTAssertFalse(labels.contains("Description"), "the form drew a description field")
         XCTAssertTrue(labels.contains("Billing email"))
     }
 

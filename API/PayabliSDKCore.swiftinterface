@@ -133,8 +133,16 @@ public protocol PayabliError : Foundation::LocalizedError {
   var type: PayabliSDKCore::PayabliErrorType { get }
   var reason: Swift::String { get }
   var detail: Swift::String? { get }
+  var httpStatus: Swift::Int? { get }
+  var rawCode: Swift::String? { get }
 }
 extension PayabliSDKCore::PayabliError {
+  public var httpStatus: Swift::Int? {
+    get
+  }
+  public var rawCode: Swift::String? {
+    get
+  }
   public var code: Swift::Int {
     get
   }
@@ -153,6 +161,8 @@ public struct PayabliGenericError : PayabliSDKCore::PayabliError {
   public let reason: Swift::String
   public let detail: Swift::String?
   public let underlying: (any Swift::Error)?
+  public let httpStatus: Swift::Int?
+  public let rawCode: Swift::String?
   public init(type: PayabliSDKCore::PayabliErrorType, reason: Swift::String, detail: Swift::String? = nil, underlying: (any Swift::Error)? = nil)
 }
 public struct PayabliFieldError : Swift::Decodable, Swift::Sendable {

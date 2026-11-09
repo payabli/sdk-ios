@@ -325,9 +325,30 @@ public protocol PayabliError: LocalizedError, Sendable {
 
     /// Optional detailed explanation.
     var detail: String? { get }
+
+    /// The status line of the response this failure was read from, never a body's own `status` field.
+    ///
+    /// `nil` when no response was read: the request never reached the service, its answer was lost, or the
+    /// SDK refused the call before sending it.
+    var httpStatus: Int? { get }
+
+    /// The service's own code for this failure, for example `E1001`.
+    ///
+    /// `nil` when no response was read, when the response named no code, or when its body could not be read.
+    var rawCode: String? { get }
 }
 
 public extension PayabliError {
+    /// `nil`, for a failure that was not read from a response.
+    var httpStatus: Int? {
+        nil
+    }
+
+    /// `nil`, for a failure that was not read from a response.
+    var rawCode: String? {
+        nil
+    }
+
     /// The catalog number.
     var code: Int {
         type.number
@@ -359,17 +380,46 @@ public struct PayabliGenericError: PayabliError {
     public let reason: String
     public let detail: String?
     public let underlying: Error?
+    public let httpStatus: Int?
+    public let rawCode: String?
 
+    /// A failure no response was read for, so it carries no status and no code.
+    ///
+    /// - Parameter type: the catalog entry.
+    /// - Parameter reason: short human-readable summary.
+    /// - Parameter detail: longer explanation, when there is one.
+    /// - Parameter underlying: the failure this one reports, when there is one.
     public init(
         type: PayabliErrorType,
         reason: String,
         detail: String? = nil,
         underlying: Error? = nil
     ) {
+        self.init(type: type, reason: reason, detail: detail, underlying: underlying, httpStatus: nil, rawCode: nil)
+    }
+
+    /// A failure read from a response.
+    ///
+    /// - Parameter type: the catalog entry.
+    /// - Parameter reason: short human-readable summary.
+    /// - Parameter detail: longer explanation, when there is one.
+    /// - Parameter underlying: the failure this one reports, when there is one.
+    /// - Parameter httpStatus: the response's status line.
+    /// - Parameter rawCode: the code the response's body named, when it named one.
+    package init(
+        type: PayabliErrorType,
+        reason: String,
+        detail: String? = nil,
+        underlying: Error? = nil,
+        httpStatus: Int?,
+        rawCode: String?
+    ) {
         self.type = type
         self.reason = reason
         self.detail = detail
         self.underlying = underlying
+        self.httpStatus = httpStatus
+        self.rawCode = rawCode
     }
 }
 

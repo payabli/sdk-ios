@@ -195,11 +195,11 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         do {
             _ = try await client.capture(entryPoint: "entry", request: cardRequest())
             XCTFail("Expected transaction failure")
-        } catch let PayabliPayInError.transactionFailed(failure) {
-            XCTAssertEqual(failure.code, "D0200")
-            XCTAssertEqual(failure.httpStatusCode, 402)
-            XCTAssertEqual(failure.reasonText, "The card issuer declined the transaction.")
-            XCTAssertEqual(failure.detailText, "Ask for a different payment method.")
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.failure.code, "D0200")
+            XCTAssertEqual(error.failure.httpStatusCode, 402)
+            XCTAssertEqual(error.failure.reasonText, "The card issuer declined the transaction.")
+            XCTAssertEqual(error.failure.detailText, "Ask for a different payment method.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -229,14 +229,14 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         do {
             _ = try await client.capture(entryPoint: "entry", request: cardRequest())
             XCTFail("Expected transaction failure")
-        } catch let PayabliPayInError.transactionFailed(failure) {
-            XCTAssertEqual(failure.code, "4001")
-            XCTAssertEqual(failure.status, 400)
+        } catch let error as PayabliPayInError.ServiceError {
+            XCTAssertEqual(error.failure.code, "4001")
+            XCTAssertEqual(error.failure.status, 400)
             XCTAssertEqual(
-                failure.reasonText,
+                error.failure.reasonText,
                 "The configured payment settings could not process this payment."
             )
-            XCTAssertEqual(failure.detailText, "Verify the payment capture configuration.")
+            XCTAssertEqual(error.failure.detailText, "Verify the payment capture configuration.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
