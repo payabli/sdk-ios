@@ -7,7 +7,7 @@ import PayabliSDKCore
 /// sees the failure reason without re-reading logs.
 private enum TTPUpdateOutcome {
     case succeeded
-    case failed(reason: String, retryAfter: TimeInterval?, processorHasNoRecord: Bool)
+    case failed(reason: String, retryAfter: TimeInterval?, processorHasNoRecord: Bool, httpStatus: Int?, rawCode: String?)
 
     /// The caller cancelled. The best-effort notify after a reader failure ignores it.
     case cancelled
@@ -235,7 +235,7 @@ extension PayabliTTP {
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
             // payment says nothing was captured, and so does a read that never reached a card, whatever the close
             // answers.
-            if case .failed(_, _, processorHasNoRecord: true) = close {
+            if case .failed(_, _, processorHasNoRecord: true, _, _) = close {
                 settleFresh(reservation)
                 if touchedNoCard {
                     logger.info("[charge] the close found no record of a payment whose read never reached a card")
@@ -256,8 +256,10 @@ extension PayabliTTP {
             // The no-record close says this charge took nothing, so it replaces the read's failure — but only
             // where this run minted the key: a resent key names an earlier charge, which it cannot settle. A read
             // that never reached a card keeps its 3017, which already says nothing was taken.
-            if case .failed(_, _, processorHasNoRecord: true) = close, !reservation.reused, !touchedNoCard {
-                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId)
+            if case let .failed(_, _, processorHasNoRecord: true, httpStatus, rawCode) = close, !reservation.reused,
+               !touchedNoCard
+            {
+                throw PayabliTTPError.paymentNotTaken(paymentTransId: paymentTransId, httpStatus: httpStatus, rawCode: rawCode)
             }
             throw failure
         }
@@ -322,9 +324,14 @@ extension PayabliTTP {
             return TransactionResult(paymentTransId: paymentTransId)
         case .succeeded:
             throw PayabliTTPError.outcomeUnknown(paymentTransId: paymentTransId)
-        case let .failed(reason, retryAfter, _):
+        case let .failed(reason, retryAfter, _, httpStatus, rawCode):
             throw PayabliTTPError.updateFailed(
-                reason: reason, paymentTransId: paymentTransId, capture: capture, retryAfter: retryAfter
+                reason: reason,
+                paymentTransId: paymentTransId,
+                capture: capture,
+                retryAfter: retryAfter,
+                httpStatus: httpStatus,
+                rawCode: rawCode
             )
         case .cancelled:
             // The card was read, so a caller who cancelled is still told what the tap did.
@@ -513,10 +520,13 @@ extension PayabliTTP {
         } catch {
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
+            let answer = TapToPayErrorTranslation.answer(of: error)
             return .failed(
                 reason: error.localizedDescription,
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
-                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error)
+                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error),
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
             )
         }
     }

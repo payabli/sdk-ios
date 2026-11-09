@@ -122,7 +122,15 @@ final class AppRegistrationRefusalsTests: XCTestCase {
         attestation.cachedDeviceId = "dev_1"
         StubURLProtocol.handler = { request in Self.refusal(request, status: 403, reason: "Device is pending activation.") }
 
-        _ = try? await ttp.initialize()
+        do {
+            try await ttp.initialize()
+            XCTFail("initialize proceeded past a pending device")
+        } catch {
+            let pending = try XCTUnwrap(error as? TapToPayError, "\(error)")
+            XCTAssertEqual(pending.type, .devicePendingActivation)
+            XCTAssertEqual(pending.httpStatus, 403)
+            XCTAssertNil(pending.rawCode)
+        }
 
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_1"))
     }
