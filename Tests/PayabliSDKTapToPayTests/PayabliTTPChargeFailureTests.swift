@@ -348,6 +348,7 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
 
         XCTAssertEqual(failure.type, .decodingError, "\(failure)", file: file, line: line)
         XCTAssertEqual(failure.code, 1014, file: file, line: line)
+        XCTAssertEqual(failure.httpStatus, 200, "the opening was answered", file: file, line: line)
         XCTAssertNil(failure.paymentTransId, file: file, line: line)
         XCTAssertEqual(failure.capture, .notCharged, file: file, line: line)
         XCTAssertEqual(provider.startReadingCalls, 0, "a card was asked for", file: file, line: line)

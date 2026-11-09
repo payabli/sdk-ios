@@ -461,6 +461,9 @@ public struct PayabliValidationError: PayabliError, Decodable {
     public let errors: [String: [PayabliFieldError]]?
     public let token: String?
 
+    /// The status the response itself carried, which is not always the `status` its body names.
+    public let httpStatus: Int?
+
     public var type: PayabliErrorType {
         .validation
     }
@@ -503,9 +506,10 @@ public struct PayabliValidationError: PayabliError, Decodable {
         status = try container.decodeIfPresent(Int.self, forKey: .status)
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
         instance = try container.decodeIfPresent(String.self, forKey: .instance)
-        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         token = try container.decodeIfPresent(String.self, forKey: .token)
         errors = try? container.decodeIfPresent([String: [PayabliFieldError]].self, forKey: .errors)
+        httpStatus = nil
     }
 
     /// The empty error, for a 400 whose body will not decode at all.
@@ -525,6 +529,28 @@ public struct PayabliValidationError: PayabliError, Decodable {
         rawCode = nil
         errors = nil
         token = nil
+        httpStatus = nil
+    }
+
+    private init(copying source: PayabliValidationError, httpStatus: Int?, rawCode: String?) {
+        problemType = source.problemType
+        title = source.title
+        status = source.status
+        detail = source.detail
+        instance = source.instance
+        self.rawCode = rawCode
+        errors = source.errors
+        token = source.token
+        self.httpStatus = httpStatus
+    }
+
+    /// The same error, carrying the response's status and the code its body named.
+    ///
+    /// - Parameter httpStatus: the status the response itself carried, not the body's `status` field.
+    /// - Parameter rawCode: the code the response's body named, or nil when it named none or could not be read.
+    /// - Returns: the same error with `httpStatus` and `rawCode` set.
+    package func carrying(httpStatus: Int?, rawCode: String?) -> PayabliValidationError {
+        PayabliValidationError(copying: self, httpStatus: httpStatus, rawCode: rawCode)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -544,6 +570,8 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
 
     /// The status the response itself carried, which is not always the `status` its body names.
     public let httpStatus: Int?
+
+    public let rawCode: String?
 
     public let retryAfter: TimeInterval?
 
@@ -566,6 +594,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         detail = nil
         instance = nil
         self.httpStatus = httpStatus
+        rawCode = nil
         self.retryAfter = retryAfter
     }
 
@@ -577,6 +606,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         detail = try container.decodeIfPresent(String.self, forKey: .detail)
         instance = try container.decodeIfPresent(String.self, forKey: .instance)
         httpStatus = nil
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         retryAfter = nil
     }
 
@@ -587,6 +617,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         detail: String?,
         instance: String?,
         httpStatus: Int?,
+        rawCode: String?,
         retryAfter: TimeInterval?
     ) {
         self.problemType = problemType
@@ -595,15 +626,17 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
         self.detail = detail
         self.instance = instance
         self.httpStatus = httpStatus
+        self.rawCode = rawCode
         self.retryAfter = retryAfter
     }
 
-    /// The same error, carrying the two things only the response envelope knows.
+    /// The same error, carrying what only the response envelope knows and the code its body named.
     ///
     /// - Parameter httpStatus: the status the response itself carried, not the body's `status` field.
+    /// - Parameter rawCode: the code the response's body named, or nil when it named none or could not be read.
     /// - Parameter retryAfter: the delay the response's `Retry-After` header named, if any.
-    /// - Returns: the same error with `httpStatus` and `retryAfter` filled in.
-    func carrying(httpStatus: Int, retryAfter: TimeInterval?) -> PayabliServerError {
+    /// - Returns: the same error with `httpStatus`, `rawCode` and `retryAfter` set.
+    func carrying(httpStatus: Int, rawCode: String?, retryAfter: TimeInterval?) -> PayabliServerError {
         PayabliServerError(
             problemType: problemType,
             title: title,
@@ -611,6 +644,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
             detail: detail,
             instance: instance,
             httpStatus: httpStatus,
+            rawCode: rawCode,
             retryAfter: retryAfter
         )
     }
@@ -618,6 +652,7 @@ public struct PayabliServerError: PayabliError, Decodable, PayabliRetryAfter {
     enum CodingKeys: String, CodingKey {
         case problemType = "type"
         case title, status, detail, instance
+        case rawCode = "code"
     }
 }
 
@@ -628,6 +663,8 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     public let reason: String
     public let explanation: String?
     public let action: String?
+
+    public let httpStatus: Int?
 
     static let defaultReason = "Payment declined (402)"
 
@@ -657,10 +694,11 @@ public struct PayabliDeclineError: PayabliError, Decodable {
     /// - Parameter decoder: the declined-payment body, whose missing `code` or `reason` degrades that field alone.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        rawCode = try container.decodeIfPresent(String.self, forKey: .rawCode)
+        rawCode = (try? container.decodeIfPresent(String.self, forKey: .rawCode)) ?? nil
         reason = try container.decodeIfPresent(String.self, forKey: .reason) ?? Self.defaultReason
         explanation = try container.decodeIfPresent(String.self, forKey: .explanation)
         action = try container.decodeIfPresent(String.self, forKey: .action)
+        httpStatus = nil
     }
 
     /// The empty decline, for a 402 whose body will not decode at all.
@@ -669,6 +707,24 @@ public struct PayabliDeclineError: PayabliError, Decodable {
         reason = Self.defaultReason
         explanation = nil
         action = nil
+        httpStatus = nil
+    }
+
+    private init(copying source: PayabliDeclineError, httpStatus: Int?, rawCode: String?) {
+        self.rawCode = rawCode
+        reason = source.reason
+        explanation = source.explanation
+        action = source.action
+        self.httpStatus = httpStatus
+    }
+
+    /// The same decline, carrying the response's status and the code its body named.
+    ///
+    /// - Parameter httpStatus: the status the response itself carried.
+    /// - Parameter rawCode: the code the response's body named, or nil when it named none or could not be read.
+    /// - Returns: the same decline with `httpStatus` and `rawCode` set.
+    package func carrying(httpStatus: Int?, rawCode: String?) -> PayabliDeclineError {
+        PayabliDeclineError(copying: self, httpStatus: httpStatus, rawCode: rawCode)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -710,6 +766,14 @@ public enum PayabliPaymentError: PayabliError, PayabliRetryAfter, Sendable {
 
     public var detail: String? {
         asPayabliError.detail
+    }
+
+    public var httpStatus: Int? {
+        asPayabliError.httpStatus
+    }
+
+    public var rawCode: String? {
+        asPayabliError.rawCode
     }
 
     /// Defers to the wrapped error for the same reason `code` does: a `catch` or a cast written against

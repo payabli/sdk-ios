@@ -230,7 +230,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
             _ = try await client.capture(entryPoint: "entry", request: cardRequest())
             XCTFail("Expected transaction failure")
         } catch let error as PayabliPayInError.ServiceError {
-            XCTAssertEqual(error.failure.code, "4001")
+            XCTAssertEqual(error.failure.code, "400")
             XCTAssertEqual(error.failure.status, 400)
             XCTAssertEqual(
                 error.failure.reasonText,

@@ -20,6 +20,22 @@ extension AuthRecoveryPolicy {
     func exhausted() -> PayabliGenericError {
         PayabliGenericError(type: .tokenExpired, reason: "Refresh token rejected")
     }
+
+    /// ``exhausted()``, carrying the status and code of the answer that refused the refreshed credential.
+    ///
+    /// - Parameter refusal: the answer to the replay.
+    /// - Returns: the ``PayabliErrorType/tokenExpired`` error with that answer's status and code, and no service text.
+    func exhausted(by refusal: PayabliResponse) -> PayabliGenericError {
+        let base = exhausted()
+        return PayabliGenericError(
+            type: base.type,
+            reason: base.reason,
+            detail: nil,
+            underlying: nil,
+            httpStatus: refusal.statusCode,
+            rawCode: serviceCode(of: refusal)
+        )
+    }
 }
 
 /// A 401 and nothing else.

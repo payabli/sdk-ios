@@ -21,7 +21,9 @@ package func decodePayabliV2Envelope<T: Decodable & Sendable>(
         // SDK does not scrub, and the code and reason are what a caller acts on.
         throw PayabliGenericError(
             type: .decodingError,
-            reason: "Failed to decode v2 envelope"
+            reason: "Failed to decode v2 envelope",
+            httpStatus: response.statusCode,
+            rawCode: nil
         )
     }
 }
