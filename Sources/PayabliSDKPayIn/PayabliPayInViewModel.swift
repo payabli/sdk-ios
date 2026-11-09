@@ -365,7 +365,7 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(fields(for: method))
             }
-            // A marked field is the whole answer; a failure that marks none on screen shows its
+            // A failure that marks no field on screen, or leaves the outcome unknown, shows its
             // message, which the opt-out hides while the marks stay.
             drawFailureMessage(for: error, operation: operation.kind)
             throw error

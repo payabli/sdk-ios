@@ -1,7 +1,7 @@
 import PayabliSDKCore
 
-/// The form fields a refusal names: the service's validation errors, or the one field the SDK refused before
-/// sending. A key is matched on its last segment and without case, so a field named bare or under its parent
+/// The form fields a refusal names: the service's validation errors, or the one field the payment flow refused
+/// before sending. A key is matched on its last segment and without case, so a field named bare or under its parent
 /// object resolves to the same box.
 enum PayabliPayInRejectedFields {
     /// - Parameter error: what the submission ended in.

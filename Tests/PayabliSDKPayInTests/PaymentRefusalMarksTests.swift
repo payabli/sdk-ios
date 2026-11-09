@@ -60,9 +60,23 @@ final class PaymentRefusalMarksTests: XCTestCase {
         transport.script = [.lost, .refusedBeforeHandOff(refusal)]
         let viewModel = try await formRetryingAnUnknownPayment()
 
-        _ = await PayInFixture.failure { _ = try await viewModel.submit() }
+        let error = await PayInFixture.failure { _ = try await viewModel.submit() }
 
-        XCTAssertEqual(viewModel.rejectedFields, [])
+        XCTAssertEqual(PayabliPayInRejectedFields.fields(in: error), [.billingEmail], "the failure names the field")
+        XCTAssertEqual(viewModel.rejectedFields, [], "the form has no box for it")
+        XCTAssertEqual(viewModel.failureMessage, Self.outcomeUnknown)
+    }
+
+    func testAHeldRetryTheCardChecksRefuseMarksTheFieldWithoutSending() async throws {
+        transport.script = [.lost]
+        let viewModel = try await formRetryingAnUnknownPayment()
+        viewModel.cardExpiration = "13/30"
+
+        let error = await PayInFixture.failure { _ = try await viewModel.submit() }
+
+        XCTAssertTrue(error is PayabliPayInError.Unsettled, "Wrong error: \(String(describing: error))")
+        XCTAssertEqual(transport.sentKeys.count, 1, "the refused retry never reached the transport")
+        XCTAssertEqual(viewModel.rejectedFields, [.cardExpiration])
         XCTAssertEqual(viewModel.failureMessage, Self.outcomeUnknown)
     }
 
