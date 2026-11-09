@@ -7,7 +7,8 @@ package enum PayabliTTPError: Error, Sendable {
     case notInitialized
     case invalidState(current: PayabliTTPSessionState, attempted: String)
     case notReady(current: PayabliTTPSessionState)
-    case devicePendingActivation
+    /// `httpStatus` is the refusing answer's when a configuration fetch was refused for it.
+    case devicePendingActivation(httpStatus: Int? = nil)
     case attestationRevoked(reason: String, httpStatus: Int? = nil)
     case attestationFailed(reason: String, httpStatus: Int? = nil)
     /// The service holds no attestation for this device, so it has to be set up again before it answers.
@@ -136,14 +137,15 @@ package extension PayabliTTPError {
              let .deviceSetupRequired(_, httpStatus),
              let .deviceSetupRefused(_, httpStatus),
              let .entryPointRefused(_, httpStatus),
-             let .configFailed(_, httpStatus):
+             let .configFailed(_, httpStatus),
+             let .devicePendingActivation(httpStatus):
             return (httpStatus, nil)
         case let .cardPresentNotEnabled(httpStatus, rawCode),
              let .paymentNotOpened(_, httpStatus, rawCode),
              let .updateFailed(_, _, _, _, httpStatus, rawCode),
              let .paymentNotTaken(_, httpStatus, rawCode):
             return (httpStatus, rawCode)
-        case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .readerSetupFailed,
+        case .notInitialized, .invalidState, .notReady, .readerSetupFailed,
              .readerCredentialsUnusable, .nfcFailed, .tokenExpired, .activationFailed, .activationCodeMalformed,
              .networkError, .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
              .readerUnavailable, .guardFailed, .readerDeviceRefused, .readerSessionExpired, .cardDeclined,
@@ -164,6 +166,7 @@ package extension PayabliTTPError {
         case let .deviceSetupRefused(reason, _): .deviceSetupRefused(reason: reason, httpStatus: httpStatus)
         case let .entryPointRefused(reason, _): .entryPointRefused(reason: reason, httpStatus: httpStatus)
         case let .configFailed(reason, _): .configFailed(reason: reason, httpStatus: httpStatus)
+        case .devicePendingActivation: .devicePendingActivation(httpStatus: httpStatus)
         default: self
         }
     }

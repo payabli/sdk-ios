@@ -75,7 +75,7 @@ final class TapToPayReportsTests: XCTestCase {
                 attestation.attestResult = .failure(PayabliTTPError.attestationFailed(reason: Self.sentinel))
             }),
             ("pending with no registration stored", { _, attestation in
-                attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+                attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation())
             }),
             ("configure", { provider, _ in
                 provider.configureResult = .failure(PayabliTTPError.readerCredentialsUnusable)
@@ -124,7 +124,7 @@ final class TapToPayReportsTests: XCTestCase {
         let paths: [(String, PayabliErrorType, (MockTapToPayProvider, MockDeviceAttestationService) -> Void)] = [
             ("pending_activation", .devicePendingActivation, { _, attestation in
                 attestation.pendingRegistration = "dev"
-                attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+                attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation())
             }),
             ("pending_terms", .termsNotAccepted, { provider, _ in
                 provider.prepareReaderResult = .failure(PayabliTTPError.termsNotAccepted)

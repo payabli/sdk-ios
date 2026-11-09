@@ -56,7 +56,7 @@ final class TTPConfigClient: Sendable {
 
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {
-                return ConfigPendingActivation(presentedDeviceId: headers.deviceId)
+                return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
             }
             return nil
         }
@@ -84,7 +84,7 @@ final class TTPConfigClient: Sendable {
                 throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
             }
             if code == 403 {
-                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId)
+                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
             }
             throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
         }
@@ -166,4 +166,5 @@ final class TTPConfigClient: Sendable {
 
 struct ConfigPendingActivation: Error {
     let presentedDeviceId: String
+    let httpStatus: Int
 }

@@ -109,7 +109,7 @@ extension AppAttestService {
 
         if isPending {
             logger.info("Attestation stored — device still pending activation")
-            throw PayabliTTPError.devicePendingActivation
+            throw PayabliTTPError.devicePendingActivation()
         }
 
         logger.info("Attestation completed")

@@ -267,7 +267,7 @@ extension PayabliTTP {
         } catch PayabliTTPError.devicePendingActivation {
             // Attested: the device owes an activation code, which is not a failed attestation.
             reports.attestationSucceeded(after: clock.now - start)
-            throw PayabliTTPError.devicePendingActivation
+            throw PayabliTTPError.devicePendingActivation()
         } catch {
             reports.attestationFailed(error, after: clock.now - start)
             throw error
@@ -297,7 +297,7 @@ extension PayabliTTP {
             if let failure = landPendingActivation() {
                 throw failure
             }
-            throw PayabliTTPError.devicePendingActivation
+            throw PayabliTTPError.devicePendingActivation()
         } catch {
             markError(error)
             syncPublished()
@@ -318,9 +318,9 @@ extension PayabliTTP {
             return try await configClient.fetchConfig(entry: entryPoint)
         } catch let pending as ConfigPendingActivation {
             if let failure = landPendingActivation(answeredFor: pending.presentedDeviceId) {
-                throw failure
+                throw (failure as? PayabliTTPError)?.carrying(httpStatus: pending.httpStatus) ?? failure
             }
-            throw PayabliTTPError.devicePendingActivation
+            throw PayabliTTPError.devicePendingActivation(httpStatus: pending.httpStatus)
         } catch {
             // A core error keeps its own code and the wait the service asked for, and a cancellation stays one.
             // Anything else is wrapped with its parsed description, so the fields

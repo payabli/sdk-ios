@@ -53,7 +53,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.notInitialized, "notInitialized"),
             (.invalidState(current: .ready, attempted: "charge"), "invalidState(current: ready, attempted: charge)"),
             (.notReady(current: .attestingDevice), "notReady(current: attestingDevice)"),
-            (.devicePendingActivation, "devicePendingActivation"),
+            (.devicePendingActivation(), "devicePendingActivation"),
             (.tokenExpired, "tokenExpired"),
             (.attestationRevoked(reason: reason), "attestationRevoked"),
             (.attestationFailed(reason: reason), "attestationFailed"),

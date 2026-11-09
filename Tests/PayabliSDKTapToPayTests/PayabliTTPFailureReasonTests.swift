@@ -57,7 +57,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
     /// has not accepted terms. Each has a state of its own.
     func testWhatIsNotAFailureDoesNotLandAsOne() {
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .held(activationId: "dev")),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation(), registration: .held(activationId: "dev")),
             .pendingActivation(activationId: "dev")
         )
         XCTAssertEqual(
@@ -190,7 +190,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             (.notInitialized, .failed(reason: .sdkInternalError)),
             (.invalidState(current: .ready, attempted: "x"), .failed(reason: .sdkInternalError)),
             (.notReady(current: .idle), .failed(reason: .sdkInternalError)),
-            (.devicePendingActivation, .pendingActivation(activationId: "dev")),
+            (.devicePendingActivation(), .pendingActivation(activationId: "dev")),
             (.attestationRevoked(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.attestationFailed(reason: "x"), .failed(reason: .deviceSetupRequired)),
             (.deviceSetupRequired(reason: "x"), .failed(reason: .deviceSetupRequired)),
@@ -338,7 +338,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             .failed(reason: .configurationRejected)
         )
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .none),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation(), registration: .none),
             .failed(reason: .configurationRejected)
         )
     }
@@ -353,7 +353,7 @@ final class PayabliTTPFailureReasonTests: XCTestCase {
             .failed(reason: .deviceKeyUnavailable)
         )
         XCTAssertEqual(
-            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation, registration: .unreadable),
+            PayabliTTPSessionState.landing(for: PayabliTTPError.devicePendingActivation(), registration: .unreadable),
             .failed(reason: .deviceKeyUnavailable)
         )
     }

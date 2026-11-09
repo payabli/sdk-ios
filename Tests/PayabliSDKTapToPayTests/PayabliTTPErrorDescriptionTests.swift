@@ -33,7 +33,7 @@ final class PayabliTTPErrorDescriptionTests: XCTestCase {
             (.notInitialized, "PayabliTTP has not been initialized"),
             (.invalidState(current: .idle, attempted: "charge"), "Invalid state idle for charge"),
             (.notReady(current: .idle), "Reader not ready (state: idle)"),
-            (.devicePendingActivation, "Device is pending activation"),
+            (.devicePendingActivation(), "Device is pending activation"),
             (.tokenExpired, "Access token expired"),
             (.termsNotAccepted, "Contactless payment terms have not been accepted"),
             (.readerOSVersionNotSupported(), "This OS version does not support contactless payments"),
