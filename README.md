@@ -332,9 +332,6 @@ Every error the SDK throws, other than a cancellation, is a `PayabliError` with 
 - `rawCode` is Payabli's own code for the condition, such as `D0329`, `E1001` or `9005`. It is `nil` when the
   service named none, as on Tap to Pay setup and activation refusals.
 
-Most failures read from a response, Tap to Pay's included, don't fill either field yet, so on those a `nil` doesn't
-mean that no response or code came.
-
 Two declines share a status and a `type`; only `rawCode` tells them apart:
 
 ```swift
@@ -407,7 +404,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `captureAuthorizedTransaction` or `voidTransaction` carries `userInfo["capture"]`: `1` when the payment may have been
   taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
   When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
-  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
+  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. A refusal or a service
+  error also carries `userInfo["paymentTransId"]` when the service's answer named a transaction. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 
 ### Other technologies
 

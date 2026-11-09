@@ -101,6 +101,20 @@ final class TapToPayErrorTests: XCTestCase {
         XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "E1001")
     }
 
+    func testAnObjectiveCTapToPayErrorCarriesItsOwnStatusAndCode() {
+        let error = TapToPayError(
+            type: .deviceSetupUnsupported,
+            reason: "r",
+            detail: nil,
+            httpStatus: 403,
+            rawCode: "9001"
+        ) as NSError
+
+        XCTAssertEqual(error.domain, "com.payabli.ttp")
+        XCTAssertEqual(error.userInfo["httpStatus"] as? NSNumber, 403)
+        XCTAssertEqual(error.userInfo["rawCode"] as? NSString, "9001")
+    }
+
     func testAnObjectiveCTapToPayErrorWithNeitherCarriesNeitherKey() {
         let error = TapToPayError(type: .deviceSetupUnsupported, reason: "r", detail: nil) as NSError
 

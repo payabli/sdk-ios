@@ -455,7 +455,8 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             return result
         } catch {
             var outcome = Self.outcome(of: error, reused: reservation.reused)
-            if !mark.mayHaveLeft {
+            // A decline answers the payment even when its 401 lowered the mark.
+            if !mark.mayHaveLeft, (error as? any PayabliError)?.type != .paymentDeclined {
                 outcome = .notAnswered
                 if PayInReports.isRefusedBeforeSending(error) {
                     PayInLocalRefusal.current?.set()

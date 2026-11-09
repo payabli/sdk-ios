@@ -309,8 +309,8 @@ public final class PayabliPayInObjC: NSObject {
 }
 
 extension Error {
-    /// The `NSError` an Objective-C caller receives; a refused input adds `field` when it names one, and an unknown
-    /// outcome adds `paymentTransId`, `paymentReference` and its redacted cause under `NSUnderlyingErrorKey`.
+    /// The `NSError` an Objective-C caller receives, adding `field`, `paymentTransId` and `paymentReference` when the
+    /// error names them, and an unknown outcome's redacted cause under `NSUnderlyingErrorKey`.
     ///
     /// - Parameter movesMoney: whether the call could take a payment, so the error says whether it may have.
     /// - Returns: the error, with `capture` set to 1 when the payment may have been taken, a refusal because another
@@ -320,6 +320,10 @@ extension Error {
         var userInfo = error.userInfo
         if let field = (self as? PayabliPayInError.InvalidInput)?.field {
             userInfo["field"] = field as NSString
+        }
+        let failure = (self as? PayabliPayInError.Refused)?.failure ?? (self as? PayabliPayInError.ServiceError)?.failure
+        if let paymentTransId = failure?.paymentTransId {
+            userInfo["paymentTransId"] = paymentTransId as NSString
         }
         if let unsettled = self as? PayabliPayInError.Unsettled {
             userInfo["paymentTransId"] = unsettled.paymentTransId

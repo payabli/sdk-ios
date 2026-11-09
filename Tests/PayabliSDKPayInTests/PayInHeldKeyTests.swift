@@ -706,6 +706,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case conflict(String)
         case lost
         case unauthorized
+        /// A 401 carrying a fraud block's code, which lowers the mark as every 401 does.
+        case fraudBlocked401(String)
         case lostBeforeHandOff
         case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
@@ -782,6 +784,10 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             throw PayabliGenericError(type: .tokenExpired, reason: "Token expired")
         case let .refusedBeforeHandOff(refusal):
             throw refusal
+        case let .fraudBlocked401(code):
+            PayabliSendMark.current?.lower()
+            let body = #"{"code":"\#(code)","reason":"Blocked","explanation":"The payer is blocked.","data":null}"#
+            return PayabliResponse(statusCode: 401, headers: [:], body: Data(body.utf8))
         }
     }
 

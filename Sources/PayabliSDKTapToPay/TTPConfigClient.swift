@@ -56,7 +56,7 @@ final class TTPConfigClient: Sendable {
 
         try mapPayabliHTTPError(response: response) { code in
             if code == 403 {
-                return ConfigPendingActivation(presentedDeviceId: headers.deviceId)
+                return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
             }
             return nil
         }
@@ -70,20 +70,23 @@ final class TTPConfigClient: Sendable {
             // known. Any other 401 in the body keeps it.
             if BindingRefusal.isBindingGone(code: code, reason: reason) {
                 guard dropRefusedBinding(entry: entry, presented: headers) else {
-                    throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
+                    throw PayabliTTPError.attestationRevoked(
+                        reason: "\(reason) — the stored binding could not be dropped",
+                        httpStatus: response.statusCode
+                    )
                 }
-                throw PayabliTTPError.attestationRevoked(reason: reason)
+                throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
             }
             if code == 401 {
-                throw PayabliGenericError(type: .tokenExpired, reason: reason)
+                throw PayabliGenericError(type: .tokenExpired, reason: reason, httpStatus: response.statusCode, rawCode: nil)
             }
             if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
-                throw refused
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
             }
             if code == 403 {
-                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId)
+                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
             }
-            throw PayabliTTPError.configFailed(reason: reason)
+            throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
         }
 
         let decoder = JSONDecoder()
@@ -94,7 +97,7 @@ final class TTPConfigClient: Sendable {
             let credentials = envelope.responseData?.credentials
         else {
             logger.error("[config] payload decode failed")
-            throw PayabliTTPError.configFailed(reason: "Invalid config envelope")
+            throw PayabliTTPError.configFailed(reason: "Invalid config envelope", httpStatus: response.statusCode)
         }
 
         return TTPConfig(providerCredentials: credentials)
@@ -119,14 +122,17 @@ final class TTPConfigClient: Sendable {
         }
         if let refused = ColdRouteRefusals.decline(code: response.statusCode, reason: reason) {
             logger.error("[config] refused: the entry point is not available")
-            throw refused
+            throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
         }
         guard BindingRefusal.isBindingGone(code: response.statusCode, reason: reason) else { return }
         logger.error("[config] the service holds no live attestation for this binding")
         guard dropRefusedBinding(entry: entry, presented: headers) else {
-            throw PayabliTTPError.attestationRevoked(reason: "\(reason) — the stored binding could not be dropped")
+            throw PayabliTTPError.attestationRevoked(
+                reason: "\(reason) — the stored binding could not be dropped",
+                httpStatus: response.statusCode
+            )
         }
-        throw PayabliTTPError.attestationRevoked(reason: reason)
+        throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
     }
 
     private func assertionHeaders(entry: String) async throws -> AssertionHeaders {
@@ -160,4 +166,5 @@ final class TTPConfigClient: Sendable {
 
 struct ConfigPendingActivation: Error {
     let presentedDeviceId: String
+    let httpStatus: Int
 }

@@ -72,7 +72,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     }
 
     func testACaseWithNoTextCarriesNoDetail() throws {
-        XCTAssertNil(try translated(PayabliTTPError.devicePendingActivation).detail)
+        XCTAssertNil(try translated(PayabliTTPError.devicePendingActivation()).detail)
     }
 
     func testATransportFailureKeepsItsCodeReasonAndDetail() throws {
@@ -428,14 +428,14 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         .notInitialized,
         .invalidState(current: .ready, attempted: "x"),
         .notReady(current: .idle),
-        .devicePendingActivation,
+        .devicePendingActivation(),
         .attestationRevoked(reason: "x"),
         .attestationFailed(reason: "x"),
         .deviceSetupRequired(reason: "x"),
         .deviceSetupRefused(reason: "x"),
         .entryPointRefused(reason: "x"),
         .configFailed(reason: "x"),
-        .cardPresentNotEnabled,
+        .cardPresentNotEnabled(),
         .readerSetupFailed(reason: "x"),
         .readerCredentialsUnusable,
         .readerHardwareUnsupported,
