@@ -136,6 +136,9 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
 
         let redactedCause: RedactedCause
 
+        /// The fields the cause blamed, read before it was redacted, so the form can mark them.
+        let rejectedFields: Set<PayabliPayInField>
+
         /// The transaction the answer named; pass it to ``PayabliPayIn/readTransaction(_:)``. `nil` when the
         /// answer named none: after `voidTransaction(_:)` or `captureAuthorizedTransaction(_:)`, read back the ID you
         /// passed; after `capture(_:)` or `authorize(_:)`, find the transaction in the Payabli portal by its `orderId`.
@@ -164,6 +167,7 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
         package init(type: PayabliErrorType, cause: any Error, paymentTransId: String?, paymentReference: String?) {
             let answer = cause as? any PayabliError
             redactedCause = cause as? RedactedCause ?? RedactedCause(cause)
+            rejectedFields = PayabliPayInRejectedFields.fields(in: cause)
             self.paymentTransId = paymentTransId
             self.paymentReference = paymentReference
             super.init(
@@ -180,6 +184,7 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
         /// - Parameter paymentReference: the payment's name, which the request did not know.
         init(_ source: Unsettled, type: PayabliErrorType, paymentReference: String?) {
             redactedCause = source.redactedCause
+            rejectedFields = source.rejectedFields
             paymentTransId = source.paymentTransId
             self.paymentReference = paymentReference
             super.init(

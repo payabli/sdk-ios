@@ -376,7 +376,9 @@ final class PayabliPayInViewModel: ObservableObject {
     /// category and operation that picked the wording so a change to the wording redraws the
     /// message already drawn.
     private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
-        guard !hasMarkedFieldOnScreen, configuration.showsFailureMessage else {
+        // A mark can't say the payment may have gone through, so an unknown outcome draws its message beside it.
+        let marksAnswerIt = hasMarkedFieldOnScreen && !(error is PayabliPayInError.Unsettled)
+        guard !marksAnswerIt, configuration.showsFailureMessage else {
             failureMessage = nil
             drawnFailure = nil
             return

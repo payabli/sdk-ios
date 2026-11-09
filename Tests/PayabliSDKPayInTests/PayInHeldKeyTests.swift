@@ -710,6 +710,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
         case tokenFetchFailed
         case cancelled(afterHandOff: Bool)
         case urlErrorCancelled
+        /// Refused on the device before the request left, as a field the SDK would not send.
+        case refusedBeforeHandOff(PayabliPayInError.InvalidInput)
     }
 
     private static let approved = Data("""
@@ -750,7 +752,7 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             return steps.isEmpty ? .lost : steps.removeFirst()
         }
         switch step {
-        case .lostBeforeHandOff, .cancelled(afterHandOff: false), .tokenFetchFailed:
+        case .lostBeforeHandOff, .cancelled(afterHandOff: false), .tokenFetchFailed, .refusedBeforeHandOff:
             break
         default:
             PayabliSendMark.current?.set()
@@ -778,6 +780,8 @@ final class ScriptedTransport: PayabliTransport, @unchecked Sendable {
             throw URLError(.cancelled)
         case .unauthorized:
             throw PayabliGenericError(type: .tokenExpired, reason: "Token expired")
+        case let .refusedBeforeHandOff(refusal):
+            throw refusal
         }
     }
 
