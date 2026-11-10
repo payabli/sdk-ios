@@ -157,16 +157,13 @@ public struct PayabliPayInForm: View {
             syncViewModel()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: PayInPaymentFlowConfigurationChange(configuration, labels: labels)) { change in
+        .onChange(of: PayInFormInputs(operation: operation, configuration: configuration, labels: labels)) { inputs in
             viewModel.update(
                 component: payIn,
-                operation: operation,
-                configuration: change.configuration,
-                labels: change.labels
+                operation: inputs.operation,
+                configuration: inputs.configuration,
+                labels: inputs.labels
             )
-        }
-        .onChange(of: operation.payabliViewModelSignature) { _ in
-            syncViewModel()
         }
         .onChange(of: viewModel.availableMethods) { _ in
             viewModel.normalizeSelectedMethodForAvailableMethods()

@@ -117,6 +117,9 @@ struct TapToPayFailure: DisplayedFailure, CodedFailure {
     /// cold attestation rather than another activation code.
     let isDeviceSetupRequired: Bool
 
+    /// Whether the service said this device is not waiting for an activation code, which another enable answers.
+    let isDeviceNotPending: Bool
+
     /// Whether the session landed on a reason no setup repairs, which the enable step reports.
     let isRefused: Bool
 
@@ -131,6 +134,7 @@ struct TapToPayFailure: DisplayedFailure, CodedFailure {
         Logger(subsystem: "com.payabli.example.app", category: "TapToPayDiagnostics")
             .error("Tap to Pay failed: \(LoggableError.label(for: error), privacy: .public)")
         isDeviceSetupRequired = failure?.type == .deviceSetupRequired
+        isDeviceNotPending = failure?.type == .deviceNotPending
         isRefused = session == .refused
         isPendingActivation = session == .pendingActivation
     }

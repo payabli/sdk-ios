@@ -70,8 +70,26 @@ extension PayabliPayInViewModel {
         return (month, 2000 + year)
     }
 
-    func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
-        switch effectiveSelectedMethod {
+    /// The fields `method` draws for this operation.
+    ///
+    /// - Parameter method: the method whose fields to list.
+    /// - Returns: the method's fields in their configured order, without the amounts when saving a method.
+    func fields(for method: PayabliPayInMethodType) -> [PayabliPayInField] {
+        let fields = switch method {
+        case .card:
+            configuration.cardFieldOrder
+        case .bankAccount:
+            configuration.bankFieldOrder
+        }
+
+        guard case .storePaymentMethod = operation else { return fields }
+        return fields.filter { field in
+            field != .amount && field != .serviceFee && field != .surchargeFee
+        }
+    }
+
+    func methodInput(_ method: PayabliPayInMethodType, with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
+        switch method {
         case .card:
             return .card(PayabliPayInCardData(
                 cardNumber: buffers.ofString(cardNumber),
@@ -92,8 +110,8 @@ extension PayabliPayInViewModel {
         }
     }
 
-    func paymentMethod(with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
-        switch effectiveSelectedMethod {
+    func paymentMethod(_ method: PayabliPayInMethodType, with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
+        switch method {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(

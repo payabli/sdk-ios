@@ -23,7 +23,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
 
         var wipedWhileInside: [Bool] = []
         let input = try await viewModel.withFormBuffers { buffers -> PayabliPayInMethodInput in
-            let method = viewModel.methodInput(with: buffers)
+            let method = viewModel.methodInput(viewModel.effectiveSelectedMethod, with: buffers)
             guard case let .card(data) = method else {
                 XCTFail("The card tab builds a card method")
                 throw FormBufferTestError.submissionRefused
@@ -68,7 +68,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
         var held: [SensitiveDigits] = []
         do {
             _ = try await viewModel.withFormBuffers { buffers -> PayabliPayInMethodInput in
-                let method = viewModel.methodInput(with: buffers)
+                let method = viewModel.methodInput(viewModel.effectiveSelectedMethod, with: buffers)
                 if case let .card(data) = method {
                     held = [data.cardNumber, data.securityCode]
                 }
@@ -106,7 +106,7 @@ final class PaymentMethodFormBufferTests: XCTestCase {
 
         var held: SensitiveDigits?
         _ = await viewModel.withFormBuffers { buffers -> PayabliPayInMethodInput in
-            let method = viewModel.methodInput(with: buffers)
+            let method = viewModel.methodInput(viewModel.effectiveSelectedMethod, with: buffers)
             if case let .bankAccount(data) = method {
                 held = data.accountNumber
             }
