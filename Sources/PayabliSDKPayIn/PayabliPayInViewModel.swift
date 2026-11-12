@@ -365,7 +365,7 @@ final class PayabliPayInViewModel: ObservableObject {
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(fields(for: method))
             }
-            // A marked field is the whole answer; a failure that marks none on screen shows its
+            // A failure that marks no field on screen, or leaves the outcome unknown, shows its
             // message, which the opt-out hides while the marks stay.
             drawFailureMessage(for: error, operation: operation.kind)
             throw error
@@ -376,7 +376,9 @@ final class PayabliPayInViewModel: ObservableObject {
     /// category and operation that picked the wording so a change to the wording redraws the
     /// message already drawn.
     private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
-        guard !hasMarkedFieldOnScreen, configuration.showsFailureMessage else {
+        // A mark can't say the payment may have gone through, so an unknown outcome draws its message beside it.
+        let marksAnswerIt = hasMarkedFieldOnScreen && !(error is PayabliPayInError.Unsettled)
+        guard !marksAnswerIt, configuration.showsFailureMessage else {
             failureMessage = nil
             drawnFailure = nil
             return
