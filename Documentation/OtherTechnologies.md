@@ -309,7 +309,7 @@ AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise)
     },
     onFailed: { error in
       // A second tap while the first submission runs; that submission still reports.
-      if case PayabliPayInError.submissionInProgress = error { return }
+      if error is PayabliPayInError.AlreadySubmitting { return }
       finish(cardOutcome(for: error))
     },
     onMethodChanged: { _ in }
@@ -328,12 +328,10 @@ Map the SDK's errors to the outcome as [Handle the outcome](../README.md#handle-
 
 ```swift
 func cardOutcome(for error: any PayabliError) -> [String: Any?] {
-  switch error {
-  case let PayabliPayInError.submissionInterrupted(_, _, paymentTransId, _):
-    return ["status": "unknown", "paymentTransId": paymentTransId]
-  default:
-    return ["status": "notCharged", "paymentTransId": nil]
+  if let unsettled = error as? PayabliPayInError.Unsettled {
+    return ["status": "unknown", "paymentTransId": unsettled.paymentTransId]
   }
+  return ["status": "notCharged", "paymentTransId": nil]
 }
 
 func tapOutcome(for error: Error) -> [String: Any?] {
