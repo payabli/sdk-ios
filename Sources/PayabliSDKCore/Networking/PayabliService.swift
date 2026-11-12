@@ -243,7 +243,7 @@ package func mapPayabliHTTPError(
     switch status {
     case 400:
         let validation = (try? decoder.decode(PayabliValidationError.self, from: response.body))
-            ?? PayabliValidationError()
+            ?? PayabliValidationError(httpStatus: status)
         throw PayabliPaymentError.validation(validation.carrying(httpStatus: status, rawCode: rawCode))
 
     case 401:

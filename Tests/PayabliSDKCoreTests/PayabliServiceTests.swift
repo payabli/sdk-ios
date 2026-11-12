@@ -136,8 +136,8 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
-            XCTAssertEqual(err.status, 400)
-            XCTAssertNotNil(err.errors?["paymentMethod.cardnumber"])
+            XCTAssertEqual(err.httpStatus, 400)
+            XCTAssertNotNil(err.errors["paymentMethod.cardnumber"])
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -161,10 +161,9 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
-            XCTAssertEqual(err.title, "One or more validation errors occurred.")
-            XCTAssertEqual(err.problemType, "https://tools.ietf.org/html/rfc9110#section-15.5.1")
-            XCTAssertEqual(err.errors?["Entry"]?.first?.message, "The Entry field is required.")
-            XCTAssertNil(err.errors?["Entry"]?.first?.suggestion)
+            XCTAssertEqual(err.reason, "One or more validation errors occurred.")
+            XCTAssertEqual(err.errors["Entry"]?.first?.message, "The Entry field is required.")
+            XCTAssertNil(err.errors["Entry"]?.first?.suggestion)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -196,10 +195,9 @@ final class PayabliServiceTests: XCTestCase {
         } catch let PayabliPaymentError.validation(err) {
             XCTAssertEqual(err.rawCode, "E9001")
             XCTAssertEqual(err.detail, "Invalid Authorization Token")
-            XCTAssertNil(err.token)
-            XCTAssertEqual(err.errors?["entryPoint"]?.first?.message, serverMessage)
+            XCTAssertEqual(err.errors["entryPoint"]?.first?.message, serverMessage)
             XCTAssertEqual(
-                err.errors?["entryPoint"]?.first?.suggestion,
+                err.errors["entryPoint"]?.first?.suggestion,
                 "Use an authorized API token for the request."
             )
         } catch {
@@ -225,10 +223,10 @@ final class PayabliServiceTests: XCTestCase {
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
             XCTAssertEqual(
-                err.errors?["$"]?.first?.message,
+                err.errors["$"]?.first?.message,
                 "JSON deserialization for type 'AttestRequest' was missing required properties including: 'platform'."
             )
-            XCTAssertEqual(err.errors?["request"]?.first?.message, "The request field is required.")
+            XCTAssertEqual(err.errors["request"]?.first?.message, "The request field is required.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -252,8 +250,8 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
-            XCTAssertEqual(err.title, "One or more validation errors occurred.")
-            XCTAssertTrue(err.errors?.isEmpty ?? true)
+            XCTAssertEqual(err.reason, "One or more validation errors occurred.")
+            XCTAssertTrue(err.errors.isEmpty)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -272,8 +270,8 @@ final class PayabliServiceTests: XCTestCase {
             XCTFail("Expected error")
         } catch let PayabliPaymentError.validation(err) {
             XCTAssertEqual(err.type, .validation)
-            XCTAssertNil(err.title)
-            XCTAssertNil(err.errors)
+            XCTAssertEqual(err.reason, "Validation failed")
+            XCTAssertTrue(err.errors.isEmpty)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -375,7 +373,6 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.server(err) {
-            XCTAssertNil(err.title)
             XCTAssertEqual(err.reason, "Internal server error")
         } catch {
             XCTFail("Wrong error: \(error)")
@@ -396,8 +393,8 @@ final class PayabliServiceTests: XCTestCase {
             _ = try await service().performV2(request, decoding: FakeData.self)
             XCTFail("Expected error")
         } catch let PayabliPaymentError.server(err) {
-            XCTAssertEqual(err.status, 500)
-            XCTAssertEqual(err.problemType, "https://tools.ietf.org/html/rfc9110#section-15.6.1")
+            XCTAssertEqual(err.httpStatus, 500)
+            XCTAssertEqual(err.reason, "Internal Server Error")
             XCTAssertEqual(err.type, .serverError)
         } catch {
             XCTFail("Wrong error: \(error)")

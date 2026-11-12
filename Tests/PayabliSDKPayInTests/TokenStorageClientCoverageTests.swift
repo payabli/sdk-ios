@@ -30,7 +30,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             XCTFail("Expected a validation error")
         } catch let PayabliPaymentError.validation(validation) {
             XCTAssertEqual(validation.detail, "Paypoint not found or inactive")
-            XCTAssertNil(validation.errors, "the route names no field, so none is invented")
+            XCTAssertTrue(validation.errors.isEmpty, "the route names no field, so none is invented")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

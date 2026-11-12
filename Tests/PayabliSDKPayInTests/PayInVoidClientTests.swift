@@ -109,7 +109,7 @@ final class PayInVoidClientTests: XCTestCase {
         } catch let PayabliPaymentError.validation(refusal) {
             XCTAssertEqual(refusal.detail, "Invalid transaction status")
             XCTAssertEqual(refusal.rawCode, "E7037")
-            XCTAssertEqual(refusal.errors?.keys.first, "transId")
+            XCTAssertEqual(refusal.errors.keys.first, "transId")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

@@ -3,8 +3,6 @@ import XCTest
 
 final class PayabliErrorCodeMappingTests: XCTestCase {
     func testValidationErrorCodeMapsToValidation() throws {
-        // Construct a PayabliValidationError via JSON decoding (the only
-        // way to build one — it has no public memberwise init).
         let json = """
         {
           "title": "Bad Request",
@@ -22,6 +20,6 @@ final class PayabliErrorCodeMappingTests: XCTestCase {
             "PayabliValidationError.type must be .validation, not .decodingError"
         )
         XCTAssertEqual(err.rawCode, "E0001")
-        XCTAssertEqual(err.title, "Bad Request")
+        XCTAssertEqual(err.reason, "Bad Request")
     }
 }

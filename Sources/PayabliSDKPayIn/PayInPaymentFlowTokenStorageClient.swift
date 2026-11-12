@@ -127,8 +127,13 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
                 )
             return PayabliPayInError.Refused(failure: failure)
         }
-        let validation = PayabliValidationError(detail: decoded?.responseText.trimmed.nilIfEmpty)
-        return PayabliPaymentError.validation(validation.carrying(httpStatus: response.statusCode, rawCode: code))
+        return PayabliPaymentError.validation(
+            PayabliValidationError(
+                httpStatus: response.statusCode,
+                detail: decoded?.responseText.trimmed.nilIfEmpty,
+                rawCode: code
+            )
+        )
     }
 
     /// The route's `responseCode` for a payer blocked by fraud control.

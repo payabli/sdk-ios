@@ -168,42 +168,31 @@ public struct PayabliGenericError : PayabliSDKCore::PayabliError {
 public struct PayabliFieldError : Swift::Decodable, Swift::Sendable {
   public let message: Swift::String
   public let suggestion: Swift::String?
+  public init(message: Swift::String, suggestion: Swift::String? = nil)
   public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliValidationError : PayabliSDKCore::PayabliError, Swift::Decodable {
-  public let problemType: Swift::String?
-  public let title: Swift::String?
-  public let status: Swift::Int?
+  public let reason: Swift::String
   public let detail: Swift::String?
-  public let instance: Swift::String?
   public let rawCode: Swift::String?
-  public let errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]]?
-  public let token: Swift::String?
+  public let errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]]
   public let httpStatus: Swift::Int?
   public var type: PayabliSDKCore::PayabliErrorType {
-    get
-  }
-  public var reason: Swift::String {
     get
   }
   public var errorDescription: Swift::String? {
     get
   }
+  public init(httpStatus: Swift::Int, reason: Swift::String = "Validation failed", detail: Swift::String? = nil, rawCode: Swift::String? = nil, errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]] = [:])
   public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliServerError : PayabliSDKCore::PayabliError, Swift::Decodable, PayabliSDKCore::PayabliRetryAfter {
-  public let problemType: Swift::String?
-  public let title: Swift::String?
-  public let status: Swift::Int?
+  public let reason: Swift::String
   public let detail: Swift::String?
-  public let instance: Swift::String?
   public let httpStatus: Swift::Int?
   public let rawCode: Swift::String?
   public let retryAfter: Foundation::TimeInterval?
   public var type: PayabliSDKCore::PayabliErrorType {
-    get
-  }
-  public var reason: Swift::String {
     get
   }
   public init(from decoder: any Swift::Decoder) throws

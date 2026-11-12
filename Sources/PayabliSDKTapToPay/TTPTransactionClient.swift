@@ -248,7 +248,7 @@ struct CustomerDataRefusal: PayabliError {
         guard response.statusCode == 400,
               let validation = try? JSONDecoder().decode(PayabliValidationError.self, from: response.body),
               validation.rawCode == "E7020",
-              let entries = validation.errors?["customerData"]
+              let entries = validation.errors["customerData"]
         else { return nil }
         self.validation = validation.carrying(httpStatus: response.statusCode, rawCode: validation.rawCode)
         requiredFields = entries.lazy.compactMap { Self.fieldsNamed(in: $0.message) }.first ?? []

@@ -127,8 +127,8 @@ final class ErrorSummaryTests: XCTestCase {
         )
         let server = try JSONDecoder().decode(
             PayabliServerError.self,
-            from: Data(#"{"title":"Internal server error","status":503}"#.utf8)
-        )
+            from: Data(#"{"title":"Internal server error","status":500}"#.utf8)
+        ).carrying(httpStatus: 503, rawCode: nil, retryAfter: nil)
 
         let declineSummary = ErrorSummary.of(PayabliPaymentError.decline(decline))
         let serverSummary = ErrorSummary.of(PayabliPaymentError.server(server))

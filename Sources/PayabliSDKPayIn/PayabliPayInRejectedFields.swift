@@ -13,7 +13,7 @@ enum PayabliPayInRejectedFields {
         case let refusal as PayabliPayInError.InvalidInput:
             return Set([refusal.field].compactMap { $0.flatMap(field(named:)) })
         case let PayabliPaymentError.validation(refusal):
-            return Set((refusal.errors ?? [:]).keys.compactMap(field(named:)))
+            return Set(refusal.errors.keys.compactMap(field(named:)))
         default:
             return []
         }
