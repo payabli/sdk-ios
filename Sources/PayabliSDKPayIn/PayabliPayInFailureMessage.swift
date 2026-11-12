@@ -46,7 +46,7 @@ enum PayabliPayInFailureMessage {
     /// - Parameter error: The failure the submission threw.
     /// - Returns: The category that picks the message.
     static func messageCategory(for error: any Error) -> PayabliErrorCategory {
-        if case .submissionInterrupted = error as? PayabliPayInError {
+        if error is PayabliPayInError.Unsettled {
             return .outcomeUnknown
         }
         return (error as? any PayabliError)?.category ?? PayabliErrorType.unknown.category
@@ -85,6 +85,8 @@ enum PayabliPayInFailureMessage {
             "This payment method couldn't be saved. Try another one."
         case (.storePaymentMethod, .retryLater):
             "The payment method couldn't be saved. Please try again."
+        case (.storePaymentMethod, .outcomeUnknown):
+            "We couldn't confirm the payment method was saved."
         case (.storePaymentMethod, _):
             "The payment method couldn't be saved."
         }

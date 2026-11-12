@@ -243,6 +243,33 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
 
+    // MARK: - The status a failed close carries
+
+    func testABare404OnTheCloseOfAnApprovedSaleIsAnUnclosedPaymentCarryingItsStatus() async throws {
+        Self.updateResponses.script([404, 200])
+        let ttp = try await makeReadyTTP(outcome: .approved)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.type, .paymentNotClosed)
+        XCTAssertEqual(failure?.httpStatus, 404)
+        XCTAssertEqual(failure?.rawCode, "A01", "the code the answer's body named")
+        XCTAssertEqual(failure?.capture, .charged)
+        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+        XCTAssertEqual(Self.updateResponses.sends, 1, "a 404 is not retried")
+        XCTAssertEqual(ttp.sessionState, .ready, "the session is not marked not enabled")
+    }
+
+    func testACloseThatKeepsFailingCarriesTheLastAnswersStatus() async throws {
+        Self.updateResponses.script([500, 500, 500])
+        let ttp = try await makeReadyTTP(outcome: .approved)
+
+        let failure = await chargeFailure(ttp)
+
+        XCTAssertEqual(failure?.type, .paymentNotClosed)
+        XCTAssertEqual(failure?.httpStatus, 500)
+    }
+
     // MARK: - Fixture
 
     /// Statuses to answer `/MoneyIn/update/` with, in order, and how many arrived. The last entry

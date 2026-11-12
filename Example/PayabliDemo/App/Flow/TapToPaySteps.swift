@@ -11,6 +11,10 @@ enum TapToPayActivationOutcome {
     /// cold attestation, which is the enable step's job.
     case deviceSetupRequired
     case enableFailed
+    /// This device is not waiting for a code, so the way on is the enable step,
+    /// not another code. When the service said so, the session still reads
+    /// `.pendingActivation` until an enable finishes.
+    case setupAskedAgain
     case succeeded
 }
 
@@ -240,12 +244,11 @@ enum TapToPaySteps {
         switch session {
         case .ready, .charging: return .done
         case .attestingDevice, .fetchingConfig, .initializingReader, .reinitializing: return .inProgress
-        // Activation is a separate step, so reaching it means this one
-        // finished — unless the enable that follows a successful activation
-        // is what failed. `/config` answering 403 again puts the session back
-        // to `.pendingActivation`, and the reason for that failure is written
-        // to this step.
-        case .pendingActivation: return outcome == .enableFailed ? .failed : .done
+        // Reaching activation means this step finished, unless the enable after
+        // an activation failed (`/config` answering 403 again) or a code was
+        // refused because the device is not waiting for one.
+        case .pendingActivation:
+            return outcome == .enableFailed || outcome == .setupAskedAgain ? .failed : .done
         // `activateDevice` calls markError when it is refused, so the session
         // reads `.error` for a failure that belongs to the step after this
         // one. Taking it here would block activation, which is where the

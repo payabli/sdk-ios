@@ -41,9 +41,10 @@ final class PayInVoidClientTests: XCTestCase {
             _ = try await client.void(transId: "   ")
             XCTFail("a blank transaction id must be refused")
         } catch let error as PayabliPayInError {
-            guard case .invalidInput = error else {
+            guard let refusal = error as? PayabliPayInError.InvalidInput else {
                 return XCTFail("Wrong error: \(error)")
             }
+            XCTAssertEqual(refusal.field, "transId")
             let requests = await transport.requests
             XCTAssertTrue(requests.isEmpty, "nothing may reach the service")
         }
@@ -60,9 +61,10 @@ final class PayInVoidClientTests: XCTestCase {
                 _ = try await client.void(transId: transId)
                 XCTFail("\(transId) must be refused")
             } catch let error as PayabliPayInError {
-                guard case .invalidInput = error else {
+                guard let refusal = error as? PayabliPayInError.InvalidInput else {
                     return XCTFail("Wrong error for \(transId): \(error)")
                 }
+                XCTAssertEqual(refusal.field, "transId")
                 let requests = await transport.requests
                 XCTAssertTrue(requests.isEmpty, "nothing may reach the service for \(transId)")
             }
@@ -107,7 +109,7 @@ final class PayInVoidClientTests: XCTestCase {
         } catch let PayabliPaymentError.validation(refusal) {
             XCTAssertEqual(refusal.detail, "Invalid transaction status")
             XCTAssertEqual(refusal.rawCode, "E7037")
-            XCTAssertEqual(refusal.errors?.keys.first, "transId")
+            XCTAssertEqual(refusal.errors.keys.first, "transId")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

@@ -2,31 +2,20 @@ import Foundation
 import PayabliSDKCore
 import PayabliSDKPayIn
 
-/// What a submission ended as, in this app's own words.
-///
-/// The form calls back with the SDK's own result and error types. These are what
-/// the screens are handed instead, so no view holds a type it would have to
-/// follow when the SDK changes.
-///
-/// The rows and the response text are derived here rather than transcribed by a
-/// screen: a result carries a dozen fields and an encodable response, and a
-/// screen that reads them one by one names the type again.
+/// What a submission ended as, in this app's own words, so no screen holds an SDK type it would have to follow.
+/// The rows are derived here: a screen reading a result's fields one by one names the type again.
+/// A success shows its code and identifiers, never the service's text.
 struct PayInOutcome {
     let code: String
-    let reason: String?
-    let explanation: String?
     let transaction: PayInTransaction?
     let storedMethod: PayInStoredMethod?
 
-    /// Everything the service answered, as rows a screen renders.
+    /// The result's code and identifiers, as rows a screen renders.
     let summaryRows: [PayInSummaryRow]
-
-    /// The raw response, formatted, for the developer reading this tab.
-    let responseJSON: String
 
     /// What a result screen leads with.
     var headline: String {
-        reason ?? explanation ?? code
+        "Code \(code)"
     }
 
     /// The identifier a reversal can be sent for, or nothing.
@@ -68,18 +57,15 @@ struct PayInTransaction {
 /// The instrument behind a save.
 struct PayInStoredMethod {
     let storedMethodId: String?
-    let responseText: String
-    let resultText: String?
-    let resultCode: Int?
 }
 
 /// A submission that did not go through.
 struct PayInFailure {
-    /// Displayable, and what a screen shows.
+    /// The message for the failure's category, or this app's own text for a case it words itself.
+    /// It never carries the error's own text, which is the service's and goes to no screen.
     let message: String
 
-    /// The failure's own classification, carrying nothing from the wire, so it is
-    /// the part safe to record.
+    /// The failure's code, carrying nothing from the wire, which is what the log records.
     let logLabel: String
 
     /// Whether the flow refused this because another submission was already running.
@@ -100,6 +86,10 @@ struct PayInFailure {
     /// That refusal lapses after a while, so submitting again later can take a second
     /// payment. What settles the earlier attempt is reading the transaction back.
     let isDuplicateSubmission: Bool
+
+    /// Whether the service answered the payment, with a decline or a refusal of what was sent, which ends any
+    /// retry of it. A refusal made on the device, or a failure the service may not have seen, leaves one open.
+    let answersThePayment: Bool
 }
 
 extension PayInOutcome {
@@ -116,8 +106,6 @@ extension PayInOutcome {
 
     init(_ result: PayabliPayInResult) {
         code = result.code
-        reason = result.reason
-        explanation = result.explanation
         transaction = result.transaction.map {
             PayInTransaction(
                 paymentTransId: $0.paymentTransId,
@@ -127,15 +115,9 @@ extension PayInOutcome {
             )
         }
         storedMethod = result.storedPaymentMethod.map {
-            PayInStoredMethod(
-                storedMethodId: $0.storedMethodId,
-                responseText: $0.responseText,
-                resultText: $0.resultText,
-                resultCode: $0.resultCode
-            )
+            PayInStoredMethod(storedMethodId: $0.storedMethodId)
         }
         summaryRows = Self.rows(for: result)
-        responseJSON = Self.json(for: result)
     }
 
     /// Built row by row rather than as one array of pairs mapped into rows. Thirteen
@@ -145,9 +127,10 @@ extension PayInOutcome {
         let transaction = result.transaction
         var rows: [PayInSummaryRow] = []
         rows.append(PayInSummaryRow(label: "Code", value: result.code))
-        rows.append(PayInSummaryRow(label: "Reason", value: text(result.reason)))
-        rows.append(PayInSummaryRow(label: "Explanation", value: text(result.explanation)))
-        rows.append(PayInSummaryRow(label: "Action", value: text(result.action)))
+        if let storedMethod = result.storedPaymentMethod {
+            rows.append(PayInSummaryRow(label: "Stored method ID", value: text(storedMethod.storedMethodId)))
+            return rows
+        }
         rows.append(PayInSummaryRow(label: "Payment trans ID", value: text(transaction?.paymentTransId)))
         rows.append(PayInSummaryRow(label: "Gateway trans ID", value: text(transaction?.gatewayTransId)))
         rows.append(PayInSummaryRow(label: "Order ID", value: text(transaction?.orderId)))
@@ -164,18 +147,6 @@ extension PayInOutcome {
     private static func text(_ value: String?) -> String {
         guard let value, !value.isEmpty else { return "-" }
         return value
-    }
-
-    private static func json(for result: PayabliPayInResult) -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard
-            let data = try? encoder.encode(result.apiResponse),
-            let text = String(data: data, encoding: .utf8)
-        else {
-            return "Unable to render response JSON."
-        }
-        return text
     }
 
     /// The response carries no currency, so this names one. The reader's own
@@ -209,21 +180,16 @@ extension PayInFailure {
     private static let reversalStillRunningMessage =
         "The earlier reversal may still be running. Read the payment again shortly."
 
-    /// Every failure reads as `localizedDescription`, which each SDK error type
-    /// writes for a merchant: a validation failure appends the rejected fields, a
-    /// decline appends the action the payer can take, and the rest fall back to the
-    /// reason and its detail. Reducing them here to reason and detail dropped
-    /// exactly the part worth showing.
+    /// A failure reads as the message for its category, never as `localizedDescription`, which is the service's text.
     ///
-    /// - Parameter operation: what the form was for. A stored method sends no
-    ///   idempotency key and offers no new attempt, so a conflict on that flow is
-    ///   not the duplicate this message describes, and it reads as the service's own
-    ///   answer.
+    /// - Parameter operation: what the form was for. A stored method sends no idempotency key, so a conflict there
+    ///   is not a duplicate and reads as the service's own answer.
     init(_ error: Error, operation: PayInOperation) {
         let duplicate = operation.canRepeatUnderOneKey && Self.isDuplicateSubmission(error)
         isDuplicateSubmission = duplicate
         outcomeIsUnresolved = Self.leavesOutcomeUnknown(error)
         refusedForAnotherSubmission = Self.refusedForAnotherSubmission(error)
+        answersThePayment = Self.answersThePayment(error)
         logLabel = LoggableError.label(for: error)
         message = Self.message(for: error, operation: operation, duplicate: duplicate)
     }
@@ -243,19 +209,67 @@ extension PayInFailure {
         if operation == .void, leavesOutcomeUnknown(error) {
             return unknownReversalMessage
         }
-        return error.localizedDescription
+        return categoryMessage(for: category(of: error), operation: operation)
+    }
+
+    /// The category whose message a failure shows. A submission that may have gone through reads as
+    /// outcome-unknown whatever its own category is.
+    private static func category(of error: Error) -> PayabliErrorCategory {
+        if leavesOutcomeUnknown(error) {
+            return .outcomeUnknown
+        }
+        return (error as? any PayabliError)?.category ?? PayabliErrorType.unknown.category
+    }
+
+    /// The form's own message for each category and operation, and this app's for a reversal, which the form
+    /// does not submit.
+    private static func categoryMessage(for category: PayabliErrorCategory, operation: PayInOperation) -> String {
+        switch (operation, category) {
+        case (.capture, .declined), (.authorize, .declined):
+            "The payment was declined. Try another payment method."
+        case (.capture, .retryLater), (.authorize, .retryLater):
+            "The payment couldn't be completed. Please try again."
+        case (.capture, .outcomeUnknown), (.authorize, .outcomeUnknown):
+            "This payment may have gone through. Check before paying again."
+        case (.capture, _), (.authorize, _):
+            "The payment couldn't be completed."
+        case (.storedMethod, .declined):
+            "This payment method couldn't be saved. Try another one."
+        case (.storedMethod, .retryLater):
+            "The payment method couldn't be saved. Please try again."
+        case (.storedMethod, .outcomeUnknown):
+            "We couldn't confirm the payment method was saved."
+        case (.storedMethod, _):
+            "The payment method couldn't be saved."
+        case (.void, .retryLater):
+            "The reversal couldn't be completed. Please try again."
+        case (.void, _):
+            "The reversal couldn't be completed."
+        }
+    }
+
+    /// Only the shapes the service's own answer arrives in. A refusal made on the device can carry the same
+    /// error type, so the type alone does not tell them apart.
+    private static func answersThePayment(_ error: Error) -> Bool {
+        switch error {
+        case PayabliPaymentError.decline, PayabliPaymentError.validation:
+            return true
+        case is PayabliPayInError.Refused:
+            return true
+        case let failure as PayabliPayInError.ServiceError:
+            return failure.type == .paymentDeclined || failure.type == .validation
+        default:
+            return false
+        }
     }
 
     private static func refusedForAnotherSubmission(_ error: Error) -> Bool {
-        if case .submissionInProgress = error as? PayabliPayInError {
-            return true
-        }
-        return false
+        error is PayabliPayInError.AlreadySubmitting
     }
 
     /// Whether the request may have reached the service, so sending it again is not safe to offer.
     private static func leavesOutcomeUnknown(_ error: Error) -> Bool {
-        if case .submissionInterrupted = error as? PayabliPayInError {
+        if error is PayabliPayInError.Unsettled {
             return true
         }
         // A request cancelled in flight may already have reached the service.
@@ -263,9 +277,8 @@ extension PayInFailure {
     }
 
     private static func isDuplicateSubmission(_ error: Error) -> Bool {
-        if case let PayabliPayInError.transactionFailed(failure) = error,
-           failure.httpStatusCode == 409
-        {
+        let answered = (error as? PayabliPayInError.Refused)?.failure ?? (error as? PayabliPayInError.ServiceError)?.failure
+        if answered?.httpStatusCode == 409 {
             return true
         }
         // An empty body carries no code of its own, so the status mapping supplies one. The code says

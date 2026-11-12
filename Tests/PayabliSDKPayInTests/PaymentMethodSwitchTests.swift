@@ -42,7 +42,7 @@ final class PaymentMethodSwitchTests: XCTestCase {
 
     func testAFieldBothTabsShowIsKeptAcrossASwitch() {
         let shared: [PayabliPayInField] = [
-            .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode, .methodDescription
+            .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode
         ]
         let viewModel = makeViewModel(
             cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder + shared,
@@ -58,7 +58,6 @@ final class PaymentMethodSwitchTests: XCTestCase {
         XCTAssertEqual(viewModel.customerNumber, "C-100")
         XCTAssertEqual(viewModel.billingEmail, "jane@example.com")
         XCTAssertEqual(viewModel.billingZip, "22039")
-        XCTAssertEqual(viewModel.methodDescription, "Rent")
     }
 
     /// The tab's own layout decides what goes, so a customer field only one tab shows is
@@ -142,6 +141,5 @@ final class PaymentMethodSwitchTests: XCTestCase {
         viewModel.customerNumber = "C-100"
         viewModel.billingEmail = "jane@example.com"
         viewModel.billingZip = "22039"
-        viewModel.methodDescription = "Rent"
     }
 }

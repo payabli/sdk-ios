@@ -81,7 +81,7 @@ final class PayInFlowHandleTests: XCTestCase {
         let handle = try makeHandle()
         XCTAssertTrue(handle.startNewAttempt(suppliesCustomer: true))
 
-        handle.chargeFailed(PayInFailure(PayabliPayInError.invalidInput("Refused."), operation: .capture))
+        handle.chargeFailed(PayInFailure(PayabliPayInError.InvalidInput(field: nil, reason: "Refused."), operation: .capture))
 
         XCTAssertEqual(handle.requestAttempt, .newPayment)
     }
@@ -185,10 +185,8 @@ final class PayInFlowHandleTests: XCTestCase {
     }
 
     private static let unknownOutcome = PayInFailure(
-        PayabliPayInError.submissionInterrupted(
-            type: .networkError,
-            causeType: "test",
-            paymentTransId: nil,
+        PayabliPayInError.Unsettled(
+            cause: PayabliGenericError(type: .networkError, reason: "networkError"),
             paymentReference: "p1"
         ),
         operation: .capture

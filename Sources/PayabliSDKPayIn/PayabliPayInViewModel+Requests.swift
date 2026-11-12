@@ -70,8 +70,26 @@ extension PayabliPayInViewModel {
         return (month, 2000 + year)
     }
 
-    func methodInput(with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
-        switch effectiveSelectedMethod {
+    /// The fields `method` draws for this operation.
+    ///
+    /// - Parameter method: the method whose fields to list.
+    /// - Returns: the method's fields in their configured order, without the amounts when saving a method.
+    func fields(for method: PayabliPayInMethodType) -> [PayabliPayInField] {
+        let fields = switch method {
+        case .card:
+            configuration.cardFieldOrder
+        case .bankAccount:
+            configuration.bankFieldOrder
+        }
+
+        guard case .storePaymentMethod = operation else { return fields }
+        return fields.filter { field in
+            field != .amount && field != .serviceFee && field != .surchargeFee
+        }
+    }
+
+    func methodInput(_ method: PayabliPayInMethodType, with buffers: FormBufferRegistry) -> PayabliPayInMethodInput {
+        switch method {
         case .card:
             return .card(PayabliPayInCardData(
                 cardNumber: buffers.ofString(cardNumber),
@@ -87,15 +105,13 @@ extension PayabliPayInViewModel {
                 routingNumber: routingNumber,
                 accountType: accountType,
                 holderName: accountHolder,
-                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                secCode: configuration.hiddenValues.secCode,
-                deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.accountHolderType
             ))
         }
     }
 
-    func paymentMethod(with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
-        switch effectiveSelectedMethod {
+    func paymentMethod(_ method: PayabliPayInMethodType, with buffers: FormBufferRegistry) -> PayabliPayInPaymentMethod {
+        switch method {
         case .card:
             return .card(PayabliPayInPaymentMethod.Card(
                 data: PayabliPayInCardData(
@@ -114,9 +130,7 @@ extension PayabliPayInViewModel {
                     routingNumber: routingNumber,
                     accountType: accountType,
                     holderName: accountHolder,
-                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.hiddenValues.accountHolderType,
-                    secCode: configuration.hiddenValues.secCode,
-                    deviceId: fieldIsVisible(.deviceId) ? deviceId : configuration.hiddenValues.deviceId
+                    holderType: fieldIsVisible(.accountHolderType) ? accountHolderType : configuration.accountHolderType
                 )
             ))
         }
@@ -126,7 +140,6 @@ extension PayabliPayInViewModel {
         var customer = operation.requestConfiguration?.customerData
             ?? operation.storeOptions?.customerData
             ?? PayabliPayInCustomerData()
-        customer.payabliCaptureMerge(configuration.hiddenValues.customerData)
         customer.payabliCaptureApply(\.firstName, firstName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
         customer.payabliCaptureApply(\.lastName, lastName.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
         customer.payabliCaptureApply(\.customerNumber, customerNumber.payabliCaptureTrimmed.payabliCaptureNilIfEmpty)
@@ -135,16 +148,9 @@ extension PayabliPayInViewModel {
         return customer.payabliCaptureHasAnyValue ? customer : nil
     }
 
-    func mergedOrderDescription() -> String? {
-        methodDescription.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-            ?? configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
-    }
-
     func mergedStoreOptions() -> PayabliPayInStoreOptions {
         var options = operation.storeOptions ?? PayabliPayInStoreOptions()
         options.customerData = mergedCustomerData()
-        options.methodDescription = mergedOrderDescription()
-            ?? options.methodDescription?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
         return options
     }
 
@@ -168,7 +174,7 @@ extension PayabliPayInViewModel {
     }
 
     /// Drops what the payer typed into a field the configuration no longer offers, writing nothing when
-    /// nothing was held. Host-supplied hidden values are untouched.
+    /// nothing was held. Values the host supplies are untouched.
     func dropValuesWithoutAField() {
         dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
@@ -235,18 +241,9 @@ extension PayabliPayInViewModel {
         if dropped.contains(.accountHolderType), accountHolderType != .personal {
             accountHolderType = .personal
         }
-        if dropped.contains(.secCode), secCode != .web {
-            secCode = .web
-        }
-        if dropped.contains(.deviceId), !deviceId.isEmpty {
-            deviceId = ""
-        }
     }
 
     private func dropCustomerValues(_ dropped: Set<PayabliPayInField>) {
-        if dropped.contains(.methodDescription), !methodDescription.isEmpty {
-            methodDescription = ""
-        }
         if dropped.contains(.firstName), !firstName.isEmpty {
             firstName = ""
         }
@@ -271,7 +268,10 @@ extension PayabliPayInViewModel {
     func validateRequiredFields() throws {
         for field in activeRequiredFields {
             guard fieldHasRequiredValue(field) else {
-                throw PayabliPayInError.invalidInput("\(labels.label(for: field)) is required.")
+                throw PayabliPayInError.InvalidInput(
+                    field: PayInFieldPath.form(field),
+                    reason: "\(labels.label(for: field)) is required."
+                )
             }
         }
     }
@@ -284,9 +284,9 @@ extension PayabliPayInViewModel {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             return cardFieldHasRequiredValue(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType:
             return achFieldHasRequiredValue(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
+        case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             return customerFieldHasRequiredValue(field)
         case .amount, .serviceFee, .surchargeFee:
             return paymentFieldHasRequiredValue(field)
@@ -327,12 +327,7 @@ extension PayabliPayInViewModel {
         case .accountType:
             return true
         case .accountHolderType:
-            return fieldIsVisible(.accountHolderType) || configuration.hiddenValues.accountHolderType != nil
-        case .secCode:
-            return true
-        case .deviceId:
-            return !deviceId.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.deviceId?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
+            return fieldIsVisible(.accountHolderType) || configuration.accountHolderType != nil
         default:
             return true
         }
@@ -340,9 +335,6 @@ extension PayabliPayInViewModel {
 
     private func customerFieldHasRequiredValue(_ field: PayabliPayInField) -> Bool {
         switch field {
-        case .methodDescription:
-            return !methodDescription.payabliCaptureTrimmed.isEmpty || configuration.hiddenValues.methodDescription?.payabliCaptureTrimmed
-                .payabliCaptureNilIfEmpty != nil
         case .firstName:
             return !firstName.payabliCaptureTrimmed.isEmpty
         case .lastName:

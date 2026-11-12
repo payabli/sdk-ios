@@ -153,7 +153,7 @@ final class PayabliTTPTests: XCTestCase {
     /// both name the paypoint's configuration.
     func testPendingWithNothingStoredThrowsWhatTheSessionLandsOn() async throws {
         let (ttp, _, attestation) = try makeTTP()
-        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation)
+        attestation.attestResult = .failure(PayabliTTPError.devicePendingActivation())
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")

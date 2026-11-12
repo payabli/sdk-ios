@@ -12,7 +12,23 @@ struct ChallengeRequest: Encodable { let entry: String }
 
 struct ChallengeResponse: Decodable {
     let challengeId: String
-    let challenge: String
+    /// The challenge's bytes, read from base64. A value that is not base64 fails the decode.
+    let challenge: Data
+
+    private enum CodingKeys: String, CodingKey {
+        case challengeId
+        case challenge
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        challengeId = try container.decode(String.self, forKey: .challengeId)
+        let text = try container.decode(String.self, forKey: .challenge)
+        guard let bytes = Data(base64Encoded: text) else {
+            throw DecodingError.dataCorruptedError(forKey: .challenge, in: container, debugDescription: "not base64")
+        }
+        challenge = bytes
+    }
 }
 
 // MARK: /register

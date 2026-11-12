@@ -32,7 +32,7 @@ final class PayInPaymentFlowClient: Sendable {
         idempotencyKey: String
     ) async throws -> PayabliPayInResult {
         guard request.paymentMethod.isAuthorizable else {
-            throw PayabliPayInError.invalidInput("This payment method cannot be authorized.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.paymentMethod, reason: "This payment method cannot be authorized.")
         }
         return try await performTransaction(
             path: "/api/v2/MoneyIn/authorize",
@@ -49,7 +49,7 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let transId = request.transId.payabliCaptureTrimmed
         guard !transId.isEmpty else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         try request.paymentDetails.validate()
 
@@ -79,11 +79,11 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let transId = transId.payabliCaptureTrimmed
         guard !transId.isEmpty else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         // `.` and `..` are unreserved, so the encoder passes them through and the path would name another route.
         guard transId != ".", transId != ".." else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
 
         let payabliRequest = try buildRequest(
@@ -105,7 +105,7 @@ final class PayInPaymentFlowClient: Sendable {
     func details(transId: String) async throws -> PayabliPayInTransaction {
         let transId = transId.payabliCaptureTrimmed
         guard !transId.isEmpty, transId != ".", transId != ".." else {
-            throw PayabliPayInError.invalidInput("Transaction ID is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.transId, reason: "Transaction ID is required.")
         }
         let request = PayabliRequest(
             method: .get,
@@ -127,18 +127,28 @@ final class PayInPaymentFlowClient: Sendable {
     ) throws -> PayabliPayInTransaction {
         switch (response.statusCode, legacyCode(of: response)) {
         case (401, callerMayNotRead):
-            throw catalogRefusal(.permissionDenied)
+            throw catalogRefusal(.permissionDenied, answeredBy: response)
         case (400, noSuchTransaction):
-            throw catalogRefusal(.transactionNotFound)
+            throw catalogRefusal(.transactionNotFound, answeredBy: response)
         default:
             try mapPayabliHTTPError(response: response)
         }
         // The decoding error is not attached: it quotes the body it rejected.
         guard let record = try? JSONDecoder().decode(TransactionDetailsRecord.self, from: response.body) else {
-            throw PayabliGenericError(type: .decodingError, reason: "Failed to decode the transaction")
+            throw PayabliGenericError(
+                type: .decodingError,
+                reason: "Failed to decode the transaction",
+                httpStatus: response.statusCode,
+                rawCode: nil
+            )
         }
         guard record.paymentTransId == transId else {
-            throw PayabliGenericError(type: .decodingError, reason: "The answer names a different transaction")
+            throw PayabliGenericError(
+                type: .decodingError,
+                reason: "The answer names a different transaction",
+                httpStatus: response.statusCode,
+                rawCode: nil
+            )
         }
         return record.transaction
     }
@@ -146,9 +156,18 @@ final class PayInPaymentFlowClient: Sendable {
     /// A refusal whose reason is the catalog's own text for `type`, so every platform words it the same.
     ///
     /// - Parameter type: the refusal's type, which picks the catalog's text.
+    /// - Parameter response: the refusing answer, whose status and code the refusal carries.
     /// - Returns: the refusal, carrying the catalog's text as its reason.
-    private static func catalogRefusal(_ type: PayabliErrorType) -> PayabliGenericError {
-        PayabliGenericError(type: type, reason: PayabliGenericError(type: type, reason: "").message)
+    private static func catalogRefusal(
+        _ type: PayabliErrorType,
+        answeredBy response: PayabliResponse
+    ) -> PayabliGenericError {
+        PayabliGenericError(
+            type: type,
+            reason: PayabliGenericError(type: type, reason: "").message,
+            httpStatus: response.statusCode,
+            rawCode: serviceCode(of: response) ?? legacyCode(of: response).map(String.init)
+        )
     }
 
     /// The numeric `responseCode` of the older envelope, or `nil` when the body carries none.
@@ -168,7 +187,7 @@ final class PayInPaymentFlowClient: Sendable {
     ) async throws -> PayabliPayInResult {
         let entry = entryPoint.payabliCaptureTrimmed
         guard !entry.isEmpty else {
-            throw PayabliPayInError.invalidInput("Entrypoint is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.entryPoint, reason: "Entrypoint is required.")
         }
         try request.paymentDetails.validate()
         try request.paymentMethod.validate(request.options.validation)
@@ -181,7 +200,8 @@ final class PayInPaymentFlowClient: Sendable {
                 path: path,
                 query: request.queryItems(allowsACHValidation: allowsACHValidation),
                 idempotencyKey: idempotencyKey,
-                body: body
+                body: body,
+                isCallerRefusal: isFraudBlockAnswered401
             )
             result = try await perform(
                 payabliRequest,
@@ -234,14 +254,16 @@ final class PayInPaymentFlowClient: Sendable {
         path: String,
         query: [URLQueryItem],
         idempotencyKey: String?,
-        body: Data
+        body: Data,
+        isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false }
     ) throws -> PayabliRequest {
         try PayabliRequest(
             method: .post,
             path: path,
             query: query,
             headers: Self.headers(idempotencyKey: idempotencyKey),
-            body: body
+            body: body,
+            isCallerRefusal: isCallerRefusal
         )
     }
 
@@ -278,15 +300,17 @@ final class PayInPaymentFlowClient: Sendable {
     ///
     /// - Parameter key: the key as the caller set it.
     /// - Returns: the trimmed key, as the `idempotencyKey` header carries it.
-    /// - Throws: ``PayabliPayInError/invalidInput(_:)`` when the key is blank once trimmed or cannot sit in a header.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when the key is blank once trimmed or cannot sit in a header.
     private static func sendableKey(_ key: String) throws -> String {
         let trimmed = key.payabliCaptureTrimmed
         guard !trimmed.isBlank else {
-            throw PayabliPayInError.invalidInput("The idempotency key cannot be blank.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.idempotencyKey, reason: "The idempotency key cannot be blank.")
         }
         guard trimmed.isHeaderSafe else {
-            throw PayabliPayInError
-                .invalidInput("The idempotency key may contain printable ASCII only.")
+            throw PayabliPayInError.InvalidInput(
+                field: PayInFieldPath.idempotencyKey,
+                reason: "The idempotency key may contain printable ASCII only."
+            )
         }
         return trimmed
     }
@@ -335,20 +359,21 @@ final class PayInPaymentFlowClient: Sendable {
         } catch {
             let refusedKey = error is IdempotencyCheckRefusal
             let failure: any Error = if refusedKey {
-                PayabliGenericError(type: .conflict, reason: "Conflict (409)")
+                PayabliGenericError(type: .conflict, reason: "Conflict (409)", httpStatus: answer?.statusCode, rawCode: nil)
             } else if PayInInterruption.isCancellation(error) {
                 CancellationError()
             } else {
                 error
             }
-            let conflict = answer?.statusCode == 409
+            // A fraud block is a decline at any status, a 409 included, so it is not the conflict that leaves a key open.
+            let conflict = answer.map { $0.statusCode == 409 && fraudBlockCode(of: $0) == nil } ?? false
             // A credential that was never obtained arrives as `.tokenExpired` or
             // `.tokenProviderFailed`, both of which `leavesOutcomeUnknown` answers false for: nothing
             // was sent, so the outcome is known and there is no key to report.
             guard carriesKey, conflict || Self.leavesOutcomeUnknown(failure) else { throw failure }
-            let interruption = PayabliPayInError.submissionInterrupted(
+            let interruption = PayabliPayInError.Unsettled(
                 type: conflict ? .conflict : PayInInterruption.type(of: failure),
-                causeType: RedactedCause(failure).originalType,
+                cause: failure,
                 paymentTransId: Self.namedTransaction(in: answer),
                 paymentReference: nil
             )
@@ -371,27 +396,60 @@ final class PayInPaymentFlowClient: Sendable {
         if response.statusCode == 409, !Self.isJSONObject(response.body) {
             throw IdempotencyCheckRefusal()
         }
+        let transaction = Self.namedTransaction(in: response)
+        // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
+        if let code = fraudBlockCode(of: response) {
+            throw PayabliPayInError.Refused(failure: Self.fraudBlock(code, answeredBy: response).naming(transaction))
+        }
         // First, because the envelope decodes this body too and keeps none of the fields it names.
         if response.statusCode == 400 {
             try mapPayabliHTTPError(response: response)
         }
         let decoder = JSONDecoder()
         if let decoded = try? decoder.decode(PayabliPayInAPIResponse.self, from: response.body) {
-            guard decoded.isApproved, response.statusCode != 409 else {
-                throw PayabliPayInError.transactionFailed(decoded.failure(httpStatusCode: response.statusCode))
+            guard decoded.isApproved, response.statusCode != 409, response.statusCode != declinedStatus else {
+                throw Self.unapproved(decoded.failure(httpStatusCode: response.statusCode).naming(transaction))
             }
             return PayabliPayInResult(apiResponse: decoded)
         }
 
         if let failure = decodeFailure(from: response, decoder: decoder) {
-            throw PayabliPayInError.transactionFailed(failure)
+            throw Self.unapproved(failure.naming(transaction))
         }
 
+        // A 402 never reaches the mapper's core decline. Its code is read alone, since a field the envelope failed on
+        // can sit beside a code that leaves the outcome open.
+        if response.statusCode == declinedStatus {
+            let failure = PayabliPayInFailure(code: serviceCode(of: response), httpStatusCode: response.statusCode)
+            throw Self.unapproved(failure.naming(transaction))
+        }
         try mapPayabliHTTPError(response: response)
-        throw PayabliGenericError(
-            type: .decodingError,
-            reason: "Failed to decode payment capture response"
-        )
+        throw PayabliPayInError.Undecodable(reason: "Failed to decode payment capture response", httpStatus: response.statusCode)
+    }
+
+    /// The failure an unapproved answer is: a decline when it was answered 402, unless its code leaves the outcome
+    /// open, or when it classifies as one; otherwise the service's own failure, which therefore never classifies
+    /// as a decline.
+    ///
+    /// - Parameter failure: the answer as the envelope read it.
+    /// - Returns: the error a caller receives.
+    private static func unapproved(_ failure: PayabliPayInFailure) -> PayabliPayInError {
+        let classification = PayabliPayInError.ServiceError.classification(of: failure)
+        let open = PayabliPayInError.ServiceError.openOutcome(of: failure) != nil
+        return !open && (failure.httpStatusCode == declinedStatus || classification == .paymentDeclined)
+            ? PayabliPayInError.Refused(failure: failure)
+            : PayabliPayInError.ServiceError(failure: failure)
+    }
+
+    /// The refusal a fraud block describes.
+    ///
+    /// - Parameter code: the block's code, as the body named it.
+    /// - Parameter response: the answer carrying it.
+    /// - Returns: the failure as the envelope reads it, or one carrying only the code and status when it can't be read.
+    private static func fraudBlock(_ code: String, answeredBy response: PayabliResponse) -> PayabliPayInFailure {
+        let envelope = try? JSONDecoder().decode(PayInPaymentFlowFailureEnvelope.self, from: response.body)
+        return envelope?.failure(httpStatusCode: response.statusCode)
+            ?? PayabliPayInFailure(code: code, httpStatusCode: response.statusCode)
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {
@@ -413,6 +471,28 @@ final class PayInPaymentFlowClient: Sendable {
     }
 }
 
+private extension PayabliPayInFailure {
+    /// This failure, naming the transaction its answer named.
+    ///
+    /// - Parameter paymentTransId: the transaction the answer named, nil when it named none.
+    /// - Returns: a copy carrying it.
+    func naming(_ paymentTransId: String?) -> PayabliPayInFailure {
+        PayabliPayInFailure(
+            code: code,
+            reason: reason,
+            explanation: explanation,
+            action: action,
+            status: status,
+            detail: detail,
+            httpStatusCode: httpStatusCode,
+            paymentTransId: paymentTransId
+        )
+    }
+}
+
+/// The status the service answers a declined payment or authorization with.
+private let declinedStatus = 402
+
 /// The one field an unknown outcome keeps from the answer.
 private struct NamedTransaction: Decodable {
     struct Payload: Decodable {
@@ -428,7 +508,7 @@ private struct IdempotencyCheckRefusal: Error {}
 /// A money-moving request whose outcome is open, for the facade to report once it knows which key was sent.
 struct PayInOpenOutcome: Error {
     /// The failure as a caller receives it when nothing else applies.
-    let interruption: PayabliPayInError
+    let interruption: PayabliPayInError.Unsettled
     /// What failed, before it was read as an open outcome.
     let cause: any Error
     /// The service refused the key because it had already seen it.
@@ -514,7 +594,7 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
     }
 
     func failure(httpStatusCode: Int) -> PayabliPayInFailure {
-        let failureCode = Self.firstNonEmpty(code, responseData?.resultCode)
+        let failureCode = Self.firstNonEmpty(code, responseCode.map(String.init))
         let failureReason = Self.firstNonEmpty(
             reason,
             responseData?.resultText,
@@ -569,14 +649,12 @@ private struct PayInPaymentFlowFailureEnvelope: Decodable {
 }
 
 private struct PayInPaymentFlowFailureResponseData: Decodable {
-    let resultCode: String?
     let resultText: String?
     let explanation: String?
     let todoAction: String?
     let detail: String?
 
     enum CodingKeys: String, CodingKey {
-        case resultCode
         case resultText
         case explanation
         case todoAction
@@ -585,7 +663,6 @@ private struct PayInPaymentFlowFailureResponseData: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        resultCode = c.decodeLossyStringIfPresent(forKey: .resultCode)
         resultText = try c.decodeIfPresent(String.self, forKey: .resultText)
         explanation = try c.decodeIfPresent(String.self, forKey: .explanation)
         todoAction = try c.decodeIfPresent(String.self, forKey: .todoAction)

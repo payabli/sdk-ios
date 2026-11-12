@@ -1,3 +1,4 @@
+import PayabliSDKCore
 import PayabliSDKPayIn
 import XCTest
 
@@ -50,7 +51,7 @@ final class PayInFormCustomizationTests: XCTestCase {
             configuration.bankSections.map(\.fields),
             PayabliPayInFormConfiguration().bankSections.map(\.fields)
         )
-        XCTAssertNil(configuration.hiddenValues.accountHolderType)
+        XCTAssertNil(configuration.accountHolderType)
         let style = customization.style
         XCTAssertEqual(style.accentColor, PayabliPayInFormStyle.default.accentColor)
         XCTAssertEqual(style.input.backgroundColor, PayabliPayInFormStyle.default.input.backgroundColor)
@@ -169,7 +170,6 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(configuration.allowedMethods, [.card])
         XCTAssertEqual(configuration.defaultMethod, .card)
-        XCTAssertNil(configuration.hiddenValues.customerData)
     }
 
     func testAnAuthorizationsCustomWordingPlacesAHold() {
@@ -177,5 +177,111 @@ final class PayInFormCustomizationTests: XCTestCase {
 
         XCTAssertEqual(customization.labels(for: .authorize).submitButton, "Place hold")
         XCTAssertNil(PayInFormCustomization().labels(for: .authorize).submitButton)
+    }
+
+    /// A payer switching method under a held key would see a total the retry does not carry.
+    func testAnOpenRetryOffersOnlyTheHeldAttemptsMethodAndSettlingItOffersEveryMethodAgain() {
+        let customization = PayInFormCustomization()
+
+        let held = customization.configuration(for: .capture, holding: .bankAccount)
+        let settled = customization.configuration(for: .capture, holding: nil)
+
+        XCTAssertEqual(held.allowedMethods, [.bankAccount])
+        XCTAssertEqual(held.defaultMethod, .bankAccount)
+        XCTAssertEqual(settled.allowedMethods, [.card, .bankAccount])
+        XCTAssertEqual(settled.defaultMethod, .card)
+    }
+
+    /// A form built again while a retry is held opens on the held method and reports no change, so a second
+    /// unknown outcome has to hold that method rather than the default.
+    func testAFormBuiltAgainOnAHeldRetryHoldsTheMethodItOpensOn() {
+        let customization = PayInFormCustomization()
+        var shown = ShownFormMethod()
+
+        shown.formBuilt(with: customization.configuration(for: .capture, holding: .bankAccount))
+
+        XCTAssertEqual(shown.heldMethod(after: Self.unresolved, holding: .bankAccount), .bankAccount)
+    }
+
+    /// A new amount ends the hold without building the form again, and the form stays on the held method.
+    func testAHoldEndedWithoutABuildKeepsTheMethodTheFormIsOn() {
+        let customization = PayInFormCustomization()
+        var shown = ShownFormMethod()
+        shown.formBuilt(with: customization.configuration(for: .capture, holding: .bankAccount))
+
+        _ = customization.configuration(for: .capture, holding: nil)
+
+        XCTAssertEqual(shown.heldMethod(after: Self.unresolved, holding: nil), .bankAccount)
+    }
+
+    func testAMoveTheFormReportsIsTheMethodHeld() {
+        var shown = ShownFormMethod()
+        shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture))
+
+        shown.moved(to: .bankAccount)
+
+        XCTAssertEqual(shown.heldMethod(after: Self.unresolved, holding: nil), .bankAccount)
+    }
+
+    /// The service answered the retry, so the next charge is a payment of its own and may use any method.
+    func testADeclineOrARefusalOfWhatWasSentEndsTheHold() throws {
+        var shown = ShownFormMethod()
+        shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture, holding: .bankAccount))
+        let body = Data(#"{"reason":"Declined"}"#.utf8)
+        let answers: [Error] = try [
+            PayabliPaymentError.decline(JSONDecoder().decode(PayabliDeclineError.self, from: body)),
+            PayabliPaymentError.validation(JSONDecoder().decode(PayabliValidationError.self, from: body)),
+            PayabliPayInError.Refused(failure: PayabliPayInFailure(code: "D0001", reason: "Declined", httpStatusCode: 402)),
+            PayabliPayInError.ServiceError(failure: PayabliPayInFailure(reason: "Invalid amount", status: 400))
+        ]
+
+        for error in answers {
+            let answer = PayInFailure(error, operation: .capture)
+            XCTAssertNil(shown.heldMethod(after: answer, holding: .bankAccount), "\(error)")
+        }
+    }
+
+    /// The service has not answered the payment the retry names, so it is still open.
+    func testAFailureTheServiceDidNotAnswerKeepsTheHold() {
+        var shown = ShownFormMethod()
+        shown.formBuilt(with: PayInFormCustomization().configuration(for: .capture, holding: .bankAccount))
+        let failures: [Error] = [
+            Reason(type: .retryNotSamePayment),
+            Reason(type: .serverError),
+            Reason(type: .paymentReferenceOpen),
+            PayabliPayInError.InvalidInput(field: "paymentDetails.totalAmount", reason: "amount"),
+            PayabliPayInError.InvalidInput(field: nil, reason: "Card number failed validation."),
+            PayabliPayInError.ServiceError(failure: PayabliPayInFailure(reason: "Unavailable", status: 503))
+        ]
+
+        for error in failures {
+            let failure = PayInFailure(error, operation: .capture)
+            XCTAssertEqual(shown.heldMethod(after: failure, holding: .bankAccount), .bankAccount, "\(error)")
+        }
+    }
+
+    /// A save moves no money and sends no retry, so a held payment's method does not bind it.
+    func testASaveWhileAPaymentsRetryIsOpenKeepsEveryMethod() {
+        let save = PayInFormCustomization().configuration(for: .storedMethod, holding: .bankAccount)
+
+        XCTAssertEqual(save.allowedMethods, [.card, .bankAccount])
+        XCTAssertEqual(save.defaultMethod, .card)
+    }
+
+    private static let unresolved = PayInFailure(
+        PayabliPayInError.Unsettled(cause: Reason(type: .networkError)),
+        operation: .capture
+    )
+}
+
+private struct Reason: PayabliError {
+    let type: PayabliErrorType
+
+    var reason: String {
+        "refused"
+    }
+
+    var detail: String? {
+        nil
     }
 }

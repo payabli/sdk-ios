@@ -17,7 +17,7 @@ final class TapToPayStepsTests: XCTestCase {
     private let everyCombination: [Combination] = {
         let checks: [TokenCheck] = [.notRun, .checking, .reachable, .unreachable]
         let outcomes: [TapToPayActivationOutcome] =
-            [.none, .activationFailed, .deviceSetupRequired, .enableFailed, .succeeded]
+            [.none, .activationFailed, .deviceSetupRequired, .enableFailed, .setupAskedAgain, .succeeded]
         return checks.flatMap { check in
             everyTapToPayStatus.flatMap { session in
                 outcomes.map { Combination(tokenCheck: check, session: session, outcome: $0) }
@@ -82,7 +82,7 @@ final class TapToPayStepsTests: XCTestCase {
     func testTheSpaceIsTheSizeItClaims() {
         // Derived from the same list the space is built over rather than written out, so a state
         // added to the SDK moves this with it instead of failing here for the wrong reason.
-        XCTAssertEqual(everyCombination.count, 4 * everyTapToPayStatus.count * 5)
+        XCTAssertEqual(everyCombination.count, 4 * everyTapToPayStatus.count * 6)
     }
 
     // MARK: - Invariants, over the whole space
@@ -278,6 +278,25 @@ final class TapToPayStepsTests: XCTestCase {
         XCTAssertTrue(sequence.enable.status.showsContent)
         XCTAssertEqual(sequence.activation.status, .blocked)
         XCTAssertEqual(sequence.nextAction, .enableTerminal)
+    }
+
+    func testACodeRefusedBecauseTheDeviceIsNotWaitingSendsTheSequenceBackToEnableUntilAnEnableFinishes() {
+        // The session still reads `.pendingActivation` after the refusal, so the
+        // recorded outcome is all that tells the enable step it is not finished.
+        let refused = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .pendingActivation, activation: .setupAskedAgain
+        )
+        XCTAssertEqual(refused.enable.status, .failed)
+        XCTAssertTrue(refused.enable.status.showsContent)
+        XCTAssertEqual(refused.nextAction, .enableTerminal)
+        XCTAssertEqual(refused.activation.status, .blocked)
+
+        // Enabling the terminal clears the outcome, which hands the sequence on.
+        let enabled = TapToPaySteps.forCharging(
+            tokenCheck: .reachable, session: .pendingActivation, activation: .none
+        )
+        XCTAssertEqual(enabled.enable.status, .done)
+        XCTAssertEqual(enabled.nextAction, .enterActivationCode)
     }
 
     func testARecordedEnableFailureIsAnsweredByTheEnableStep() {

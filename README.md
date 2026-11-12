@@ -310,17 +310,42 @@ retry.
 | Outcome | Card-not-present | Tap to Pay | Retry? |
 |---|---|---|---|
 | **Charged** | The call returns a result | `charge` returns a `TransactionResult` | No |
-| **Not charged** | `PayabliPayInError.transactionFailed`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
-| **Unknown** | `PayabliPayInError.submissionInterrupted`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
+| **Not charged** | `PayabliPayInError.Refused`, for example a decline | a `TapToPayError` whose `capture` is `.notCharged`, or a `CancellationError`, which `charge` throws only before the card is read | Yes |
+| **Unknown** | `PayabliPayInError.Unsettled`, or a `CancellationError` when your app cancelled the call | an error whose `capture` is `.unknown` | Not until you've checked |
 | **Charged, not confirmed** | — | an error whose `capture` is `.charged` | No. Reconcile the payment |
 
 When the outcome is unknown, look the transaction up before you charge again. On card-not-present, call
 `readTransaction(_:)` and check its `status`. From your backend, use
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction).
-`TapToPayError` and `PayabliPayInError.submissionInterrupted` carry the `paymentTransId` to look up when there is
+`TapToPayError` and `PayabliPayInError.Unsettled` carry the `paymentTransId` to look up when there is
 one. When there isn't one, find the transaction in the
 Payabli portal before you charge again. On card-not-present, setting `orderId` on each request lets you find it
 by your own reference. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed.
+
+### What an error carries
+
+Every error the SDK throws, other than a cancellation, is a `PayabliError` with three fields to read:
+
+- `type` says what to do. Switch on it.
+- `httpStatus` is the status of the response the error came from. It is `nil` when no response came, for example
+  on a network failure or a value the SDK refused before sending.
+- `rawCode` is Payabli's own code for the condition, such as `D0329`, `E1001` or `9005`. It is `nil` when the
+  service named none, as on Tap to Pay setup and activation refusals.
+
+Two declines share a status and a `type`; only `rawCode` tells them apart:
+
+```swift
+// Two declined charges
+error.type        // .paymentDeclined     .paymentDeclined
+error.httpStatus  // 402                  402
+error.rawCode     // "D0329"              "D0583"
+```
+
+From Objective-C the error is an `NSError`: `userInfo[@"httpStatus"]` is the status as an `NSNumber` and
+`userInfo[@"rawCode"]` is the code as an `NSString`, and each key is absent when its field is `nil`. A refused
+input's `field` is `userInfo[@"field"]`, also absent when `nil`. Where Swift's `underlying` names the failing type,
+`userInfo[NSUnderlyingErrorKey]` is an `NSError` whose `localizedDescription` is that type's name; its message is
+never included.
 
 Each guide lists its errors in full: [card-not-present](Sources/PayabliSDKPayIn/README.md#outcomes-and-errors)
 and [Tap to Pay](Sources/PayabliSDKTapToPay/README.md#outcomes-and-errors).
@@ -380,7 +405,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `captureAuthorizedTransaction` or `voidTransaction` carries `userInfo["capture"]`: `1` when the payment may have been
   taken, including a refusal with code 1023 because another call for the payment is open, and `0` when it wasn't.
   When it's `1`, `userInfo["paymentTransId"]` holds the transaction ID and
-  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
+  `userInfo["paymentReference"]` the payment's reference; each is absent when there is none. A refusal or a service
+  error also carries `userInfo["paymentTransId"]` when the service's answer named a transaction. Errors from `PayabliSessionObjC`'s initializer are in `com.payabli.session`.
 
 ## Sample app and testing
 

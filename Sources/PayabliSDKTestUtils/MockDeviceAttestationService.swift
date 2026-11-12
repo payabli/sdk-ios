@@ -187,7 +187,7 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             if let storedPendingRegistration {
                 storedBindings[entry] = storedPendingRegistration
                 storedKeys[entry] = Self.defaultKeyId
-                return .failure(PayabliTTPError.devicePendingActivation)
+                return .failure(PayabliTTPError.devicePendingActivation())
             }
             return storedAttestResult
         }

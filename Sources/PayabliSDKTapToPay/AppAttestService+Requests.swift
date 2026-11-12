@@ -81,14 +81,24 @@ extension AppAttestService {
         do {
             let success = try decoder.decode(PayabliEnvelope.Success<Payload>.self, from: response.body)
             guard let payload = success.responseData else {
-                throw TapToPayError(type: .decodingError, reason: "\(label) missing responseData", detail: nil)
+                throw TapToPayError(
+                    type: .decodingError,
+                    reason: "\(label) missing responseData",
+                    detail: nil,
+                    httpStatus: response.statusCode
+                )
             }
             return payload
         } catch let error as TapToPayError {
             throw error
         } catch {
             logger.error("[\(label)] payload decode failed: \(error.localizedDescription)")
-            throw TapToPayError(type: .decodingError, reason: "Failed to decode \(label) response", detail: nil)
+            throw TapToPayError(
+                type: .decodingError,
+                reason: "Failed to decode \(label) response",
+                detail: nil,
+                httpStatus: response.statusCode
+            )
         }
     }
 
@@ -196,7 +206,7 @@ extension AppAttestService {
         {
             if let decline = makeDeclineError(code ?? response.statusCode, reason) {
                 logger.error("[\(label)] refused (code=\(code.map(String.init) ?? "nil"))")
-                throw decline
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
             }
         }
         if pinsCredential, response.statusCode == 401 {
@@ -216,7 +226,8 @@ extension AppAttestService {
             // sent. The code says which decline this was, and a classifier that
             // knows the words answers with its own failure.
             logger.error("[\(label)] declined (code=\(code.map(String.init) ?? "nil"))")
-            throw makeDeclineError(code, reason) ?? PayabliTTPError.attestationFailed(reason: reason)
+            let decline = makeDeclineError(code, reason) ?? PayabliTTPError.attestationFailed(reason: reason)
+            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
         }
 
         return response

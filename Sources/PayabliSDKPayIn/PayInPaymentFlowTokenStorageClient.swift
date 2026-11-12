@@ -19,7 +19,7 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
     ) async throws -> PayabliPayInStoredMethod {
         let entry = entryPoint.trimmed
         guard !entry.isEmpty else {
-            throw PayabliPayInTokenStorageError.invalidInput("Entrypoint is required.")
+            throw PayabliPayInError.InvalidInput(field: PayInFieldPath.entryPoint, reason: "Entrypoint is required.")
         }
         try paymentMethod.validate(options.validation)
         let storedMethod = paymentMethod.storedMethodType
@@ -39,22 +39,16 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             response = try await transport.perform(request)
         } catch {
             PayInBodyWriter.wipe(&body)
-            // The chain refuses an empty credential in the capture surface's error type. Translated,
-            // so this surface answers in its own.
-            if case PayabliPayInError.missingAccessToken = error {
-                throw PayabliPayInTokenStorageError.missingAccessToken
-            }
             throw error
         }
         PayInBodyWriter.wipe(&body)
-        // The status first: a failed status is the core error for that status, so only a refusal
-        // answered on a success status is this surface's own. This route refuses a 400 with prose
-        // alone, which is kept as the validation error's detail.
+        // The status first: a failed status is the core error for that status, except a 400, which this route
+        // answers in its own envelope.
         try mapPayabliHTTPError(response: response) { status in
-            status == 400 ? PayabliPaymentError.validation(Self.badRequest(from: response)) : nil
+            status == 400 ? Self.badRequest(from: response) : nil
         }
         if let failure = decodePaymentMethodFailure(from: response) {
-            throw PayabliPayInTokenStorageError.saveFailed(failure)
+            throw PayabliPayInError.Refused(failure: failure)
         }
         return try decodeStoredPaymentMethod(from: response, method: storedMethod)
     }
@@ -96,42 +90,74 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             let decoded = try decoder.decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
             let approved = decoded.isSuccess == true || decoded.responseData?.resultCode == 1
             guard approved else {
-                throw PayabliPayInTokenStorageError.saveFailed(decoded.failure(httpStatusCode: response.statusCode))
+                throw PayabliPayInError.Refused(failure: decoded.failure(httpStatusCode: response.statusCode))
             }
             return PayabliPayInStoredMethod(
                 storedMethodId: decoded.responseData?.referenceId,
                 method: method,
                 methodReferenceId: decoded.responseData?.methodReferenceId,
-                resultCode: decoded.responseData?.resultCode,
-                resultText: decoded.responseData?.resultText,
-                customerId: decoded.responseData?.customerId,
-                responseText: decoded.responseText,
-                apiResponse: decoded
+                customerId: decoded.responseData?.customerId
             )
-        } catch let error as PayabliPayInTokenStorageError {
+        } catch let error as PayabliPayInError {
             throw error
         } catch {
-            throw PayabliGenericError(
-                type: .decodingError,
+            throw PayabliPayInError.Undecodable(
                 reason: "Failed to decode payment method response",
-                underlying: error
+                httpStatus: response.statusCode
             )
         }
     }
 
-    /// The validation error for a refused request on this route.
+    /// The error a 400 from this route is: a decline when the payer is blocked by fraud control, otherwise a validation
+    /// error.
     ///
     /// - Parameter response: A 400 from the route.
-    /// - Returns: The error carrying the route's `responseText` as its detail, or an empty one when the body has none.
-    private static func badRequest(from response: PayabliResponse) -> PayabliValidationError {
+    /// - Returns: ``PayabliPayInError/Refused`` when either code field names 9005; otherwise the validation error carrying
+    ///   the status, the code, and `responseText` as its detail when the answer has one.
+    private static func badRequest(from response: PayabliResponse) -> any Error {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
-        return PayabliValidationError(detail: decoded?.responseText.trimmed.nilIfEmpty)
+        let code = serviceCode(of: response)
+        let responseCode = (try? JSONDecoder().decode(ResponseCodeOnly.self, from: response.body))?.responseCode
+        if code == blockedByFraudControl || responseCode.map(String.init) == blockedByFraudControl {
+            let failure = decoded?.failure(httpStatusCode: response.statusCode, code: blockedByFraudControl)
+                ?? PayabliPayInFailure(
+                    code: blockedByFraudControl,
+                    reason: "Unable to save payment method.",
+                    httpStatusCode: response.statusCode
+                )
+            return PayabliPayInError.Refused(failure: failure)
+        }
+        return PayabliPaymentError.validation(
+            PayabliValidationError(
+                httpStatus: response.statusCode,
+                detail: decoded?.responseText.trimmed.nilIfEmpty,
+                rawCode: code
+            )
+        )
     }
 
-    private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInSaveFailure? {
+    /// The route's `responseCode` for a payer blocked by fraud control.
+    private static let blockedByFraudControl = "9005"
+
+    private func decodePaymentMethodFailure(from response: PayabliResponse) -> PayabliPayInFailure? {
         let decoded = try? JSONDecoder().decode(PayabliPayInTokenStorageAPIResponse.self, from: response.body)
         guard let decoded, decoded.isSuccess == false else { return nil }
         return decoded.failure(httpStatusCode: response.statusCode)
+    }
+}
+
+/// The body's `responseCode` alone, so a display field the full answer requires cannot hide it.
+private struct ResponseCodeOnly: Decodable {
+    let responseCode: Int?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        responseCode = (try? container.decodeIfPresent(Int.self, forKey: .responseCode))
+            ?? (try? container.decodeIfPresent(String.self, forKey: .responseCode)).flatMap { Int($0) }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case responseCode
     }
 }
 

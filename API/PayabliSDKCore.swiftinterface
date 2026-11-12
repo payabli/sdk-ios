@@ -133,8 +133,16 @@ public protocol PayabliError : Foundation::LocalizedError {
   var type: PayabliSDKCore::PayabliErrorType { get }
   var reason: Swift::String { get }
   var detail: Swift::String? { get }
+  var httpStatus: Swift::Int? { get }
+  var rawCode: Swift::String? { get }
 }
 extension PayabliSDKCore::PayabliError {
+  public var httpStatus: Swift::Int? {
+    get
+  }
+  public var rawCode: Swift::String? {
+    get
+  }
   public var code: Swift::Int {
     get
   }
@@ -153,45 +161,38 @@ public struct PayabliGenericError : PayabliSDKCore::PayabliError {
   public let reason: Swift::String
   public let detail: Swift::String?
   public let underlying: (any Swift::Error)?
+  public let httpStatus: Swift::Int?
+  public let rawCode: Swift::String?
   public init(type: PayabliSDKCore::PayabliErrorType, reason: Swift::String, detail: Swift::String? = nil, underlying: (any Swift::Error)? = nil)
 }
 public struct PayabliFieldError : Swift::Decodable, Swift::Sendable {
   public let message: Swift::String
   public let suggestion: Swift::String?
+  public init(message: Swift::String, suggestion: Swift::String? = nil)
   public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliValidationError : PayabliSDKCore::PayabliError, Swift::Decodable {
-  public let problemType: Swift::String?
-  public let title: Swift::String?
-  public let status: Swift::Int?
+  public let reason: Swift::String
   public let detail: Swift::String?
-  public let instance: Swift::String?
   public let rawCode: Swift::String?
-  public let errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]]?
-  public let token: Swift::String?
+  public let errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]]
+  public let httpStatus: Swift::Int?
   public var type: PayabliSDKCore::PayabliErrorType {
-    get
-  }
-  public var reason: Swift::String {
     get
   }
   public var errorDescription: Swift::String? {
     get
   }
+  public init(httpStatus: Swift::Int, reason: Swift::String = "Validation failed", detail: Swift::String? = nil, rawCode: Swift::String? = nil, errors: [Swift::String : [PayabliSDKCore::PayabliFieldError]] = [:])
   public init(from decoder: any Swift::Decoder) throws
 }
 public struct PayabliServerError : PayabliSDKCore::PayabliError, Swift::Decodable, PayabliSDKCore::PayabliRetryAfter {
-  public let problemType: Swift::String?
-  public let title: Swift::String?
-  public let status: Swift::Int?
+  public let reason: Swift::String
   public let detail: Swift::String?
-  public let instance: Swift::String?
   public let httpStatus: Swift::Int?
+  public let rawCode: Swift::String?
   public let retryAfter: Foundation::TimeInterval?
   public var type: PayabliSDKCore::PayabliErrorType {
-    get
-  }
-  public var reason: Swift::String {
     get
   }
   public init(from decoder: any Swift::Decoder) throws
@@ -201,6 +202,7 @@ public struct PayabliDeclineError : PayabliSDKCore::PayabliError, Swift::Decodab
   public let reason: Swift::String
   public let explanation: Swift::String?
   public let action: Swift::String?
+  public let httpStatus: Swift::Int?
   public var type: PayabliSDKCore::PayabliErrorType {
     get
   }
@@ -227,6 +229,12 @@ public enum PayabliPaymentError : PayabliSDKCore::PayabliError, PayabliSDKCore::
     get
   }
   public var detail: Swift::String? {
+    get
+  }
+  public var httpStatus: Swift::Int? {
+    get
+  }
+  public var rawCode: Swift::String? {
     get
   }
   public var retryAfter: Foundation::TimeInterval? {
@@ -307,6 +315,8 @@ public enum PayabliPaymentError : PayabliSDKCore::PayabliError, PayabliSDKCore::
 }
 public struct PayabliRateLimitError : PayabliSDKCore::PayabliError, PayabliSDKCore::PayabliRetryAfter {
   public let retryAfter: Foundation::TimeInterval?
+  public let httpStatus: Swift::Int?
+  public let rawCode: Swift::String?
   public var type: PayabliSDKCore::PayabliErrorType {
     get
   }

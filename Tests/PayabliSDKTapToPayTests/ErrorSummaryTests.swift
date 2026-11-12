@@ -53,7 +53,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.notInitialized, "notInitialized"),
             (.invalidState(current: .ready, attempted: "charge"), "invalidState(current: ready, attempted: charge)"),
             (.notReady(current: .attestingDevice), "notReady(current: attestingDevice)"),
-            (.devicePendingActivation, "devicePendingActivation"),
+            (.devicePendingActivation(), "devicePendingActivation"),
             (.tokenExpired, "tokenExpired"),
             (.attestationRevoked(reason: reason), "attestationRevoked"),
             (.attestationFailed(reason: reason), "attestationFailed"),
@@ -61,7 +61,7 @@ final class ErrorSummaryTests: XCTestCase {
             (.deviceSetupRefused(reason: reason), "deviceSetupRefused"),
             (.entryPointRefused(reason: reason), "entryPointRefused"),
             (.configFailed(reason: reason), "configFailed"),
-            (.cardPresentNotEnabled, "cardPresentNotEnabled"),
+            (.cardPresentNotEnabled(), "cardPresentNotEnabled"),
             (.readerSetupFailed(reason: reason), "readerSetupFailed"),
             (.readerHardwareUnsupported, "readerHardwareUnsupported"),
             (.readerUnavailable(reason: reason), "readerUnavailable"),
@@ -127,8 +127,8 @@ final class ErrorSummaryTests: XCTestCase {
         )
         let server = try JSONDecoder().decode(
             PayabliServerError.self,
-            from: Data(#"{"title":"Internal server error","status":503}"#.utf8)
-        )
+            from: Data(#"{"title":"Internal server error","status":500}"#.utf8)
+        ).carrying(httpStatus: 503, rawCode: nil, retryAfter: nil)
 
         let declineSummary = ErrorSummary.of(PayabliPaymentError.decline(decline))
         let serverSummary = ErrorSummary.of(PayabliPaymentError.server(server))

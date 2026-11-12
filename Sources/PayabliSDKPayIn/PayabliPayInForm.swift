@@ -157,16 +157,13 @@ public struct PayabliPayInForm: View {
             syncViewModel()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: PayInPaymentFlowConfigurationChange(configuration, labels: labels)) { change in
+        .onChange(of: PayInFormInputs(operation: operation, configuration: configuration, labels: labels)) { inputs in
             viewModel.update(
                 component: payIn,
-                operation: operation,
-                configuration: change.configuration,
-                labels: change.labels
+                operation: inputs.operation,
+                configuration: inputs.configuration,
+                labels: inputs.labels
             )
-        }
-        .onChange(of: operation.payabliViewModelSignature) { _ in
-            syncViewModel()
         }
         .onChange(of: viewModel.availableMethods) { _ in
             viewModel.normalizeSelectedMethodForAvailableMethods()
@@ -364,9 +361,9 @@ public struct PayabliPayInForm: View {
         switch field {
         case .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode:
             cardFieldView(field)
-        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType, .secCode, .deviceId:
+        case .accountHolder, .routingNumber, .accountNumber, .accountType, .accountHolderType:
             achFieldView(field)
-        case .methodDescription, .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
+        case .firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode:
             customerFieldView(field)
         case .amount, .serviceFee, .surchargeFee:
             EmptyView()
@@ -428,10 +425,6 @@ public struct PayabliPayInForm: View {
             pickerField(field, selection: $viewModel.accountType, values: PayabliPayInAccountType.allCases)
         case .accountHolderType:
             pickerField(field, selection: $viewModel.accountHolderType, values: PayabliPayInAccountHolderType.allCases)
-        case .secCode:
-            pickerField(field, selection: $viewModel.secCode, values: PayabliPayInSecCode.allCases)
-        case .deviceId:
-            textField(field, text: $viewModel.deviceId)
         default:
             EmptyView()
         }
@@ -440,8 +433,6 @@ public struct PayabliPayInForm: View {
     @ViewBuilder
     func customerFieldView(_ field: PayabliPayInField) -> some View {
         switch field {
-        case .methodDescription:
-            textField(field, text: $viewModel.methodDescription, autocapitalization: .sentences)
         case .firstName:
             textField(
                 field,

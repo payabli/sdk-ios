@@ -140,19 +140,19 @@ A charge always sends an idempotency key, which the SDK makes and keeps; your ap
 payment with `paymentReference` on the request's options, or leave it unset on a new payment and the SDK names it.
 The reference stays on the device. Calling again is a new payment unless you say otherwise.
 
-When a charge ends in `submissionInterrupted`, its outcome is unknown. The error carries the payment's
+When a charge ends in `PayabliPayInError.Unsettled`, its outcome is unknown. The error carries the payment's
 `paymentReference` and, when the service named one, its `paymentTransId`. Find the transaction first. If you charge
 again, set `attempt: .retry` and that `paymentReference` on the options: the SDK sends that payment's key, so the
 service refuses a repeat while it still recognises the key. On the form, pass a new operation carrying the same
 configuration with `attempt: .retry`. When it refuses one, the charge ends in
-`submissionInterrupted` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
+`Unsettled` with type `.retryRefused`, which means the earlier attempt reached the service. A refusal that
 names an earlier payment matching this one ends with type `.conflict`. `captureAuthorizedTransaction(_:)` and
 `voidTransaction(_:)` do this for their transaction without being asked.
 
 Cancelling the task that runs a charge ends the call with a `CancellationError`, whether or not the request was
 sent, so treat its outcome as unknown. If your app cancels charges, name each payment with `paymentReference` and
-retry under it with `attempt: .retry`. The form reports a cancelled charge that may have been sent to its failure
-handler as `submissionInterrupted` with type `.userCancelled`.
+retry under it with `attempt: .retry`. The form reports a cancelled charge to its failure handler
+as `PayabliPayInError.Interrupted`, or as `Unsettled` with type `.userCancelled` when it may have been sent.
 
 A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
 payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
@@ -161,6 +161,10 @@ retry. A new payment that names a reference whose payment is still unresolved is
 with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
 retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
 is refused as invalid input, and so is a retry that names no reference.
+
+On the form, while a payment's outcome is unknown, pass only that attempt's method in `allowedMethods`. The form
+then draws no method selector, so the total you show can't move to another method's fee. Pass the full list again
+once the outcome is settled.
 
 Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
 from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after
@@ -172,7 +176,7 @@ point, read the transaction back instead.
 
 A returned result means what the call did, which depends on the call:
 
-| Call | A result means | `transactionFailed` means |
+| Call | A result means | `PayabliPayInError.Refused` means |
 |---|---|---|
 | `capture(_:)` | The payment was charged | Not charged |
 | `authorize(_:)` | An amount is held. Nothing is charged until you capture it | No hold was placed |
@@ -186,17 +190,21 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | Result | Outcome | What to do |
 |---|---|---|
 | The call returns a `PayabliPayInResult` | Charged, or saved | Store the transaction ID or the stored method ID |
-| `PayabliPayInError.transactionFailed`, for example a decline | Not charged | You can retry |
-| `PayabliPayInError.invalidInput`, `.submissionInProgress` | Not charged; refused before anything was sent | Fix the input, or wait for the running submission |
+| `PayabliPayInError.Refused`, for example a decline | Not charged | You can retry |
+| `PayabliPayInError.ServiceError` | The service failed the call without declining it | Branch on its `type` |
+| `PayabliPayInError.InvalidInput`, `.AlreadySubmitting` | Not charged; refused before anything was sent | Fix the value its `field` names, or wait for the running submission |
 | A core `PayabliError` whose `type` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
-| `PayabliPayInError.submissionInterrupted` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
+| `PayabliPayInError.Unsettled` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
-| `PayabliPayInTokenStorageError` | The method wasn't saved | `invalidInput` was refused before sending; `saveFailed` is the service refusing it, typed `.paymentDeclined`. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
-| A core `PayabliError` from `storeMethod(_:)` whose `type` is `.networkError`, `.serverError` or `.decodingError` | Unknown: the method may have been saved | Read the stored methods back before saving again |
+| `PayabliPayInError.InvalidInput` or `.Refused` from `storeMethod(_:)` | The method wasn't saved | `InvalidInput` was refused before sending; `Refused` is the service refusing it. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
+| From `storeMethod(_:)` or a form storing a method: `PayabliPayInError.Undecodable`, a core `PayabliError` whose `type` is `.networkError` or `.serverError`, a `CancellationError`, or `PayabliPayInError.Interrupted` from the form | Unknown: the method may have been saved | Read the stored methods back before saving again |
+
+Catch the family with `catch let error as PayabliPayInError`, or one failure by its type, for example
+`catch let error as PayabliPayInError.Unsettled`.
 
 Don't show `error.localizedDescription` to the payer or log it: it names what the service rejected and can
 quote what was submitted. Show the payer a message for the error's `category`, and log
-`(error as? any PayabliError)?.code`. Check for `submissionInterrupted` first: it keeps its cause's category, so a
+`(error as? any PayabliError)?.code`. Check for `Unsettled` first: it keeps its cause's category, so a
 retried payment refused for a rate limit or a credential is still one that may have gone through, and its message says so.
 
 ## Reference
@@ -228,7 +236,8 @@ retried payment refused for a rate limit or a credential is still one that may h
 |---|---|
 | `allowedMethods`, `defaultMethod` | Card, bank account, or both, and which opens first |
 | `cardFieldOrder`, `bankFieldOrder`, `cardSections`, `bankSections` | The fields, their order, and their sections |
-| `requiredFields`, `hiddenValues`, `options` | Fields the payer must fill, values sent without a field, and form options |
+| `requiredFields`, `options` | Fields the payer must fill, and form options |
+| `accountHolderType` | The holder type sent when the form doesn't show that field |
 | `labelLayout`, `showsFieldLabels`, `hiddenFieldLabels` | Where labels sit, and whether they show |
 | `failureMessagePlacement`, `showsFailureMessage` | Where the form's failure message sits, and whether the form draws it; the marks a failure puts on fields stay |
 | `formatting`, `inputSizing`, `cardBrandIconPlacement` | Formatting, field sizes, and the card brand icon |

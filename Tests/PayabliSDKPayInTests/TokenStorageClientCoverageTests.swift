@@ -30,7 +30,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             XCTFail("Expected a validation error")
         } catch let PayabliPaymentError.validation(validation) {
             XCTAssertEqual(validation.detail, "Paypoint not found or inactive")
-            XCTAssertNil(validation.errors, "the route names no field, so none is invented")
+            XCTAssertTrue(validation.errors.isEmpty, "the route names no field, so none is invented")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -100,8 +100,9 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 ))
             )
             XCTFail("Expected decoding error")
-        } catch let error as PayabliGenericError {
+        } catch let error as PayabliPayInError.Undecodable {
             XCTAssertEqual(error.type, .decodingError)
+            XCTAssertEqual(error.httpStatus, 200)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -122,8 +123,9 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 ))
             )
             XCTFail("Expected decoding error")
-        } catch let error as PayabliGenericError {
+        } catch let error as PayabliPayInError.Undecodable {
             XCTAssertEqual(error.type, .decodingError)
+            XCTAssertEqual(error.httpStatus, 200)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -157,7 +159,6 @@ final class TokenStorageClientCoverageTests: XCTestCase {
         )
 
         XCTAssertEqual(result.storedMethodId, "stored-result-code")
-        XCTAssertEqual(result.resultCode, 1)
     }
 
     func testA200ThatClaimsNothingIsARefusalRatherThanAStoredMethod() async throws {
@@ -179,15 +180,14 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 ))
             )
             XCTFail("Expected a refusal")
-        } catch let error as PayabliPayInTokenStorageError {
-            guard case .saveFailed = error else { return XCTFail("Wrong error: \(error)") }
+        } catch let error as PayabliPayInError.Refused {
             XCTAssertEqual(error.type, .paymentDeclined)
         } catch {
             XCTFail("Wrong error: \(error)")
         }
     }
 
-    func testUnapprovedResultCodeWithoutFailureFlagThrowsSaveFailure() async throws {
+    func testUnapprovedResultCodeWithoutFailureFlagIsRefused() async throws {
         let transport = CoverageMockTransport(responseBody: """
         {
           "responseText": "Gateway response",
@@ -214,10 +214,10 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 ))
             )
             XCTFail("Expected save failure")
-        } catch let PayabliPayInTokenStorageError.saveFailed(failure) {
-            XCTAssertEqual(failure.responseText, "Gateway response")
-            XCTAssertEqual(failure.resultCode, 2)
-            XCTAssertEqual(failure.resultText, "Processor declined")
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.failure.reason, "Processor declined")
+            XCTAssertNil(error.failure.code)
+            XCTAssertEqual(error.reason, "Processor declined")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -242,8 +242,9 @@ final class TokenStorageClientCoverageTests: XCTestCase {
                 ))
             )
             XCTFail("Expected invalid entrypoint error")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual(message, "Entrypoint is required.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Entrypoint is required.")
+            XCTAssertEqual(refusal.field, "entryPoint")
             let requests = await invalidEntryTransport.requests
             XCTAssertTrue(requests.isEmpty)
         } catch {
@@ -281,7 +282,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
     }
 
     @MainActor
-    func testACHViewModelDefaultsNilHiddenSecCodeToWeb() async throws {
+    func testACHViewModelSendsWEBAsTheSecCode() async throws {
         let transport = CoverageMockTransport(responseBody: """
         {
           "responseText": "Success",
@@ -303,8 +304,7 @@ final class TokenStorageClientCoverageTests: XCTestCase {
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
-                defaultMethod: .bankAccount,
-                hiddenValues: PayabliPayInHiddenValues(secCode: nil)
+                defaultMethod: .bankAccount
             )
         )
         viewModel.accountHolder = "Jane Business"

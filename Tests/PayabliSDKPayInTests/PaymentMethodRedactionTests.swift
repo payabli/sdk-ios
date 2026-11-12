@@ -66,8 +66,9 @@ final class PaymentMethodRedactionTests: XCTestCase {
         do {
             try data.validate(.default)
             XCTFail("Expected a validation failure")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual("Card number must be 12 to 19 digits.", message)
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual("Card number must be 12 to 19 digits.", refusal.reason)
+            XCTAssertEqual(refusal.field, "paymentMethod.cardnumber")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -80,8 +81,9 @@ final class PaymentMethodRedactionTests: XCTestCase {
         do {
             try data.validate(.default)
             XCTFail("Expected a validation failure")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual("CVV is required.", message)
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual("CVV is required.", refusal.reason)
+            XCTAssertEqual(refusal.field, "paymentMethod.cardcvv")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -94,8 +96,9 @@ final class PaymentMethodRedactionTests: XCTestCase {
         do {
             try data.validate(.default)
             XCTFail("Expected a validation failure")
-        } catch let PayabliPayInTokenStorageError.invalidInput(message) {
-            XCTAssertEqual("Account number must be 4 to 17 digits.", message)
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual("Account number must be 4 to 17 digits.", refusal.reason)
+            XCTAssertEqual(refusal.field, "paymentMethod.achAccount")
         } catch {
             XCTFail("Wrong error: \(error)")
         }

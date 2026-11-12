@@ -51,7 +51,8 @@ package final class TTPTransactionClient: Sendable {
             method: .post,
             path: "/api/v2/MoneyIn/initiate",
             headers: [payabliIdempotencyKeyHeader: idempotencyKey],
-            jsonBody: body
+            jsonBody: body,
+            isCallerRefusal: isFraudBlockAnswered401
         )
 
         // `customerData` is the caller's whole customer record, so the body is
@@ -60,13 +61,23 @@ package final class TTPTransactionClient: Sendable {
         logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
+        let status: Int
         do {
             let response = try await transport.perform(request)
+            status = response.statusCode
             if response.statusCode == 409, !Self.isJSONObject(response.body) {
                 throw ChargeKeyRefusal()
             }
+            // Before the status: the service answers it as a refusal of the request, but it refuses the payer.
+            if let code = fraudBlockCode(of: response) {
+                throw PayabliTTPError.paymentNotOpened(
+                    reason: Self.reason(of: response) ?? code,
+                    httpStatus: response.statusCode,
+                    rawCode: code
+                )
+            }
             if response.statusCode == 404 {
-                throw PayabliTTPError.cardPresentNotEnabled
+                throw PayabliTTPError.cardPresentNotEnabled(httpStatus: response.statusCode, rawCode: serviceCode(of: response))
             }
             if let refusal = CustomerDataRefusal(response: response) {
                 throw refusal
@@ -84,12 +95,17 @@ package final class TTPTransactionClient: Sendable {
             )
 
         guard envelope.isApproved else {
-            throw PayabliTTPError.paymentNotOpened(reason: envelope.reason ?? envelope.code)
+            throw PayabliTTPError.paymentNotOpened(
+                reason: envelope.reason ?? envelope.code,
+                httpStatus: status,
+                rawCode: envelope.code
+            )
         }
         // A blank or dot-segment identifier counts as none: the close could not address it, and the card would
         // already be taken.
         guard let data = envelope.data, Self.isAddressable(data.paymentTransId) else {
-            throw TapToPayError(type: .decodingError, reason: "The opening was approved with no payment", detail: nil)
+            let reason = "The opening was approved with no payment"
+            throw TapToPayError(type: .decodingError, reason: reason, detail: nil, httpStatus: status, rawCode: envelope.code)
         }
         return data.paymentTransId
     }
@@ -102,6 +118,14 @@ package final class TTPTransactionClient: Sendable {
     private static func isAddressable(_ paymentTransId: String) -> Bool {
         let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
+    }
+
+    /// The words a refusal's body gives, when it gives any.
+    ///
+    /// - Parameter response: the refused answer.
+    /// - Returns: the body's `reason`, or nil when it names none or cannot be read.
+    private static func reason(of response: PayabliResponse) -> String? {
+        (try? JSONDecoder().decode(PayabliV2Envelope<InitiateData>.self, from: response.body))?.reason
     }
 
     private static func isJSONObject(_ body: Data) -> Bool {
@@ -197,6 +221,10 @@ struct ChargeKeyRefusal: PayabliError {
         .conflict
     }
 
+    var httpStatus: Int? {
+        409
+    }
+
     var reason: String {
         PayabliErrorType.conflict.message
     }
@@ -220,9 +248,9 @@ struct CustomerDataRefusal: PayabliError {
         guard response.statusCode == 400,
               let validation = try? JSONDecoder().decode(PayabliValidationError.self, from: response.body),
               validation.rawCode == "E7020",
-              let entries = validation.errors?["customerData"]
+              let entries = validation.errors["customerData"]
         else { return nil }
-        self.validation = validation
+        self.validation = validation.carrying(httpStatus: response.statusCode, rawCode: validation.rawCode)
         requiredFields = entries.lazy.compactMap { Self.fieldsNamed(in: $0.message) }.first ?? []
     }
 
@@ -236,6 +264,14 @@ struct CustomerDataRefusal: PayabliError {
 
     var detail: String? {
         validation.detail
+    }
+
+    var httpStatus: Int? {
+        validation.httpStatus
+    }
+
+    var rawCode: String? {
+        validation.rawCode
     }
 
     var errorDescription: String? {

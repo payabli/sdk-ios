@@ -29,9 +29,9 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
 
     func testAnInterruptedSubmissionWarnsWhateverItsCausesCategory() {
         for type in [PayabliErrorType.rateLimited, .tokenExpired, .tokenProviderFailed, .validation] {
-            let interrupted = PayabliPayInError.submissionInterrupted(
+            let interrupted = PayabliPayInError.Unsettled(
                 type: type,
-                causeType: "test",
+                cause: PayabliGenericError(type: type, reason: "test"),
                 paymentTransId: nil,
                 paymentReference: "p1"
             )
@@ -49,6 +49,7 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
             let expected = switch category {
             case .declined: "This payment method couldn't be saved. Try another one."
             case .retryLater: "The payment method couldn't be saved. Please try again."
+            case .outcomeUnknown: "We couldn't confirm the payment method was saved."
             default: "The payment method couldn't be saved."
             }
             XCTAssertEqual(
@@ -66,7 +67,7 @@ final class PayabliPayInFailureMessageTests: XCTestCase {
         )
         XCTAssertEqual(
             PayabliPayInFailureMessage.text(for: URLError(.notConnectedToInternet), operation: .storePaymentMethod),
-            "The payment method couldn't be saved."
+            "We couldn't confirm the payment method was saved."
         )
     }
 

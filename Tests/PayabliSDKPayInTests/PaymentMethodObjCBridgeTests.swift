@@ -61,54 +61,79 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertNil(options.temporary)
     }
 
+    func testAStoreRequestCarriesEveryStoreOption() throws {
+        let customer = PayabliPayInCustomerDataObjC()
+        customer.customerId = 4440
+        let request = try storeRequest()
+        request.customerData = customer
+        request.vendorId = 4
+        request.vendorNumber = "4781"
+        request.fallbackAuth = true
+        request.fallbackAuthAmount = 150
+        request.methodDescription = "House account"
+        request.subdomain = "objc-subdomain"
+        request.requiresLuhnCheck = false
+        request.validatesRoutingNumberChecksum = false
+
+        let options = request.toSwift().options
+
+        XCTAssertEqual(options.customerData?.customerId, 4440)
+        XCTAssertEqual(options.vendorData?.vendorId, 4)
+        XCTAssertEqual(options.vendorData?.vendorNumber, "4781")
+        XCTAssertEqual(options.fallbackAuth, true)
+        XCTAssertEqual(options.fallbackAuthAmount, 150)
+        XCTAssertEqual(options.methodDescription, "House account")
+        XCTAssertEqual(options.subdomain, "objc-subdomain")
+        XCTAssertFalse(options.validation.requiresLuhnCheck)
+        XCTAssertFalse(options.validation.validatesRoutingNumberChecksum)
+    }
+
+    func testAStoreRequestNamingOneVendorIdentifierSendsOnlyThatOne() throws {
+        let byId = try storeRequest()
+        byId.vendorId = 4
+        let byNumber = try storeRequest()
+        byNumber.vendorNumber = "4781"
+
+        XCTAssertEqual(byId.toSwift().options.vendorData?.vendorId, 4)
+        XCTAssertNil(byId.toSwift().options.vendorData?.vendorNumber)
+        XCTAssertNil(byNumber.toSwift().options.vendorData?.vendorId)
+        XCTAssertEqual(byNumber.toSwift().options.vendorData?.vendorNumber, "4781")
+    }
+
+    func testAStoreRequestSettingNothingCarriesTheSwiftDefaults() throws {
+        let options = try storeRequest().toSwift().options
+        let defaults = PayabliPayInStoreOptions()
+
+        XCTAssertNil(options.customerData)
+        XCTAssertNil(options.vendorData)
+        XCTAssertNil(options.fallbackAuth)
+        XCTAssertNil(options.fallbackAuthAmount)
+        XCTAssertNil(options.methodDescription)
+        XCTAssertNil(options.subdomain)
+        XCTAssertEqual(options.validation.requiresLuhnCheck, defaults.validation.requiresLuhnCheck)
+        XCTAssertEqual(
+            options.validation.validatesRoutingNumberChecksum,
+            defaults.validation.validatesRoutingNumberChecksum
+        )
+    }
+
     private func storeRequest() throws -> PayabliPayInStoreRequestObjC {
         try XCTUnwrap(PayabliPayInStoreRequestObjC.bankAccount(
             accountNumber: "123456789",
             routingNumber: "021000021",
-            accountType: "Checking",
+            accountType: .checking,
             holderName: "Jane Doe",
-            holderType: nil,
-            secCode: nil,
-            deviceId: nil
+            holderType: .unspecified,
+            secCode: .unspecified
         ))
     }
 
-    func testTheBankAccountFactoryRejectsAnInvalidHolderType() {
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "123456789",
-                routingNumber: "021000021",
-                accountType: "Checking",
-                holderName: "Jane Doe",
-                holderType: "company",
-                secCode: "WEB",
-                deviceId: nil
-            ),
-            "a holder type that names none of the kinds is refused before a request exists"
-        )
-    }
-
-    func testStoredMethodWrapperConvertsValuesAndResponse() {
+    func testStoredMethodWrapperConvertsEachField() {
         let storedMethod = PayabliPayInStoredMethod(
             storedMethodId: "stored-123",
             method: .bankAccount,
             methodReferenceId: "method-123",
-            resultCode: 1,
-            resultText: "Approved",
-            customerId: 4440,
-            responseText: "Success",
-            apiResponse: PayabliPayInTokenStorageAPIResponse(
-                isSuccess: true,
-                responseText: "Success",
-                responseCode: 200,
-                responseData: PayabliPayInTokenStorageAPIResponseData(
-                    referenceId: "stored-123",
-                    resultCode: 1,
-                    resultText: "Approved",
-                    customerId: 4440,
-                    methodReferenceId: "method-123"
-                )
-            )
+            customerId: 4440
         )
 
         let wrapper = PayabliPayInStoredMethodObjC(storedMethod)
@@ -116,37 +141,7 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
         XCTAssertEqual(wrapper.storedMethodId, "stored-123")
         XCTAssertEqual(wrapper.method, "bankAccount")
         XCTAssertEqual(wrapper.methodReferenceId, "method-123")
-        XCTAssertEqual(wrapper.resultCode, 1)
         XCTAssertEqual(wrapper.customerId, 4440)
-        XCTAssertEqual(wrapper.responseText, "Success")
-        XCTAssertEqual(wrapper.apiResponse["responseText"] as? String, "Success")
-    }
-
-    func testTheBankAccountFactoryRejectsInvalidArguments() {
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "111111111",
-                routingNumber: "123456780",
-                accountType: "Business",
-                holderName: "Jane Doe",
-                holderType: nil,
-                secCode: nil,
-                deviceId: nil
-            ),
-            "an account type that names none of the kinds is refused before a request exists"
-        )
-        XCTAssertNil(
-            PayabliPayInStoreRequestObjC.bankAccount(
-                accountNumber: "111111111",
-                routingNumber: "123456780",
-                accountType: PayabliPayInAccountType.checking.rawValue,
-                holderName: "Jane Doe",
-                holderType: nil,
-                secCode: "POP",
-                deviceId: nil
-            ),
-            "an SEC code that names none of the kinds is refused before a request exists"
-        )
     }
 
     func testStoreMethodReturnsValidationErrorWithoutCallingTokenHandler() async throws {
@@ -297,11 +292,10 @@ final class PaymentMethodObjCBridgeTests: XCTestCase {
             PayabliPayInStoreRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "123456780",
-                accountType: PayabliPayInAccountType.checking.rawValue,
+                accountType: .checking,
                 holderName: "Jane Doe",
-                holderType: PayabliPayInAccountHolderType.personal.rawValue,
-                secCode: nil,
-                deviceId: nil
+                holderType: .personal,
+                secCode: .unspecified
             ),
             "a bank account request whose named values are all real is a request"
         )

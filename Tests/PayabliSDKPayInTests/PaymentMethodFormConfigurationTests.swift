@@ -164,7 +164,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             bankSections: [
                 PayabliPayInFieldSection(
                     title: "Hidden",
-                    fields: [.secCode]
+                    fields: []
                 )
             ]
         )
@@ -194,12 +194,12 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                     fields: [.accountHolder]
                 )
             ],
-            requiredFields: [.billingPostalCode, .deviceId]
+            requiredFields: [.billingPostalCode, .billingEmail]
         )
 
         XCTAssertEqual(configuration.bankSections[0].fields, [
             .firstName,
-            .deviceId,
+            .billingEmail,
             .billingPostalCode
         ])
         XCTAssertEqual(configuration.bankSections[1].fields, [
@@ -468,7 +468,7 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
             XCTFail("Expected transport error")
         } catch let error as PayabliGenericError {
             XCTAssertEqual(error.type, .unknown)
-            XCTAssertEqual(viewModel.failureMessage, "The payment method couldn't be saved.")
+            XCTAssertEqual(viewModel.failureMessage, "We couldn't confirm the payment method was saved.")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -483,8 +483,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
                 requiredFields: [
-                    .deviceId,
-                    .methodDescription,
                     .firstName,
                     .lastName,
                     .customerNumber,
@@ -496,8 +494,6 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
         viewModel.accountHolder = "Jane Business"
         viewModel.routingNumber = "123456780"
         viewModel.accountNumber = "1111111111"
-        viewModel.deviceId = "terminal-1"
-        viewModel.methodDescription = "Business account"
         viewModel.firstName = "Jane"
 
         XCTAssertFalse(viewModel.canSubmit)

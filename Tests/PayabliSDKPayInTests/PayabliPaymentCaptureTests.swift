@@ -256,8 +256,8 @@ final class PayabliPayInTests: XCTestCase {
         do {
             _ = try await component.capture(request)
             XCTFail("Expected concurrent submission to be rejected")
-        } catch let error as PayabliPayInError {
-            XCTAssertEqual(error, .submissionInProgress)
+        } catch {
+            XCTAssertTrue(error is PayabliPayInError.AlreadySubmitting, "\(error)")
         }
 
         await transport.resume()
@@ -368,13 +368,13 @@ final class PayabliPayInTests: XCTestCase {
         component.newIdempotencyKey = { "idem-form" }
         let configuration = PayabliPayInFormConfiguration(
             allowedMethods: [.card],
-            defaultMethod: .card,
-            hiddenValues: PayabliPayInHiddenValues(methodDescription: "Configured description")
+            defaultMethod: .card
         )
         let viewModel = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
                 paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+                orderDescription: "Configured description",
                 source: "ios-form-test",
                 achValidation: true,
                 forceCustomerCreation: false
@@ -479,8 +479,9 @@ final class PayabliPayInTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a total sent as 0.00 is refused")
-        } catch let PayabliPayInError.invalidInput(reason) {
-            XCTAssertEqual(reason, "Total amount must be greater than 0.")
+        } catch let refusal as PayabliPayInError.InvalidInput {
+            XCTAssertEqual(refusal.reason, "Total amount must be greater than 0.")
+            XCTAssertEqual(refusal.field, "paymentDetails.totalAmount")
             XCTAssertEqual(viewModel.failureMessage, "The payment couldn't be completed.")
         }
         XCTAssertEqual(viewModel.cardNumber.filter(\.isNumber), "4111111111111111", "only the host can fix the amount")

@@ -439,7 +439,7 @@ struct PaymentTapToPayQAView: View {
                 let accepted = try await terminal.termsAccepted()
                 termsMessage = accepted ? "✓ Accepted" : "✗ Not accepted"
             } catch {
-                termsMessage = "? Could not ask: \(error.localizedDescription)"
+                termsMessage = "? Could not ask: \(ActionLine.message(for: error))"
             }
         }
     }
@@ -482,6 +482,7 @@ struct PaymentTapToPayQAView: View {
                 enableMessage = "✓ Reader ready"
             } catch {
                 enableMessage = ActionLine.failed(error)
+                logEnableFailure(error)
             }
         }
     }
@@ -503,6 +504,7 @@ struct PaymentTapToPayQAView: View {
                 chargeMessage = "✓ Charged · txn \(paymentTransId)"
             } catch {
                 chargeMessage = ActionLine.failed(error)
+                logEntry(ActionLine.failureEvent(step: "charge", error: error))
             }
         }
     }
@@ -517,6 +519,7 @@ struct PaymentTapToPayQAView: View {
             do {
                 try await terminal.activate(code: code)
             } catch let failure as TapToPayFailure {
+                logEntry(ActionLine.failureEvent(step: "activation", error: failure))
                 // A device that has to be set up again needs a fresh cold
                 // attestation, not another code. The reason goes to the step
                 // that offers it.
@@ -524,6 +527,12 @@ struct PaymentTapToPayQAView: View {
                     activationOutcome = .deviceSetupRequired
                     enableMessage = "✗ \(failure.message)"
                     activationMessage = "✗ This device must be set up again — re-enable the terminal, see step 2."
+                } else if failure.isDeviceNotPending {
+                    // A refusal from the service leaves the session reading
+                    // `.pendingActivation`, so only the outcome sends the
+                    // sequence back to the enable step.
+                    activationOutcome = .setupAskedAgain
+                    enableMessage = "✗ \(failure.message)"
                 } else {
                     activationOutcome = .activationFailed
                     activationMessage = "✗ \(failure.message)"
@@ -552,6 +561,7 @@ struct PaymentTapToPayQAView: View {
                 // so writing only to `activationMessage` would discard the error.
                 activationOutcome = .enableFailed
                 enableMessage = ActionLine.failed(error)
+                logEnableFailure(error)
                 activationMessage = "✓ Activated. Enabling the terminal failed — see step 2."
             }
         }
@@ -569,7 +579,20 @@ struct PaymentTapToPayQAView: View {
     // MARK: - State log
 
     private func logState(_ status: TapToPaySessionStatus) {
-        stateLog.insert(TapToPayQAStateEntry(label: status.label), at: 0)
+        logEntry(status.label)
+    }
+
+    /// Records a failed enable, unless it left the session waiting for an activation code, which is the next step
+    /// rather than a failure.
+    private func logEnableFailure(_ error: Error) {
+        if (error as? TapToPayFailure)?.isPendingActivation == true {
+            return
+        }
+        logEntry(ActionLine.failureEvent(step: "enable", error: error))
+    }
+
+    private func logEntry(_ label: String) {
+        stateLog.insert(TapToPayQAStateEntry(label: label), at: 0)
         if stateLog.count > 100 {
             stateLog.removeLast(stateLog.count - 100)
         }

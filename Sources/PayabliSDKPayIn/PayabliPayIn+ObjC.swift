@@ -11,21 +11,13 @@ public final class PayabliPayInStoredMethodObjC: NSObject {
     @objc public let storedMethodId: String?
     @objc public let method: String
     @objc public let methodReferenceId: String?
-    @objc public let resultCode: NSNumber?
-    @objc public let resultText: String?
     @objc public let customerId: NSNumber?
-    @objc public let responseText: String
-    @objc public let apiResponse: NSDictionary
 
     init(_ method: PayabliPayInStoredMethod) {
         storedMethodId = method.storedMethodId
         self.method = Self.name(of: method.method)
         methodReferenceId = method.methodReferenceId
-        resultCode = method.resultCode.map(NSNumber.init(value:))
-        resultText = method.resultText
         customerId = method.customerId.map(NSNumber.init(value:))
-        responseText = method.responseText
-        apiResponse = Self.dictionary(from: method.apiResponse)
         super.init()
     }
 
@@ -34,15 +26,6 @@ public final class PayabliPayInStoredMethodObjC: NSObject {
         case .card: return "card"
         case .bankAccount: return "bankAccount"
         }
-    }
-
-    private static func dictionary(from response: PayabliPayInTokenStorageAPIResponse) -> NSDictionary {
-        guard let data = try? JSONEncoder().encode(response),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else {
-            return [:]
-        }
-        return object as NSDictionary
     }
 }
 
@@ -279,10 +262,55 @@ public final class PayabliPayInObjC: NSObject {
             }
         }
     }
+
+    /// The bank values in their Swift types, `nil` where the host passed `unspecified`.
+    struct BankValues {
+        let accountType: PayabliPayInAccountType
+        let secCode: PayabliPayInSecCode?
+        let holderType: PayabliPayInAccountHolderType?
+    }
+
+    /// Reads the bank values an Objective-C host passed. Objective-C passes an enum as a plain integer, so a number
+    /// that names no case can arrive, and a switch over it traps.
+    ///
+    /// - Parameter accountType: the account type the host passed.
+    /// - Parameter secCode: the SEC code the host passed.
+    /// - Parameter holderType: the holder type the host passed.
+    /// - Returns: the values in their Swift types.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` naming the request member, for a number that names no case.
+    nonisolated static func validated(
+        accountType: PayabliPayInAccountTypeCode,
+        secCode: PayabliPayInSecCodeCode,
+        holderType: PayabliPayInAccountHolderTypeCode
+    ) throws -> BankValues {
+        guard let account = PayabliPayInAccountTypeCode(rawValue: accountType.rawValue) else {
+            throw refusal(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: .achAccountType)
+        }
+        guard let sec = PayabliPayInSecCodeCode(rawValue: secCode.rawValue) else {
+            throw refusal(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: .achCode)
+        }
+        guard let holder = PayabliPayInAccountHolderTypeCode(rawValue: holderType.rawValue) else {
+            throw refusal(holderType.rawValue, of: PayabliPayInAccountHolderTypeCode.self, field: .achHolderType)
+        }
+        return BankValues(accountType: account.accountType, secCode: sec.secCode, holderType: holder.holderType)
+    }
+
+    /// - Parameter value: the number the host passed.
+    /// - Parameter type: the enum it names no case of.
+    /// - Parameter field: the request member it fills.
+    /// - Returns: the refusal, naming that member.
+    private nonisolated static func refusal(
+        _ value: Int,
+        of type: (some Any).Type,
+        field: PayabliPayInMethodInput.CodingKeys
+    ) -> PayabliPayInError.InvalidInput {
+        PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(field), reason: "\(value) is not a \(type) value.")
+    }
 }
 
 extension Error {
-    /// The `NSError` an Objective-C caller receives; an unknown outcome adds `paymentTransId` and `paymentReference`.
+    /// The `NSError` an Objective-C caller receives, adding `field`, `paymentTransId` and `paymentReference` when the
+    /// error names them, and an unknown outcome's redacted cause under `NSUnderlyingErrorKey`.
     ///
     /// - Parameter movesMoney: whether the call could take a payment, so the error says whether it may have.
     /// - Returns: the error, with `capture` set to 1 when the payment may have been taken, a refusal because another
@@ -290,9 +318,17 @@ extension Error {
     func toPayabliPayInNSError(movesMoney: Bool = false) -> NSError {
         let error = payabliNSError(domain: payInObjCErrorDomain)
         var userInfo = error.userInfo
-        if case let .submissionInterrupted(_, _, paymentTransId, paymentReference) = self as? PayabliPayInError {
-            userInfo["paymentTransId"] = paymentTransId
-            userInfo["paymentReference"] = paymentReference
+        if let field = (self as? PayabliPayInError.InvalidInput)?.field {
+            userInfo["field"] = field as NSString
+        }
+        let failure = (self as? PayabliPayInError.Refused)?.failure ?? (self as? PayabliPayInError.ServiceError)?.failure
+        if let paymentTransId = failure?.paymentTransId {
+            userInfo["paymentTransId"] = paymentTransId as NSString
+        }
+        if let unsettled = self as? PayabliPayInError.Unsettled {
+            userInfo["paymentTransId"] = unsettled.paymentTransId
+            userInfo["paymentReference"] = unsettled.paymentReference
+            userInfo[NSUnderlyingErrorKey] = unsettled.underlying as NSError
             if movesMoney {
                 userInfo["capture"] = 1
             }

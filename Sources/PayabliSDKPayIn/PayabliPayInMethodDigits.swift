@@ -93,8 +93,7 @@ private extension PayabliPayInBankAccountData {
             accountType: accountType,
             holderName: holderName,
             holderType: holderType,
-            secCode: secCode,
-            deviceId: deviceId
+            secCode: secCode
         )
     }
 }

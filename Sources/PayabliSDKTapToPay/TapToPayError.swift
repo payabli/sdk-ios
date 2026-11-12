@@ -17,6 +17,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let capture: PayabliTTPCapture
     public let retryAfter: TimeInterval?
     public let refusal: TapToPayChargeRefusal?
+    public let httpStatus: Int?
+    public let rawCode: String?
 
     package init(
         type: PayabliErrorType,
@@ -25,7 +27,9 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         paymentTransId: String? = nil,
         capture: PayabliTTPCapture = .notCharged,
         retryAfter: TimeInterval? = nil,
-        refusal: TapToPayChargeRefusal? = nil
+        refusal: TapToPayChargeRefusal? = nil,
+        httpStatus: Int? = nil,
+        rawCode: String? = nil
     ) {
         self.type = type
         self.reason = reason
@@ -34,11 +38,33 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         self.capture = capture
         self.retryAfter = retryAfter
         self.refusal = refusal
+        self.httpStatus = httpStatus
+        self.rawCode = rawCode
     }
 }
 
-/// Bridges to `NSError` with the catalog number as its code, so an Objective-C caller branches on the
-/// same number telemetry reports. A refused customer adds `refusal` and
+extension TapToPayError {
+    /// The same failure, carrying the status of the answer it was read from.
+    ///
+    /// - Parameter httpStatus: the status the answer came with.
+    /// - Returns: a copy with `httpStatus` set and every other field unchanged.
+    func carrying(httpStatus: Int) -> TapToPayError {
+        TapToPayError(
+            type: type,
+            reason: reason,
+            detail: detail,
+            paymentTransId: paymentTransId,
+            capture: capture,
+            retryAfter: retryAfter,
+            refusal: refusal,
+            httpStatus: httpStatus,
+            rawCode: rawCode
+        )
+    }
+}
+
+/// Bridges to `NSError` with the catalog number as its code, so an Objective-C caller branches on the same number
+/// telemetry reports. `userInfo` carries ``PayabliError/answerUserInfo``, and a refused customer adds `refusal` and
 /// `requiredFields`, every identifier the paypoint requires named by its ``PayabliTTPCustomerData`` property.
 extension TapToPayError: CustomNSError {
     public static var errorDomain: String {
@@ -68,6 +94,7 @@ extension TapToPayError: CustomNSError {
         case nil:
             break
         }
+        info.merge(answerUserInfo) { _, answer in answer }
         return info
     }
 }

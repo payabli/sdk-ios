@@ -1,11 +1,22 @@
 import PayabliSDKCore
 
-/// The form fields a validation refusal names. A key is matched on its last segment and without case,
-/// so a field named bare or under its parent object resolves to the same box.
+/// The form fields a refusal names: the service's validation errors, or the one field the payment flow refused
+/// before sending. A key is matched on its last segment and without case, so a field named bare or under its parent
+/// object resolves to the same box.
 enum PayabliPayInRejectedFields {
+    /// - Parameter error: what the submission ended in.
+    /// - Returns: the fields it blamed that the form has a box for, or none.
     static func fields(in error: any Error) -> Set<PayabliPayInField> {
-        guard case let .validation(refusal)? = error as? PayabliPaymentError else { return [] }
-        return Set((refusal.errors ?? [:]).keys.compactMap(field(named:)))
+        switch error {
+        case let unsettled as PayabliPayInError.Unsettled:
+            return unsettled.rejectedFields
+        case let refusal as PayabliPayInError.InvalidInput:
+            return Set([refusal.field].compactMap { $0.flatMap(field(named:)) })
+        case let PayabliPaymentError.validation(refusal):
+            return Set(refusal.errors.keys.compactMap(field(named:)))
+        default:
+            return []
+        }
     }
 
     static func field(named name: String) -> PayabliPayInField? {
@@ -31,8 +42,6 @@ enum PayabliPayInRejectedFields {
             (MethodKey.achAccount.stringValue, .accountNumber),
             (MethodKey.achAccountType.stringValue, .accountType),
             (MethodKey.achHolderType.stringValue, .accountHolderType),
-            (MethodKey.achCode.stringValue, .secCode),
-            (MethodKey.device.stringValue, .deviceId),
             ("firstName", .firstName),
             ("lastName", .lastName),
             ("customerNumber", .customerNumber),

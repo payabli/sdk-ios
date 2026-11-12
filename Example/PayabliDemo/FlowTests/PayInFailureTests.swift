@@ -43,14 +43,14 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
-    func testABareConflictOnAReversalSaysWhatTheServiceSaid() {
+    func testABareConflictOnAReversalShowsTheReversalsMessage() {
         let failure = PayInFailure(
             BareReason(reason: "Conflict (409)", type: .conflict),
             operation: .void
         )
 
         XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertEqual(failure.message, "Conflict (409)")
+        XCTAssertEqual(failure.message, "The reversal couldn't be completed.")
     }
 
     /// A reversal's open outcome reads as the reversal's, in the demo's own copy.
@@ -66,11 +66,8 @@ final class PayInFailureTests: XCTestCase {
 
     /// A refused repeat of a reversal says the earlier one may still be running, and leaves the read as the next step.
     func testARefusedRepeatOfAReversalSaysTheEarlierOneMayStillBeRunning() {
-        let refused = PayabliPayInError.submissionInterrupted(
-            type: .retryRefused,
-            causeType: "PayabliSDKCore.PayabliGenericError",
-            paymentTransId: nil,
-            paymentReference: nil
+        let refused = PayabliPayInError.Unsettled(
+            cause: PayabliGenericError(type: .retryRefused, reason: "retryRefused")
         )
 
         let failure = PayInFailure(refused, operation: .void)
@@ -97,40 +94,40 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("Start a new attempt"), failure.message)
     }
 
-    private static let interruptedReversal = PayabliPayInError.submissionInterrupted(
-        type: .networkError,
-        causeType: "PayabliSDKCore.PayabliGenericError",
-        paymentTransId: nil,
-        paymentReference: nil
+    private static let interruptedReversal = PayabliPayInError.Unsettled(
+        cause: PayabliGenericError(type: .networkError, reason: "networkError")
     )
 
-    /// What the SDK hands over for a `409` on a money-in route. A reversal carries a key too, but mints a
-    /// fresh one per call, so no repeat of one can be recognised and the case this fixture stands for does
-    /// not arise there. The `causeType` is the one the bodyless route produces; a `409` answered with a
-    /// body names the flow's own error type instead. Nothing here reads it — the adapter branches on the
-    /// code — and both values are pinned where they are derived, in the SDK's own idempotency cases.
-    private static let interruptedConflict = PayabliPayInError.submissionInterrupted(
-        type: .conflict,
-        causeType: "PayabliSDKCore.PayabliGenericError",
-        paymentTransId: nil,
-        paymentReference: nil
+    /// What the SDK hands over for a bodyless `409` on a money-in route. The adapter branches on the code, not
+    /// the cause, and both values are pinned in the SDK's own idempotency cases.
+    private static let interruptedConflict = PayabliPayInError.Unsettled(
+        cause: PayabliGenericError(type: .conflict, reason: "conflict")
     )
 
-    func testATypedConflictOnAStoredMethodSaysWhatTheServiceSaid() {
+    func testATypedConflictOnAStoredMethodIsNotReadAsARepeat() {
         let failure = PayInFailure(typedConflict, operation: .storedMethod)
 
         XCTAssertFalse(failure.isDuplicateSubmission)
         XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
     }
 
-    func testABareConflictOnAStoredMethodSaysWhatTheServiceSaid() {
+    func testASaveWhoseAnswerWasLostSaysItCouldNotBeConfirmed() {
+        let failure = PayInFailure(
+            BareReason(reason: "The network connection was lost.", type: .networkError),
+            operation: .storedMethod
+        )
+
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
+    }
+
+    func testABareConflictOnAStoredMethodShowsTheStoreMessage() {
         let failure = PayInFailure(
             BareReason(reason: "Conflict (409)", type: .conflict),
             operation: .storedMethod
         )
 
         XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertEqual(failure.message, "Conflict (409)")
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
     }
 
     /// A validation failure's reason is the server's own title, which can carry
@@ -146,22 +143,30 @@ final class PayInFailureTests: XCTestCase {
         XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
     }
 
-    func testAFailureThatIsNotAConflictReadsAsItself() {
+    func testADeclineShowsTheDeclinedMessage() {
         let failure = PayInFailure(
-            PayabliPayInError.transactionFailed(
-                PayabliPayInFailure(reason: "Declined", httpStatusCode: 402)
+            PayabliPayInError.Refused(
+                failure: PayabliPayInFailure(code: "D0001", reason: "Declined", httpStatusCode: 402)
             ),
             operation: .capture
         )
 
         XCTAssertFalse(failure.isDuplicateSubmission)
-        XCTAssertFalse(failure.message.contains("idempotency key"), failure.message)
+        XCTAssertEqual(failure.message, "The payment was declined. Try another payment method.")
     }
 
-    /// A validation failure's own description names each rejected field, which is
-    /// the part saying what to correct. The title alone is usually "Validation
-    /// failed", which tells a merchant nothing.
-    func testAValidationFailureKeepsTheFieldsItRejected() throws {
+    func testAnInterruptedCaptureShowsTheOutcomeUnknownMessage() {
+        let interrupted = PayabliPayInError.Unsettled(
+            cause: PayabliGenericError(type: .networkError, reason: "networkError")
+        )
+
+        let failure = PayInFailure(interrupted, operation: .capture)
+
+        XCTAssertEqual(failure.message, "This payment may have gone through. Check before paying again.")
+    }
+
+    /// The service's text names fields and quotes what was submitted, so it goes to no screen.
+    func testAValidationFailureShowsNoneOfTheServicesText() throws {
         let json = Data(#"""
         {
           "title": "Validation failed",
@@ -173,22 +178,23 @@ final class PayInFailureTests: XCTestCase {
 
         let failure = PayInFailure(validation, operation: .storedMethod)
 
-        XCTAssertTrue(failure.message.contains("cardNumber"), failure.message)
-        XCTAssertTrue(failure.message.contains("is not a valid card number"), failure.message)
+        XCTAssertEqual(failure.message, "The payment method couldn't be saved.")
+        XCTAssertEqual(failure.logLabel, validation.type.rawValue)
     }
 
     /// The same for a failure whose description carries an action.
-    func testAFailureKeepsTheActionItNames() {
+    func testAFailureShowsNoneOfTheActionItNames() {
         let failure = PayInFailure(ActionableDecline(), operation: .storedMethod)
 
-        XCTAssertTrue(failure.message.contains("Ask for another card"), failure.message)
+        XCTAssertFalse(failure.message.contains("Ask for another card"), failure.message)
+        XCTAssertEqual(failure.message, "We couldn't confirm the payment method was saved.")
     }
 
     // MARK: -
 
     private var typedConflict: Error {
-        PayabliPayInError.transactionFailed(
-            PayabliPayInFailure(reason: "Conflict", httpStatusCode: 409)
+        PayabliPayInError.ServiceError(
+            failure: PayabliPayInFailure(reason: "Conflict", httpStatusCode: 409)
         )
     }
 }

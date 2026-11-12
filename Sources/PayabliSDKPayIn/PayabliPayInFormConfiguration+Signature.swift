@@ -9,19 +9,16 @@ func payabliFramedSignature(_ components: [String]) -> String {
     components.map { "\($0.utf8.count):\($0)" }.joined()
 }
 
-/// Carries the configuration and the labels into a change handler, which may otherwise read the
-/// view's previous values.
-struct PayInPaymentFlowConfigurationChange: Equatable {
+/// Carries the operation, the configuration and the labels into one change handler, which may otherwise read the
+/// view's previous values: two handlers firing on one update would each apply one new value beside a stale one.
+struct PayInFormInputs: Equatable {
+    let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
     let labels: PayabliPayInFormLabels
 
-    init(_ configuration: PayabliPayInFormConfiguration, labels: PayabliPayInFormLabels) {
-        self.configuration = configuration
-        self.labels = labels
-    }
-
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
+        lhs.operation.payabliViewModelSignature == rhs.operation.payabliViewModelSignature
+            && lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
             && lhs.labels.payabliViewModelSignature == rhs.labels.payabliViewModelSignature
     }
 }
@@ -33,24 +30,12 @@ extension PayabliPayInFormConfiguration {
             "default:\(defaultMethod.rawValue)",
             "cardFields:\(cardFieldOrder.map(\.rawValue).joined(separator: ","))",
             "achFields:\(bankFieldOrder.map(\.rawValue).joined(separator: ","))",
-            "hidden:\(hiddenValues.payabliViewModelSignature)",
+            "achHolderType:\(accountHolderType?.rawValue ?? "")",
             "formatting:\(formatting.payabliViewModelSignature)",
             "required:\(requiredFields.map(\.rawValue).sorted().joined(separator: ","))",
             "paymentSummary:\(paymentSummary.payabliViewModelSignature)",
             "showsBaseAmount:\(showsBaseAmount)",
             "showsFailureMessage:\(showsFailureMessage)"
-        ])
-    }
-}
-
-private extension PayabliPayInHiddenValues {
-    var payabliViewModelSignature: String {
-        payabliFramedSignature([
-            "achHolderType:\(accountHolderType?.rawValue ?? "")",
-            "achSecCode:\(secCode?.rawValue ?? "")",
-            "achDevice:\(deviceId ?? "")",
-            "methodDescription:\(methodDescription ?? "")",
-            "customerData:\(customerData.payabliJSONSignature)"
         ])
     }
 }

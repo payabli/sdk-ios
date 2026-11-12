@@ -156,14 +156,13 @@ struct PaymentMethodQAView: View {
         }
 
         resultText = [
-            "Stored method: \(method.storedMethodId ?? "-")",
-            "Response: \(method.responseText)",
-            "Result: \(method.resultText ?? "-")"
+            "Code: \(outcome.code)",
+            "Stored method: \(method.storedMethodId ?? "-")"
         ].joined(separator: "\n")
         Logger(
             subsystem: "com.payabli.example.app",
             category: "PaymentMethodDiagnostics"
-        ).info("Payment method added: result=\(method.resultCode ?? 0, privacy: .public)")
+        ).info("Payment method added: \(outcome.code, privacy: .public)")
 
         if isPaymentMethodSheetPresented {
             isPaymentMethodSheetPresented = false

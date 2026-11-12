@@ -143,6 +143,40 @@ final class AuthenticatedTransportTests: XCTestCase {
         XCTAssertEqual(stub.count, 2, "no third attempt")
     }
 
+    func testASecond401ReportsTheStatusAndCodeItWasAnsweredWith() async throws {
+        let stub = RecordingStub { _ in (Self.unauthorized, Data(#"{"responseCode": 9001}"#.utf8)) }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+
+        let failure = await failure(from: { _ = try await transport.perform(self.ping()) }) as? PayabliGenericError
+
+        XCTAssertEqual(failure?.type, .tokenExpired)
+        XCTAssertEqual(failure?.httpStatus, Self.unauthorized)
+        XCTAssertEqual(failure?.rawCode, "9001")
+        XCTAssertEqual(failure?.reason, "Refresh token rejected", "the body's text stays the service's")
+    }
+
+    func testARequestOnTheFinishedSessionCarriesNoStatusOrCodeFromTheRefusalThatFinishedIt() async throws {
+        let stub = RecordingStub { _ in (Self.unauthorized, Data(#"{"responseCode": 9001}"#.utf8)) }
+        stub.install()
+        defer { stub.uninstall() }
+
+        let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
+        let transport = makeAuthenticatedStack(auth: auth)
+        _ = await failure(from: { _ = try await transport.perform(self.ping()) })
+        let sends = stub.count
+
+        let later = await failure(from: { _ = try await transport.perform(self.ping()) }) as? PayabliGenericError
+
+        XCTAssertEqual(later?.type, .tokenExpired)
+        XCTAssertEqual(stub.count, sends, "nothing is sent on a finished session")
+        XCTAssertNil(later?.httpStatus, "this request was never answered")
+        XCTAssertNil(later?.rawCode)
+    }
+
     func testARefusalOfTheCallerOnTheReplayIsReturnedAndNotReadAsAnExpiredToken() async throws {
         let refusal = Data(#"{"responseCode": 9001}"#.utf8)
         let stub = RecordingStub { request in

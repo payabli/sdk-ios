@@ -7,25 +7,35 @@ package enum PayabliTTPError: Error, Sendable {
     case notInitialized
     case invalidState(current: PayabliTTPSessionState, attempted: String)
     case notReady(current: PayabliTTPSessionState)
-    case devicePendingActivation
-    case attestationRevoked(reason: String)
-    case attestationFailed(reason: String)
+    /// `httpStatus` is the refusing answer's when a configuration fetch was refused for it.
+    case devicePendingActivation(httpStatus: Int? = nil)
+    case attestationRevoked(reason: String, httpStatus: Int? = nil)
+    case attestationFailed(reason: String, httpStatus: Int? = nil)
     /// The service holds no attestation for this device, so it has to be set up again before it answers.
-    case deviceSetupRequired(reason: String)
+    case deviceSetupRequired(reason: String, httpStatus: Int? = nil)
     /// The service refused the attestation this device presented, in its own words.
-    case deviceSetupRefused(reason: String)
+    case deviceSetupRefused(reason: String, httpStatus: Int? = nil)
     /// The entry point refuses this request at the door, before anything about the device is weighed.
-    case entryPointRefused(reason: String)
-    case configFailed(reason: String)
+    case entryPointRefused(reason: String, httpStatus: Int? = nil)
+    case configFailed(reason: String, httpStatus: Int? = nil)
     /// Card-present payments are not enabled for this paypoint. Carries no reason: the status alone says it.
-    case cardPresentNotEnabled
+    case cardPresentNotEnabled(httpStatus: Int? = nil, rawCode: String? = nil)
     case readerSetupFailed(reason: String, paymentTransId: String? = nil)
     /// A gateway credential the reader needs is blank. Carries no field name.
     case readerCredentialsUnusable
     case nfcFailed(reason: String, paymentTransId: String? = nil)
-    /// The service refused to open the payment, in its own words, before any card was asked for.
-    case paymentNotOpened(reason: String)
-    case updateFailed(reason: String, paymentTransId: String, capture: PayabliTTPCapture, retryAfter: TimeInterval? = nil)
+    /// The service refused to open the payment, in its own words, before any card was asked for. `httpStatus` and
+    /// `rawCode` are the refusing answer's status and the code its envelope named.
+    case paymentNotOpened(reason: String, httpStatus: Int? = nil, rawCode: String? = nil)
+    /// The close was not confirmed. `httpStatus` and `rawCode` are the answer's, when the close was answered.
+    case updateFailed(
+        reason: String,
+        paymentTransId: String,
+        capture: PayabliTTPCapture,
+        retryAfter: TimeInterval? = nil,
+        httpStatus: Int? = nil,
+        rawCode: String? = nil
+    )
     case tokenExpired
     case activationFailed(reason: String)
     /// The activation code is not the six digits the service reads. Carries no reason.
@@ -67,8 +77,8 @@ package enum PayabliTTPError: Error, Sendable {
     case outcomeUnknown(paymentTransId: String)
 
     /// The processor has no record of the payment, so the card was not charged. Only the close of
-    /// a failed read raises it, and only for a key this run minted.
-    case paymentNotTaken(paymentTransId: String)
+    /// a failed read raises it, and only for a key this run minted. `httpStatus` and `rawCode` are that close's answer's.
+    case paymentNotTaken(paymentTransId: String, httpStatus: Int? = nil, rawCode: String? = nil)
 }
 
 package extension PayabliTTPError {
@@ -78,7 +88,7 @@ package extension PayabliTTPError {
         case .nfcFailed, .outcomeUnknown:
             // Raised once the reader was asked for a card, and the processor may take the sale before it answers.
             return .unknown
-        case let .updateFailed(_, _, capture, _),
+        case let .updateFailed(_, _, capture, _, _, _),
              let .readerOSVersionNotSupported(_, capture),
              let .readerUnavailable(_, _, capture),
              let .readerDeviceRefused(_, _, capture),
@@ -104,16 +114,60 @@ package extension PayabliTTPError {
              let .readerSessionExpired(paymentTransId, _),
              let .guardFailed(_, paymentTransId):
             return paymentTransId
-        case let .updateFailed(_, paymentTransId, _, _),
+        case let .updateFailed(_, paymentTransId, _, _, _, _),
              let .cardDeclined(paymentTransId),
              let .outcomeUnknown(paymentTransId),
-             let .paymentNotTaken(paymentTransId):
+             let .paymentNotTaken(paymentTransId, _, _):
             return paymentTransId
         case .notInitialized, .invalidState, .notReady, .devicePendingActivation, .attestationRevoked,
              .attestationFailed, .deviceSetupRequired, .deviceSetupRefused, .entryPointRefused, .configFailed,
              .cardPresentNotEnabled, .readerCredentialsUnusable, .readerHardwareUnsupported, .paymentNotOpened,
              .tokenExpired, .activationFailed, .activationCodeMalformed, .networkError, .termsNotAccepted:
             return nil
+        }
+    }
+}
+
+package extension PayabliTTPError {
+    /// The status and code of the answer this failure was read from, or nil for both when it was read from none.
+    var answer: (httpStatus: Int?, rawCode: String?) {
+        switch self {
+        case let .attestationRevoked(_, httpStatus),
+             let .attestationFailed(_, httpStatus),
+             let .deviceSetupRequired(_, httpStatus),
+             let .deviceSetupRefused(_, httpStatus),
+             let .entryPointRefused(_, httpStatus),
+             let .configFailed(_, httpStatus),
+             let .devicePendingActivation(httpStatus):
+            return (httpStatus, nil)
+        case let .cardPresentNotEnabled(httpStatus, rawCode),
+             let .paymentNotOpened(_, httpStatus, rawCode),
+             let .updateFailed(_, _, _, _, httpStatus, rawCode),
+             let .paymentNotTaken(_, httpStatus, rawCode):
+            return (httpStatus, rawCode)
+        case .notInitialized, .invalidState, .notReady, .readerSetupFailed,
+             .readerCredentialsUnusable, .nfcFailed, .tokenExpired, .activationFailed, .activationCodeMalformed,
+             .networkError, .termsNotAccepted, .readerOSVersionNotSupported, .readerHardwareUnsupported,
+             .readerUnavailable, .guardFailed, .readerDeviceRefused, .readerSessionExpired, .cardDeclined,
+             .outcomeUnknown:
+            return (nil, nil)
+        }
+    }
+
+    /// The same refusal, carrying the status of the answer it was read from, and no code.
+    ///
+    /// - Parameter httpStatus: the status the refusing answer came with.
+    /// - Returns: the refusal with `httpStatus` set, or this failure unchanged when it is not a refusal read from an answer.
+    func carrying(httpStatus: Int) -> PayabliTTPError {
+        switch self {
+        case let .attestationRevoked(reason, _): .attestationRevoked(reason: reason, httpStatus: httpStatus)
+        case let .attestationFailed(reason, _): .attestationFailed(reason: reason, httpStatus: httpStatus)
+        case let .deviceSetupRequired(reason, _): .deviceSetupRequired(reason: reason, httpStatus: httpStatus)
+        case let .deviceSetupRefused(reason, _): .deviceSetupRefused(reason: reason, httpStatus: httpStatus)
+        case let .entryPointRefused(reason, _): .entryPointRefused(reason: reason, httpStatus: httpStatus)
+        case let .configFailed(reason, _): .configFailed(reason: reason, httpStatus: httpStatus)
+        case .devicePendingActivation: .devicePendingActivation(httpStatus: httpStatus)
+        default: self
         }
     }
 }
@@ -158,15 +212,15 @@ extension PayabliTTPError: LocalizedError {
              let .readerUnavailable(reason, _, _),
              let .readerDeviceRefused(reason, _, _),
              let .guardFailed(reason, _),
-             let .updateFailed(reason, _, _, _):
+             let .updateFailed(reason, _, _, _, _, _):
             return reason
-        case let .attestationRevoked(reason),
-             let .attestationFailed(reason),
-             let .deviceSetupRequired(reason),
-             let .deviceSetupRefused(reason),
-             let .entryPointRefused(reason),
-             let .configFailed(reason),
-             let .paymentNotOpened(reason),
+        case let .attestationRevoked(reason, _),
+             let .attestationFailed(reason, _),
+             let .deviceSetupRequired(reason, _),
+             let .deviceSetupRefused(reason, _),
+             let .entryPointRefused(reason, _),
+             let .configFailed(reason, _),
+             let .paymentNotOpened(reason, _, _),
              let .activationFailed(reason),
              let .networkError(reason):
             return reason

@@ -8,7 +8,15 @@ struct PayInFormCustomization: Hashable {
     /// Names this tab on every request it sends, a capture and a save alike.
     static let source = "ios-simple-capture"
     /// What a method stored from this screen is sent with.
-    static let storeOptions = PayabliPayInStoreOptions(forceCustomerCreation: true, source: source)
+    static var storeOptions: PayabliPayInStoreOptions {
+        PayabliPayInStoreOptions(
+            forceCustomerCreation: true,
+            // A capture or an authorization names its customer on the request instead.
+            customerData: PayInDemoCustomer.customerData,
+            methodDescription: QAIdentity.current.note("simple-save"),
+            source: source
+        )
+    }
 
     enum Preset: String, CaseIterable, Identifiable {
         case sdkDefault = "Default"
@@ -105,21 +113,24 @@ struct PayInFormCustomization: Hashable {
 
     // MARK: - What the SDK is handed
 
-    func configuration(for operation: PayInOperation) -> PayabliPayInFormConfiguration {
+    /// The form's configuration for `operation`.
+    ///
+    /// - Parameter operation: what the form is for.
+    /// - Parameter held: the method of a payment whose retry is open. The form offers only that method, so it
+    ///   draws no selector and the total stays the one the retry sends. A save sends no retry and ignores it.
+    /// - Returns: the configuration to hand the form.
+    func configuration(
+        for operation: PayInOperation,
+        holding held: PayabliPayInMethodType? = nil
+    ) -> PayabliPayInFormConfiguration {
         // An authorization holds funds on a card and nothing else.
-        let methods = operation == .authorize ? [.card] : allowedMethods
-        let charges = operation != .storedMethod
+        let offered: [PayabliPayInMethodType] = operation == .authorize ? [.card] : allowedMethods
+        let methods = operation == .storedMethod ? offered : held.map { [$0] } ?? offered
         return PayabliPayInFormConfiguration(
             allowedMethods: methods,
             defaultMethod: methods.count > 1 ? startOn : methods[0],
             cardSections: sections(paymentFields: Self.cardFields, sectionTitle: "Your card"),
             bankSections: sections(paymentFields: bankFields, sectionTitle: "Your bank"),
-            hiddenValues: PayabliPayInHiddenValues(
-                accountHolderType: fixesHolderType ? .personal : nil,
-                methodDescription: QAIdentity.current.note(Self.note(for: operation)),
-                // A capture or an authorization names its customer on the request instead.
-                customerData: charges ? nil : PayInDemoCustomer.customerData
-            ),
             labelLayout: labelsInsideFields ? .placeholder : .external,
             showsFieldLabels: !hidesLabels,
             formatting: PayabliPayInFormatting(
@@ -131,7 +142,8 @@ struct PayInFormCustomization: Hashable {
             cardBrandIconPlacement: cardBrandIconPlacement,
             failureMessagePlacement: failureMessagePlacement,
             requiredFields: requiresCustomerNumber ? [.customerNumber] : [],
-            paymentSummary: paymentSummary
+            paymentSummary: paymentSummary,
+            accountHolderType: fixesHolderType ? .personal : nil
         )
     }
 
@@ -211,7 +223,7 @@ struct PayInFormCustomization: Hashable {
         .cardholderName, .cardNumber, .cardExpiration, .cardSecurityCode, .cardPostalCode
     ]
 
-    /// A holder type supplied as a hidden value takes the place of its picker.
+    /// A holder type the configuration supplies takes the place of its picker.
     private var bankFields: [PayabliPayInField] {
         let fields = PayabliPayInFormConfiguration.defaultBankFieldOrder
         return fixesHolderType ? fields.filter { $0 != .accountHolderType } : fields
@@ -277,14 +289,6 @@ struct PayInFormCustomization: Hashable {
             fieldLabels: fieldLabels,
             fieldPlaceholders: placeholders
         )
-    }
-
-    private static func note(for operation: PayInOperation) -> String {
-        switch operation {
-        case .capture, .void: "simple-capture"
-        case .authorize: "simple-authorize"
-        case .storedMethod: "simple-save"
-        }
     }
 
     private static func customSubmitWording(for operation: PayInOperation) -> String {
@@ -356,5 +360,40 @@ struct PayInFormCustomization: Hashable {
         case .sdkDefault, .compact:
             PayabliPayInPaymentSummaryConfiguration()
         }
+    }
+}
+
+/// The method on the form a screen shows, which is the method a charge from it is sent with.
+///
+/// Set when a form is built and when it reports a move. A configuration handed to a form already built moves
+/// the method only through that report, so it is never worked out again from the latest configuration.
+struct ShownFormMethod: Equatable {
+    private(set) var method: PayabliPayInMethodType?
+
+    /// A form was built, and opens on its configuration's default without reporting it.
+    ///
+    /// - Parameter configuration: the configuration the form was built with.
+    mutating func formBuilt(with configuration: PayabliPayInFormConfiguration) {
+        method = configuration.defaultMethod
+    }
+
+    /// The form reported drawing `method`.
+    ///
+    /// - Parameter method: the method it moved to.
+    mutating func moved(to method: PayabliPayInMethodType) {
+        self.method = method
+    }
+
+    /// The method an open retry must send once a charge from this form has failed.
+    ///
+    /// - Parameter failure: how the charge ended.
+    /// - Parameter held: the method held before it, if a retry was open.
+    /// - Returns: the method sent while the outcome is unknown, nil once the service answered the payment, and
+    ///   otherwise the one held.
+    func heldMethod(after failure: PayInFailure, holding held: PayabliPayInMethodType?) -> PayabliPayInMethodType? {
+        if failure.outcomeIsUnresolved {
+            return method
+        }
+        return failure.answersThePayment ? nil : held
     }
 }

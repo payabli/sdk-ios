@@ -236,38 +236,50 @@ package func mapPayabliHTTPError(
     }
 
     let decoder = JSONDecoder()
+    let status = response.statusCode
+    // One read of the body's `code` for every arm, so a body the typed shape cannot read costs only that shape.
+    let rawCode = serviceCode(of: response)
 
-    switch response.statusCode {
+    switch status {
     case 400:
         let validation = (try? decoder.decode(PayabliValidationError.self, from: response.body))
-            ?? PayabliValidationError()
-        throw PayabliPaymentError.validation(validation)
+            ?? PayabliValidationError(httpStatus: status)
+        throw PayabliPaymentError.validation(validation.carrying(httpStatus: status, rawCode: rawCode))
 
     case 401:
-        throw PayabliGenericError(type: .tokenExpired, reason: "Unauthorized (401)")
+        throw PayabliGenericError(type: .tokenExpired, reason: "Unauthorized (401)", httpStatus: status, rawCode: rawCode)
 
     case 402:
         let decline = (try? decoder.decode(PayabliDeclineError.self, from: response.body))
             ?? PayabliDeclineError()
-        throw PayabliPaymentError.decline(decline)
+        throw PayabliPaymentError.decline(decline.carrying(httpStatus: status, rawCode: rawCode))
 
     case 403:
-        throw PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)")
+        throw PayabliGenericError(type: .permissionDenied, reason: "Forbidden (403)", httpStatus: status, rawCode: rawCode)
 
     case 408:
         // RFC 9110 Section 15.5.9: the server did not receive a complete request in time and "the client
         // MAY repeat the request without modifications at any later time". Retryable, and classified as a
         // network failure because that is what it is: the request did not arrive, so nothing ran.
-        throw PayabliGenericError(type: .networkError, reason: "Request timeout (408)")
+        throw PayabliGenericError(
+            type: .networkError,
+            reason: "Request timeout (408)",
+            httpStatus: status,
+            rawCode: rawCode
+        )
 
     case 409:
-        throw PayabliGenericError(type: .conflict, reason: "Conflict (409)")
+        throw PayabliGenericError(type: .conflict, reason: "Conflict (409)", httpStatus: status, rawCode: rawCode)
 
     case 410:
-        throw PayabliGenericError(type: .sessionBurned, reason: "Session burned (410)")
+        throw PayabliGenericError(type: .sessionBurned, reason: "Session burned (410)", httpStatus: status, rawCode: rawCode)
 
     case 429:
-        throw PayabliRateLimitError(retryAfter: RetryAfterHeader.value(from: response))
+        throw PayabliRateLimitError(
+            retryAfter: RetryAfterHeader.value(from: response),
+            httpStatus: status,
+            rawCode: rawCode
+        )
 
     // Everything at or above 500, including the 6xx and up a proxy or a library may invent. RFC 9110
     // Section 15: "A client that receives a response with an invalid status code SHOULD process the
@@ -277,7 +289,8 @@ package func mapPayabliHTTPError(
             ?? PayabliServerError()
         throw PayabliPaymentError.server(
             server.carrying(
-                httpStatus: response.statusCode,
+                httpStatus: status,
+                rawCode: rawCode,
                 retryAfter: RetryAfterHeader.value(from: response)
             )
         )
@@ -285,7 +298,56 @@ package func mapPayabliHTTPError(
     default:
         throw PayabliGenericError(
             type: .unknown,
-            reason: "HTTP \(response.statusCode)"
+            reason: "HTTP \(status)",
+            httpStatus: status,
+            rawCode: rawCode
         )
+    }
+}
+
+/// The code the service named in a response's body, read as ``mapPayabliHTTPError(response:override:)`` reads it.
+///
+/// - Parameter response: the answer whose body is read.
+/// - Returns: the body's `code`, else the older envelope's `responseCode` as text, or nil when it names neither.
+package func serviceCode(of response: PayabliResponse) -> String? {
+    (try? JSONDecoder().decode(ErrorCodeBody.self, from: response.body))?.code
+}
+
+/// The fraud block a response names: `E9005` is the blacklist and `E9051` the risk workflow. The service answers
+/// either as a refusal of the request, but it refuses the payer, so the code decides and the status does not.
+///
+/// - Parameter response: the answer whose body is read.
+/// - Returns: the block's code, or nil when the body names neither.
+package func fraudBlockCode(of response: PayabliResponse) -> String? {
+    guard let code = serviceCode(of: response), ["E9005", "E9051"].contains(code) else { return nil }
+    return code
+}
+
+/// Whether a 401 is fraud control refusing the payer rather than the service refusing the token, which a refresh
+/// cannot fix and a replay would send again. A payment request declares it as its caller's refusal.
+///
+/// - Parameter response: the answered request.
+/// - Returns: true for a 401 whose body names a fraud block; false otherwise.
+@Sendable
+package func isFraudBlockAnswered401(_ response: PayabliResponse) -> Bool {
+    response.statusCode == 401 && fraudBlockCode(of: response) != nil
+}
+
+/// The service's code, read apart from the typed shapes: the body's `code`, else the older envelope's integer
+/// `responseCode`, quoted or not, as text. Each is read on its own, so one malformed field doesn't lose the other.
+private struct ErrorCodeBody: Decodable {
+    let code: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case code
+        case responseCode
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let named = (try? container.decodeIfPresent(String.self, forKey: .code)) ?? nil
+        let legacy = (try? container.decodeIfPresent(Int.self, forKey: .responseCode))
+            ?? (try? container.decodeIfPresent(String.self, forKey: .responseCode)).flatMap { Int($0) }
+        code = named ?? legacy.map(String.init)
     }
 }

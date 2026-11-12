@@ -23,7 +23,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             _ = try await viewModel.submit()
             XCTFail("a refusal must not read as a payment")
         } catch let PayabliPaymentError.validation(refusal) {
-            XCTAssertEqual(Set(refusal.errors?.keys.map { $0 } ?? []), ["paymentMethod.cardnumber", "customerData.firstName"])
+            XCTAssertEqual(Set(refusal.errors.keys), ["paymentMethod.cardnumber", "customerData.firstName"])
             XCTAssertEqual(refusal.rawCode, "E7002")
         } catch {
             XCTFail("Wrong error: \(error)")
@@ -39,8 +39,8 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         do {
             _ = try await viewModel.submit()
             XCTFail("a decline must not read as a payment")
-        } catch let PayabliPayInError.transactionFailed(failure) {
-            XCTAssertEqual(failure.code, "D0200")
+        } catch let error as PayabliPayInError.Refused {
+            XCTAssertEqual(error.failure.code, "D0200")
         } catch {
             XCTFail("Wrong error: \(error)")
         }
@@ -384,13 +384,12 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.bankAccount],
                 defaultMethod: .bankAccount,
-                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder + [.secCode, .deviceId]
+                bankFieldOrder: PayabliPayInFormConfiguration.defaultBankFieldOrder
             )
         )
         achForm.accountHolder = "Jane Doe"
         achForm.routingNumber = "021000021"
         achForm.accountNumber = "123456789"
-        achForm.deviceId = "device-1"
         _ = try await achForm.submit()
 
         var sent: Set<String> = []
