@@ -23,7 +23,7 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
             _ = try await viewModel.submit()
             XCTFail("a refusal must not read as a payment")
         } catch let PayabliPaymentError.validation(refusal) {
-            XCTAssertEqual(Set(refusal.errors?.keys.map { $0 } ?? []), ["paymentMethod.cardnumber", "customerData.firstName"])
+            XCTAssertEqual(Set(refusal.errors.keys), ["paymentMethod.cardnumber", "customerData.firstName"])
             XCTAssertEqual(refusal.rawCode, "E7002")
         } catch {
             XCTFail("Wrong error: \(error)")

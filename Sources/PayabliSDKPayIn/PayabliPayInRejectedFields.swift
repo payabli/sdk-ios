@@ -5,7 +5,7 @@ import PayabliSDKCore
 enum PayabliPayInRejectedFields {
     static func fields(in error: any Error) -> Set<PayabliPayInField> {
         guard case let .validation(refusal)? = error as? PayabliPaymentError else { return [] }
-        return Set((refusal.errors ?? [:]).keys.compactMap(field(named:)))
+        return Set(refusal.errors.keys.compactMap(field(named:)))
     }
 
     static func field(named name: String) -> PayabliPayInField? {
