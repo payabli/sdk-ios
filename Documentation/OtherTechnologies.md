@@ -254,6 +254,10 @@ export function TapToPayStatus() {
 }
 ```
 
+`useEvent` shows only the states sent after the component subscribes, so a component that mounts later shows `idle`
+until the next change. Keep `TapToPayStatus` mounted from app start, under the component that calls `initialize`, or
+hold the last state in your app's own store.
+
 Outside a component, subscribe with `Payabli.addListener('onSessionState', listener)` and call `remove()` on the
 result when you're done. Keep the activation code as a string: it's six digits and can start with zero.
 
