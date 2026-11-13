@@ -615,7 +615,8 @@ Future<Map<String, Object?>> payWithCard(double amount, String orderId) async {
   return result ?? const {'status': 'unknown'};
 }
 
-Stream<String> get sessionState => _state.receiveBroadcastStream().map((e) => e as String);
+// Made once: each call opens the channel again, and a second open cuts off the first.
+final Stream<String> sessionState = _state.receiveBroadcastStream().map((e) => e as String);
 ```
 
 `invokeMethod` throws `PlatformException` when the native side reports an error, and `MissingPluginException` when
