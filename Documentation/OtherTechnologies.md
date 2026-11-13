@@ -276,6 +276,7 @@ Run the payment calls on the main queue so the SDK's screens can be presented, a
 import ExpoModulesCore
 import PayabliSDKCore
 import PayabliSDKPayIn
+import PayabliSDKTapToPay
 import SwiftUI
 
 AsyncFunction("payWithCard") { (request: PaymentRequestRecord, promise: Promise) in
