@@ -364,10 +364,9 @@ public extension PayabliError {
         type.message
     }
 
-    /// What `localizedDescription` returns, which is what a host app puts in
-    /// front of a merchant. Without this every one of these reads "The
-    /// operation couldn't be completed. (Module.Type error N.)", and the
-    /// `reason` the SDK went to the trouble of parsing never leaves the SDK.
+    /// What `localizedDescription` returns: the reason, then the detail when it adds to it. This is the
+    /// service's text and can repeat what was submitted, so don't show it to a payer or an operator, or log it.
+    /// Show a message for `category`, and log `code`.
     var errorDescription: String? {
         guard let detail, !detail.isEmpty, detail != reason else { return reason }
         return "\(reason): \(detail)"
@@ -477,13 +476,13 @@ public struct PayabliValidationError: PayabliError, Decodable {
 
     /// Appends each rejected field and the message the server sent for it, which
     /// is the part that says what to correct. The reason alone is usually
-    /// "Validation failed", which tells a merchant nothing.
+    /// "Validation failed", which names no field.
     ///
     /// `suggestion` is left out: it can quote a corrected value, and a value is
     /// what this must not carry.
     ///
-    /// For display. A message is server text and can echo request data, so it
-    /// belongs in front of a person rather than in a log.
+    /// Like every error's description, this is the service's text and can repeat what was submitted, so it is
+    /// neither shown to a payer nor logged.
     public var errorDescription: String? {
         var parts = [reason]
         if let detail, !detail.isEmpty, detail != reason {
