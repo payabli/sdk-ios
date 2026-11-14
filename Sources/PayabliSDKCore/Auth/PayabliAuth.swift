@@ -204,11 +204,9 @@ actor PayabliAuth {
                     detail: "The tokenProvider did not return within \(Int(Self.providerTimeout)) seconds."
                 )
             } catch {
-                // Every other throw from the provider lands here, this SDK's own error type
-                // included: it is host code whatever it chose to throw. The detail is a static
-                // sentence rather than the thrown error's message: a host's error can carry
-                // request data, and the reason and detail are displayable strings. The type
-                // name reaches a caller through `underlying` via `RedactedCause`.
+                // Any throw from the provider is host code, this SDK's own error type included. The detail is
+                // fixed because a host's error can carry request data; its type name still reaches a caller
+                // through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
                 throw PayabliGenericError(
                     type: .tokenProviderFailed,
