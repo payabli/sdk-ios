@@ -173,6 +173,7 @@ import { Payabli, type PaymentOutcome } from './modules/payabli';
 export function Checkout({ orderId, amount }: { orderId: string; amount: number }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tapAvailable, setTapAvailable] = useState(true);
   const paying = useRef(false); // set synchronously, so a second tap before the re-render can't start a payment
 
   async function pay(way: 'card' | 'tap') {
@@ -184,6 +185,7 @@ export function Checkout({ orderId, amount }: { orderId: string; amount: number 
       const request = { amount, orderId };
       const outcome = way === 'card' ? await Payabli.payWithCard(request) : await Payabli.tapToPay(request);
       canPayAgain = outcome.status === 'notCharged' || outcome.status === 'unsupported';
+      if (outcome.status === 'unsupported') setTapAvailable(false);
       setMessage(describe(outcome));
     } catch (e) {
       const error = e as { code?: string; message: string };
@@ -200,7 +202,7 @@ export function Checkout({ orderId, amount }: { orderId: string; amount: number 
   return (
     <View>
       <Button title="Pay by card" disabled={busy} onPress={() => pay('card')} />
-      {Platform.OS === 'ios' && <Button title="Tap to Pay" disabled={busy} onPress={() => pay('tap')} />}
+      {Platform.OS === 'ios' && tapAvailable && <Button title="Tap to Pay" disabled={busy} onPress={() => pay('tap')} />}
       <Text>{message}</Text>
     </View>
   );
