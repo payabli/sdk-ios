@@ -347,7 +347,7 @@ final class PayInTelemetryTests: XCTestCase {
         let viewModel = PayabliPayInViewModel(
             component: flow,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd)
             )),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
@@ -375,7 +375,7 @@ final class PayInTelemetryTests: XCTestCase {
         let viewModel = PayabliPayInViewModel(
             component: flow,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: .usd)
             )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )

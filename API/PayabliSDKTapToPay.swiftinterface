@@ -151,9 +151,9 @@ public enum PayabliTTPFailureReason : Swift::Int, Swift::Sendable, Swift::CaseIt
 @objc(PayabliTTPPaymentDetailsObjC) final public class PayabliTTPPaymentDetailsObjC : ObjectiveC::NSObject {
   @objc final public let amount: Foundation::NSDecimalNumber
   @objc final public let serviceFee: Foundation::NSDecimalNumber
-  @objc final public let currency: Swift::String?
+  @objc final public let currency: PayabliSDKCore::PayabliCurrency
   @objc final public let paymentDescription: Swift::String?
-  @objc public init(amount: Foundation::NSDecimalNumber, serviceFee: Foundation::NSDecimalNumber, currency: Swift::String?, paymentDescription: Swift::String?)
+  @objc public init(amount: Foundation::NSDecimalNumber, serviceFee: Foundation::NSDecimalNumber, currency: PayabliSDKCore::PayabliCurrency = .usd, paymentDescription: Swift::String?)
   @objc deinit
 }
 @objc(PayabliTTPInvoiceDataObjC) final public class PayabliTTPInvoiceDataObjC : ObjectiveC::NSObject {
@@ -195,9 +195,9 @@ public struct PayabliTTPCustomerData : Swift::Sendable, Swift::Equatable {
 public struct PayabliTTPPaymentDetails : Swift::Sendable, Swift::Equatable {
   public let amount: Foundation::Decimal
   public let serviceFee: Foundation::Decimal
-  public let currency: Swift::String?
+  public let currency: PayabliSDKCore::PayabliCurrency?
   public let paymentDescription: Swift::String?
-  public init(amount: Foundation::Decimal, serviceFee: Foundation::Decimal = 0, currency: Swift::String? = nil, paymentDescription: Swift::String? = nil)
+  public init(amount: Foundation::Decimal, serviceFee: Foundation::Decimal = 0, currency: PayabliSDKCore::PayabliCurrency? = nil, paymentDescription: Swift::String? = nil)
   public static func == (a: PayabliSDKTapToPay::PayabliTTPPaymentDetails, b: PayabliSDKTapToPay::PayabliTTPPaymentDetails) -> Swift::Bool
 }
 public struct PayabliTTPInvoiceData : Swift::Sendable, Swift::Equatable {

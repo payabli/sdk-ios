@@ -8,10 +8,10 @@ import XCTest
 @MainActor
 final class PaymentSummaryRenderTests: XCTestCase {
     func testEachDrawnRowTakesItsOwnLine() {
-        let totalOnly = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"))
-        let withFee = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: "USD"))
+        let totalOnly = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd))
+        let withFee = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: .usd))
         let withBoth = renderedHeight(
-            PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31, currency: "USD")
+            PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, surchargeFee: 0.31, currency: .usd)
         )
 
         XCTAssertGreaterThan(withFee, totalOnly, "a fee adds the Amount and Fee rows above Total")
@@ -19,7 +19,7 @@ final class PaymentSummaryRenderTests: XCTestCase {
     }
 
     func testAStoredMethodDrawsNoSummary() {
-        let capture = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"))
+        let capture = renderedHeight(PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd))
         let store = renderedHeight(nil)
 
         XCTAssertGreaterThan(capture, store, "a capture draws its Total, a stored method draws no summary")

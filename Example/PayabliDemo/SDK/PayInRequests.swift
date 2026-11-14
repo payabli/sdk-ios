@@ -20,7 +20,7 @@ enum PayInRequests {
             paymentDetails: PayabliPayInPaymentDetails(
                 totalAmount: amount,
                 serviceFee: 0.10,
-                currency: "USD"
+                currency: .usd
             ),
             customerData: suppliesCustomer ? PayInDemoCustomer.customerData : nil,
             orderDescription: identity.note("capture"),

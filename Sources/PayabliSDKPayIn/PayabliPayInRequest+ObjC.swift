@@ -10,7 +10,7 @@ public final class PayabliPayInRequestObjC: NSObject {
     @objc public var totalAmount: Double
     @objc public var serviceFee: NSNumber?
     @objc public var surchargeFee: NSNumber?
-    @objc public var currency: String?
+    @objc public var currency: PayabliCurrency = .usd
     @objc public var checkNumber: String?
     @objc public var checkUniqueId: String?
     @objc public var accountId: String?
@@ -314,7 +314,7 @@ public final class PayabliPayInAuthorizedRequestObjC: NSObject {
     @objc public var totalAmount: Double
     @objc public var serviceFee: NSNumber?
     @objc public var surchargeFee: NSNumber?
-    @objc public var currency: String?
+    @objc public var currency: PayabliCurrency = .usd
 
     /// - Parameter transId: the authorization to capture.
     /// - Parameter totalAmount: the amount to capture.

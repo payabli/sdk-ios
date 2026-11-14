@@ -7,7 +7,7 @@ final class PaymentSummaryAmountTests: XCTestCase {
         fee: Double? = nil,
         surcharge: Double? = nil
     ) -> PayabliPayInPaymentDetails {
-        PayabliPayInPaymentDetails(totalAmount: totalAmount, serviceFee: fee, surchargeFee: surcharge, currency: "USD")
+        PayabliPayInPaymentDetails(totalAmount: totalAmount, serviceFee: fee, surchargeFee: surcharge, currency: .usd)
     }
 
     private func amount(_ text: String) -> Decimal {

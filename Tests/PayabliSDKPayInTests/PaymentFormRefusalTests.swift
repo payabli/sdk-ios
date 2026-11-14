@@ -13,7 +13,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let transport = RecordingTransport()
         let viewModel = form(
             on: transport,
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1.00, serviceFee: 1.00, currency: .usd),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         fillCard(viewModel)
@@ -37,7 +37,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let transport = RecordingTransport()
         let viewModel = form(
             on: transport,
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd),
             attempt: .retry,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
@@ -57,7 +57,7 @@ final class PaymentFormRefusalTests: XCTestCase {
     func testAnAmountRefusalKeepsTheBankFields() async throws {
         let viewModel = form(
             on: RecordingTransport(),
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.30, surchargeFee: 0.50, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.30, surchargeFee: 0.50, currency: .usd),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.bankAccount], defaultMethod: .bankAccount)
         )
         viewModel.accountHolder = "Jane Business"
@@ -77,7 +77,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let viewModel = form(
             on: transport,
             entryPoint: "  ",
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         fillCard(viewModel)
@@ -99,7 +99,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let transport = RecordingTransport()
         let viewModel = form(
             on: transport,
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
         fillCard(viewModel)
@@ -128,7 +128,7 @@ final class PaymentFormRefusalTests: XCTestCase {
                 transport: transport
             ),
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd)
             )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
@@ -148,7 +148,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let transport = RecordingTransport()
         let viewModel = form(
             on: transport,
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
                 defaultMethod: .card,

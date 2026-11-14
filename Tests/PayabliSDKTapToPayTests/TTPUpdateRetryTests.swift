@@ -471,7 +471,7 @@ final class TTPUpdateRetryTests: XCTestCase {
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
         try await ttp.charge(
-            paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+            paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
         )
     }
 

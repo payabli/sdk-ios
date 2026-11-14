@@ -1,11 +1,12 @@
 import Foundation
+import PayabliSDKCore
 
 /// The payment a held key was sent for, so a declared retry goes out under that key only for the same payment. Kept in
 /// memory beside the key and dropped with it; it names an amount, so it never prints its fields.
 struct ChargeDescription: CustomStringConvertible {
     private let amount: Decimal
     private let serviceFee: Decimal
-    private let currency: String?
+    private let currency: PayabliCurrency?
     private let invoiceNumber: String?
 
     /// - Parameter paymentDetails: the amounts and currency the charge sends, already normalised.

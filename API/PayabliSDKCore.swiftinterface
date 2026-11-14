@@ -27,6 +27,21 @@ import os
     get
   }
 }
+@objc public enum PayabliCurrency : Swift::Int, Swift::Sendable, Swift::CaseIterable {
+  case usd = 0
+  public var code: Swift::String {
+    get
+  }
+  public init?(rawValue: Swift::Int)
+  public typealias AllCases = [PayabliSDKCore::PayabliCurrency]
+  public typealias RawValue = Swift::Int
+  nonisolated public static var allCases: [PayabliSDKCore::PayabliCurrency] {
+    get
+  }
+  public var rawValue: Swift::Int {
+    get
+  }
+}
 public enum PayabliErrorType : Swift::String, Swift::Sendable, Swift::CaseIterable {
   case missingToken
   case tokenExpired
@@ -394,6 +409,9 @@ public typealias PayabliTokenRefresh = @Sendable () async throws -> Swift::Strin
 extension PayabliSDKCore::PayabliAttempt : Swift::Equatable {}
 extension PayabliSDKCore::PayabliAttempt : Swift::Hashable {}
 extension PayabliSDKCore::PayabliAttempt : Swift::RawRepresentable {}
+extension PayabliSDKCore::PayabliCurrency : Swift::Equatable {}
+extension PayabliSDKCore::PayabliCurrency : Swift::Hashable {}
+extension PayabliSDKCore::PayabliCurrency : Swift::RawRepresentable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::Equatable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::Hashable {}
 extension PayabliSDKCore::PayabliErrorType : Swift::RawRepresentable {}

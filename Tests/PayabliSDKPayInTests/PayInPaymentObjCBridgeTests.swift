@@ -221,7 +221,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         let request = PayabliPayInRequestObjC.cash(totalAmount: 12.5)
         request.serviceFee = 0.5
         request.surchargeFee = 0.25
-        request.currency = "USD"
+        request.currency = .usd
         request.orderId = "order-1"
         request.subscriptionId = 7
         request.paymentReference = "payment-1"
@@ -238,7 +238,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(options.paymentDetails.totalAmount, 12.5)
         XCTAssertEqual(options.paymentDetails.serviceFee, 0.5)
         XCTAssertEqual(options.paymentDetails.surchargeFee, 0.25)
-        XCTAssertEqual(options.paymentDetails.currency, "USD")
+        XCTAssertEqual(options.paymentDetails.currency, .usd)
         XCTAssertEqual(options.orderId, "order-1")
         XCTAssertEqual(options.subscriptionId, 7)
         XCTAssertEqual(options.paymentReference, "payment-1")

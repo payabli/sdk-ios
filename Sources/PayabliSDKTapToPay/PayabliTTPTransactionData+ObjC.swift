@@ -178,19 +178,19 @@ public final class PayabliTTPTransactionResultObjC: NSObject {
 /// ObjC companion for `PayabliTTPPaymentDetails`.
 ///
 /// `amount` and `serviceFee` use `NSDecimalNumber` for lossless bridging to
-/// Swift `Decimal`. `currency` is non-null on the ObjC side because the Swift
-/// struct always materializes a non-nil currency (default `"USD"`).
+/// Swift `Decimal`. `currency` is non-optional because Objective-C cannot express an
+/// optional enum.
 @objc(PayabliTTPPaymentDetailsObjC)
 public final class PayabliTTPPaymentDetailsObjC: NSObject {
     @objc public let amount: NSDecimalNumber
     @objc public let serviceFee: NSDecimalNumber
-    @objc public let currency: String?
+    @objc public let currency: PayabliCurrency
     @objc public let paymentDescription: String?
 
     @objc public init(
         amount: NSDecimalNumber,
         serviceFee: NSDecimalNumber,
-        currency: String?,
+        currency: PayabliCurrency = .usd,
         paymentDescription: String?
     ) {
         self.amount = amount

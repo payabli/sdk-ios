@@ -32,7 +32,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
             ("total", payment(.retry, total: 10.01, orderId: "order-1")),
             ("service fee", payment(.retry, fee: 0.5, orderId: "order-1")),
             ("surcharge", payment(.retry, surcharge: 0.5, orderId: "order-1")),
-            ("currency", payment(.retry, currency: "CAD", orderId: "order-1")),
+            ("currency", payment(.retry, currency: .usd, orderId: "order-1")),
             ("method kind", payment(.retry, method: .bankAccount, orderId: "order-1")),
             ("order", payment(.retry, orderId: "order-2"))
         ]
@@ -110,9 +110,9 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         let flow = makeFlow()
         transport.script = [.lost, .approved]
 
-        _ = await failure { try await flow.authorize(self.payment(.newPayment, currency: "USD")) }
+        _ = await failure { try await flow.authorize(self.payment(.newPayment, currency: .usd)) }
         _ = try await flow.authorize(
-            payment(.retry, total: 10.001, fee: 0, currency: " usd", method: .cloudDevice, orderId: "o")
+            payment(.retry, total: 10.001, fee: 0, currency: .usd, method: .cloudDevice, orderId: "o")
         )
 
         XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
@@ -163,7 +163,7 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         total: Double = 10,
         fee: Double? = nil,
         surcharge: Double? = nil,
-        currency: String? = nil,
+        currency: PayabliCurrency? = nil,
         method: Method = .storedCard,
         orderId: String? = nil,
         reference: String = "p1"

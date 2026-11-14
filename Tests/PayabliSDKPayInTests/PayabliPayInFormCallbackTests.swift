@@ -411,7 +411,7 @@ final class PayabliPayInFormCallbackTests: XCTestCase {
 
     /// The payment a capture form submits.
     private static let capture = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: .usd)
     ))
 
     /// A flow on a transport the cases answer from.
