@@ -232,12 +232,37 @@ before charging it again.
 ### 5. Show Tap to Pay readiness
 
 ```tsx
-import { useEvent } from 'expo';
+// useSessionState.ts
+import { useSyncExternalStore } from 'react';
+import { Payabli, type SessionState } from './modules/payabli';
+
+// Subscribed once, when this file loads, so a component that mounts later still reads the latest state.
+let current: SessionState = 'idle';
+const watchers = new Set<() => void>();
+Payabli.addListener('onSessionState', ({ state }) => {
+  current = state;
+  watchers.forEach(notify => notify());
+});
+
+export function useSessionState(): SessionState {
+  return useSyncExternalStore(
+    notify => {
+      watchers.add(notify);
+      return () => watchers.delete(notify);
+    },
+    () => current,
+  );
+}
+```
+
+```tsx
+// TapToPayStatus.tsx
 import { Button, Text } from 'react-native';
 import { Payabli } from './modules/payabli';
+import { useSessionState } from './useSessionState';
 
 export function TapToPayStatus() {
-  const { state } = useEvent(Payabli, 'onSessionState', { state: 'idle' }) ?? { state: 'idle' };
+  const state = useSessionState();
 
   switch (state) {
     case 'ready': return <Text>Ready</Text>;
@@ -254,9 +279,7 @@ export function TapToPayStatus() {
 }
 ```
 
-`useEvent` shows only the states sent after the component subscribes, so a component that mounts later shows `idle`
-until the next change. Keep `TapToPayStatus` mounted from app start, under the component that calls `initialize`, or
-hold the last state in your app's own store.
+Import `useSessionState.ts` before the app calls `initialize`, so it's listening from the first state.
 
 Outside a component, subscribe with `Payabli.addListener('onSessionState', listener)` and call `remove()` on the
 result when you're done. Keep the activation code as a string: it's six digits and can start with zero.
