@@ -378,7 +378,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
                 entryPoint: "myEntry",
                 deviceId: "dev_1",
                 idempotencyKey: "key-1",
-                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
             )
             XCTFail("initiate succeeded", file: file, line: line)
         } catch {

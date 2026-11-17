@@ -379,7 +379,7 @@ final class PayabliTTPChargingTests: XCTestCase {
         let (ttp, _) = try await makeReadyTTP()
         let request = PayabliTTPChargeRequestObjC(
             paymentDetails: PayabliTTPPaymentDetailsObjC(
-                amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+                amount: 1, serviceFee: 0, currency: .usd, paymentDescription: nil
             )
         )
 
@@ -551,7 +551,7 @@ final class PayabliTTPChargingTests: XCTestCase {
     }
 
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
-        try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+        try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd))
     }
 
     private func chargeFailure(_ ttp: PayabliTTP) async -> TapToPayError? {

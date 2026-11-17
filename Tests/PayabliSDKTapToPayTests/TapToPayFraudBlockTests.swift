@@ -92,7 +92,7 @@ final class TapToPayFraudBlockTests: XCTestCase {
 
     // MARK: - Fixtures
 
-    private static let details = PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+    private static let details = PayabliTTPPaymentDetails(amount: 1, currency: .usd)
     private static let opened = #"{"code":"A01","data":{"paymentTransId":"ttp-txn-1"}}"#
 
     private static func read(_ outcome: CardReadOutcome) -> Result<CardReadResult, Error> {

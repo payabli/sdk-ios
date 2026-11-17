@@ -723,7 +723,7 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc final public var totalAmount: Swift::Double
   @objc final public var serviceFee: Foundation::NSNumber?
   @objc final public var surchargeFee: Foundation::NSNumber?
-  @objc final public var currency: Swift::String?
+  @objc final public var currency: PayabliSDKCore::PayabliCurrency
   @objc final public var checkNumber: Swift::String?
   @objc final public var checkUniqueId: Swift::String?
   @objc final public var accountId: Swift::String?
@@ -772,7 +772,7 @@ extension PayabliSDKPayIn::PayabliPayInRequest : Swift::CustomStringConvertible 
   @objc final public var totalAmount: Swift::Double
   @objc final public var serviceFee: Foundation::NSNumber?
   @objc final public var surchargeFee: Foundation::NSNumber?
-  @objc final public var currency: Swift::String?
+  @objc final public var currency: PayabliSDKCore::PayabliCurrency
   @objc public init(transId: Swift::String, totalAmount: Swift::Double)
   @objc deinit
 }
@@ -846,7 +846,7 @@ public enum PayabliPayInSummaryRows {
   public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
   public static func rowAmount(for field: PayabliSDKPayIn::PayabliPayInField, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
   public static func totalRowAmount(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
-  public static func formattedAmount(_ amount: Foundation::Decimal, currency: Swift::String?) -> Swift::String
+  public static func formattedAmount(_ amount: Foundation::Decimal, currency: PayabliSDKCore::PayabliCurrency?) -> Swift::String
 }
 public enum PayabliPayInTransactionStatus : Swift::Sendable, Swift::Hashable {
   case initiated
@@ -944,13 +944,13 @@ public struct PayabliPayInPaymentDetails : Swift::Codable, Swift::Sendable, Swif
   public let totalAmount: Swift::Double
   public let serviceFee: Swift::Double?
   public let surchargeFee: Swift::Double?
-  public let currency: Swift::String?
+  public let currency: PayabliSDKCore::PayabliCurrency?
   public let checkNumber: Swift::String?
   public let checkUniqueId: Swift::String?
-  public init(totalAmount: Swift::Double, serviceFee: Swift::Double? = nil, surchargeFee: Swift::Double? = nil, currency: Swift::String? = nil, checkNumber: Swift::String? = nil, checkUniqueId: Swift::String? = nil)
-  public static func == (a: PayabliSDKPayIn::PayabliPayInPaymentDetails, b: PayabliSDKPayIn::PayabliPayInPaymentDetails) -> Swift::Bool
-  public func encode(to encoder: any Swift::Encoder) throws
+  public init(totalAmount: Swift::Double, serviceFee: Swift::Double? = nil, surchargeFee: Swift::Double? = nil, currency: PayabliSDKCore::PayabliCurrency? = nil, checkNumber: Swift::String? = nil, checkUniqueId: Swift::String? = nil)
   public init(from decoder: any Swift::Decoder) throws
+  public func encode(to encoder: any Swift::Encoder) throws
+  public static func == (a: PayabliSDKPayIn::PayabliPayInPaymentDetails, b: PayabliSDKPayIn::PayabliPayInPaymentDetails) -> Swift::Bool
 }
 public struct PayabliPayInRequest : Swift::Sendable {
   public let paymentMethod: PayabliSDKPayIn::PayabliPayInPaymentMethod

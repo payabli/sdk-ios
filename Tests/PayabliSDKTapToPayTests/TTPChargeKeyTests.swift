@@ -50,7 +50,7 @@ final class TTPChargeKeyTests: XCTestCase {
         provider.readingResult = Self.read(.approved)
         let request = PayabliTTPChargeRequestObjC(
             paymentDetails: PayabliTTPPaymentDetailsObjC(
-                amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+                amount: 1, serviceFee: 0, currency: .usd, paymentDescription: nil
             )
         )
         request.attempt = .retry
@@ -69,7 +69,7 @@ final class TTPChargeKeyTests: XCTestCase {
         provider.readingResult = Self.read(.approved)
 
         let refused = await failure {
-            try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 2, currency: "USD"), attempt: .retry)
+            try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 2, currency: .usd), attempt: .retry)
         }
 
         XCTAssertEqual(refused?.type, .retryNotSamePayment)
@@ -492,7 +492,7 @@ final class TTPChargeKeyTests: XCTestCase {
 
     // MARK: - Helpers
 
-    static let details = PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+    static let details = PayabliTTPPaymentDetails(amount: 1, currency: .usd)
 
     private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
 

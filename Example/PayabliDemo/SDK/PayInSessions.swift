@@ -31,7 +31,7 @@ enum PayInSessions {
         PayInFlowHandle(
             PayabliPayIn(session: session),
             request: PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, serviceFee: 0.10, currency: "USD"),
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, serviceFee: 0.10, currency: .usd),
                 orderDescription: "Preview Payment",
                 orderId: "preview-order",
                 source: "preview",

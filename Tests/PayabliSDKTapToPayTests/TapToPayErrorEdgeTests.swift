@@ -128,7 +128,7 @@ final class TapToPayErrorEdgeTests: XCTestCase {
                 ttp.charge(
                     PayabliTTPChargeRequestObjC(
                         paymentDetails: PayabliTTPPaymentDetailsObjC(
-                            amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+                            amount: 1, serviceFee: 0, currency: .usd, paymentDescription: nil
                         )
                     )
                 ) { _, error in done(error) }

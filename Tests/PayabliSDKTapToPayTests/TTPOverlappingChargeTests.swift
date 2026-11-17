@@ -273,8 +273,8 @@ final class TTPOverlappingChargeTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private static let sale = PayabliTTPPaymentDetails(amount: 1, currency: "USD")
-    private static let otherSale = PayabliTTPPaymentDetails(amount: 2, currency: "USD")
+    private static let sale = PayabliTTPPaymentDetails(amount: 1, currency: .usd)
+    private static let otherSale = PayabliTTPPaymentDetails(amount: 2, currency: .usd)
 
     /// Whether a terminal's session is still the installed one, as a test sets it.
     private final class LiveFlag: @unchecked Sendable {

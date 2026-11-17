@@ -308,7 +308,7 @@ recognizable on the store route, so a key sent there is read by nothing.
 | `totalAmount` | Required. The amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional. Must not be negative. Currency JSON is normalized to two decimals such as `0.10`. |
 | `surchargeFee` | Optional. Already included in `totalAmount`. Must not be negative. Currency JSON is normalized to two decimals such as `0.30`. |
-| `currency` | Optional processor currency, for example `USD`. |
+| `currency` | Optional `PayabliCurrency`, for example `.usd`. |
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
 
@@ -341,7 +341,7 @@ let request = PayabliPayInRequest(
         paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
-            currency: "USD"
+            currency: .usd
         ),
         orderDescription: "iOS checkout",
         source: "ios-sdk"
@@ -382,7 +382,7 @@ let captured = try await paymentFlow.captureAuthorizedTransaction(
         paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
-            currency: "USD"
+            currency: .usd
         )
     )
 )
@@ -558,7 +558,7 @@ every figure is nil and the form draws no summary. A card or bank account submit
 empty the summary. Amount is the total amount less the service
 fee and any surcharge, and Total is the total amount, which includes any surcharge sent.
 `formattedAmount(_:currency:)` writes a
-figure the way the form does.
+figure the way the form does. Pass the payment details' `PayabliCurrency?`; nil writes the number without a symbol.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 
