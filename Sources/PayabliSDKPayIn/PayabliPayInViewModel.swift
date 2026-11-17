@@ -98,18 +98,14 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     @Published private(set) var isSubmitting = false
-    /// The operation the submission in flight is sending, or nil when none is.
     @Published private(set) var submittingOperation: PayabliPayInOperation.Kind?
     @Published private(set) var failureMessage: String?
-    /// The last submission's failure where it has a message, by its category and the operation it sent.
-    /// Its message shows only while the form saves or pays as that submission did and the opt-out is off.
-    /// Cleared by the next submission and by a new component.
-    private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind)?
+    /// By the operation it sent, which the form may no longer hold.
+    private var keptFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind)?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
 
     private(set) var component: PayabliPayIn
-    /// The operation the form submits, which is the form's own: one form, one operation.
     private(set) var operation: PayabliPayInOperation
     var configuration: PayabliPayInFormConfiguration
     var labels: PayabliPayInFormLabels
@@ -157,7 +153,6 @@ final class PayabliPayInViewModel: ObservableObject {
         guard nextSignature != lifecycleSignature else { return }
 
         objectWillChange.send()
-        // A new component is a new payment flow, so the last flow's refusal describes nothing on it.
         let replacesFlow = component !== self.component
         // Before the swap: a combining-mark separator cannot be stripped back to digits.
         let expiry = submittedExpiration
@@ -173,9 +168,9 @@ final class PayabliPayInViewModel: ObservableObject {
         lifecycleSignature = nextSignature
         if replacesFlow {
             clearMarks()
-            drawnFailure = nil
+            keptFailure = nil
         }
-        showDrawnFailure()
+        showKeptFailure()
 
         keepTheMethodOnScreenOffered()
         dropValuesWithoutAField()
@@ -311,12 +306,12 @@ final class PayabliPayInViewModel: ObservableObject {
 
     func submit() async throws -> PayabliPayInResult {
         failureMessage = nil
-        drawnFailure = nil
+        keptFailure = nil
         clearMarks()
         guard !isSubmitting else {
             let error = PayabliPayInError.AlreadySubmitting()
             component.reportFormRefusal(error, method: effectiveSelectedMethod, operation: operation.kind)
-            drawFailureMessage(for: error, operation: operation.kind)
+            keepFailure(for: error, operation: operation.kind)
             throw error
         }
         isSubmitting = true
@@ -335,7 +330,7 @@ final class PayabliPayInViewModel: ObservableObject {
             try validateRequiredFields()
         } catch {
             component.reportFormRefusal(error, method: method, operation: operation.kind)
-            drawFailureMessage(for: error, operation: operation.kind)
+            keepFailure(for: error, operation: operation.kind)
             throw error
         }
 
@@ -350,11 +345,10 @@ final class PayabliPayInViewModel: ObservableObject {
             if sendMark.mayHaveLeft {
                 clearSensitiveFieldsAfterFailure()
             }
-            // After the clear, because its edits take a mark off. A failure that marks no field shows its
-            // message, which the opt-out hides. A refusal of a flow replaced in flight draws nothing.
+            // After the clear, because its edits take a mark off.
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(fields(for: method))
-                drawFailureMessage(for: error, operation: operation.kind)
+                keepFailure(for: error, operation: operation.kind)
             }
             throw error
         }
@@ -364,20 +358,20 @@ final class PayabliPayInViewModel: ObservableObject {
     ///
     /// - Parameter error: the submission's failure.
     /// - Parameter operation: the operation the submission sent.
-    private func drawFailureMessage(for error: any Error, operation: PayabliPayInOperation.Kind) {
+    private func keepFailure(for error: any Error, operation: PayabliPayInOperation.Kind) {
         // A mark can't say the payment may have gone through, so an unknown outcome draws its message beside it.
         let marksAnswerIt = hasMarkedFieldOnScreen && !(error is PayabliPayInError.Unsettled)
-        drawnFailure = marksAnswerIt
+        keptFailure = marksAnswerIt
             ? nil
             : (PayabliPayInFailureMessage.messageCategory(for: error), operation)
-        showDrawnFailure()
+        showKeptFailure()
     }
 
     /// Shows the kept failure's message in the form's current wording, or none while the opt-out is on
     /// or the form saves a method where the failure paid, or the reverse.
-    private func showDrawnFailure() {
+    private func showKeptFailure() {
         var shown: String?
-        if let failure = drawnFailure,
+        if let failure = keptFailure,
            (failure.operation == .storePaymentMethod) == (operation.kind == .storePaymentMethod),
            configuration.showsFailureMessage
         {

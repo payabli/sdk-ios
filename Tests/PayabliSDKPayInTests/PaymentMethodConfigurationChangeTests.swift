@@ -339,7 +339,6 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         )
     }
 
-    /// One flow for every input that should compare equal on everything but what the test changes.
     private lazy var inputsComponent = captureComponent()
 
     private func captureComponent() -> PayabliPayIn {
