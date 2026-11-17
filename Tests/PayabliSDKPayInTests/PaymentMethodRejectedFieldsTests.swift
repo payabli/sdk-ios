@@ -228,6 +228,25 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [])
     }
 
+    @MainActor
+    func testARefusalOfAFlowReplacedInFlightDrawsNoMessage() async {
+        let transport = HeldRefusalTransport(responseBody: Self.refusal(naming: ["entryPoint"]))
+        let viewModel = filledCardForm(transport: transport)
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForRequest()
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            operation: .capture(Self.requestConfiguration),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+        await transport.release()
+        _ = try? await submission.value
+
+        XCTAssertNil(viewModel.failureMessage)
+    }
+
     /// A box a reconfiguration brings on screen holds a value the request already carried, because every
     /// typed customer value is sent whichever box is drawn.
     @MainActor
