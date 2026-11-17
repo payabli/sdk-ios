@@ -183,7 +183,7 @@ your own records:
    and store it before you call the SDK.
 2. After a relaunch, for a payment whose outcome your app never received, read the payment back from your backend
    by that `orderId` before paying again:
-   `GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`.
+   [`GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`](https://docs.payabli.com/developers/api-reference/query/get-list-of-transactions-for-an-entrypoint).
 3. When a record is there, show its outcome and send nothing. When none is, start a new payment with
    `attempt: .newPayment` and a new `paymentReference`.
 
