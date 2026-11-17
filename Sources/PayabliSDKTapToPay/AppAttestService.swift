@@ -10,6 +10,7 @@ import Security
 /// `activateDevice` takes a partner-supplied out-of-band code; `entry` comes per call and is never cached.
 package final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
     let transport: any PayabliTransport
+    let routes: DeviceRouteClient
     let attestor: AppAttestor
     let storage: SecureStorage
     let bindingStore: AttestedDeviceStore
@@ -60,6 +61,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         osVersionProvider: @Sendable @escaping () -> String
     ) {
         self.transport = transport
+        routes = DeviceRouteClient(transport: transport)
         self.attestor = attestor
         self.storage = storage
         bindingStore = AttestedDeviceStore(storage: storage)
