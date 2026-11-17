@@ -208,6 +208,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         // The reversal button is disabled while a submission is in flight, so a flow that
         // never reports the capture finished would leave it permanently untappable.
         XCTAssertFalse(flow.isSubmitting, "the capture never reported itself finished")
+        await waitUntilSaved(transId, on: flow)
 
         // Reported either way. Letting this throw would end the test on a captured payment whose
         // identifier never reached the output, leaving nothing to reconcile it by.
@@ -288,6 +289,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         let transId = try XCTUnwrap(captured.transaction?.paymentTransId)
 
         // A read that fails still reverses the capture, so a failed run leaves nothing standing.
+        await waitUntilSaved(transId, on: flow)
         let before: PayabliPayInTransaction
         do {
             before = try await flow.readTransaction(transId)
@@ -351,6 +353,28 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
 
     // MARK: - Void
 
+    /// Reads `transId` until the service finds it, every 10 seconds for at most 5 minutes.
+    ///
+    /// A paypoint can save a payment after answering it; until then a void is refused and a read is
+    /// not found. Reading is safe to repeat, voiding is not. Past the ceiling the caller goes on.
+    ///
+    /// - Parameters:
+    ///   - transId: The payment's identifier, as the charge returned it.
+    ///   - flow: The flow that took the payment.
+    private func waitUntilSaved(_ transId: String, on flow: PayabliPayIn) async {
+        let deadline = ContinuousClock.now + .seconds(300)
+        while ContinuousClock.now < deadline {
+            do {
+                _ = try await flow.readTransaction(transId)
+                return
+            } catch {
+                guard (error as? any PayabliError)?.type == .transactionNotFound else { return }
+                LiveEnvironment.report("PAYABLI_NOT_SAVED_YET env=\(named.name) transId=\(transId)")
+                try? await Task.sleep(for: .seconds(10))
+            }
+        }
+    }
+
     /// Reverses a transaction through the SDK's own member, which is what gives this
     /// path product coverage rather than coverage of a request the test wrote itself.
     ///
@@ -363,6 +387,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
         on flow: PayabliPayIn,
         whenLeftStanding standing: String
     ) async {
+        await waitUntilSaved(transId, on: flow)
         do {
             let reversed = try await flow.voidTransaction(transId)
             LiveEnvironment.report(
