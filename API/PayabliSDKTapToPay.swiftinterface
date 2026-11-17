@@ -295,6 +295,7 @@ public struct TapToPayError : PayabliSDKCore::PayabliError, PayabliSDKCore::Paya
   public let refusal: PayabliSDKTapToPay::TapToPayChargeRefusal?
   public let httpStatus: Swift::Int?
   public let rawCode: Swift::String?
+  public let underlying: (any Swift::Error)?
 }
 extension PayabliSDKTapToPay::TapToPayError : Foundation::CustomNSError {
   public static var errorDomain: Swift::String {
