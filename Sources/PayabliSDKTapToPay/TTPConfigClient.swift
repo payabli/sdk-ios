@@ -11,7 +11,7 @@ struct TTPConfig: Sendable {
 /// `X-Assertion-Timestamp` headers inline. Bearer auth and HTTP 401 refresh-and-retry come from the
 /// `PayabliTransport` passed at init, which should be `session.transport`.
 final class TTPConfigClient: Sendable {
-    private let transport: any PayabliTransport
+    private let routes: DeviceRouteClient
     private let attestation: DeviceAttestationService
     private let logger = PayabliLogger(category: .taptopay)
 
@@ -19,7 +19,7 @@ final class TTPConfigClient: Sendable {
         transport: any PayabliTransport,
         attestation: DeviceAttestationService
     ) {
-        self.transport = transport
+        routes = DeviceRouteClient(transport: transport)
         self.attestation = attestation
     }
 
@@ -40,14 +40,7 @@ final class TTPConfigClient: Sendable {
             pinsCredential: true
         )
 
-        // The headers carry the App Attest assertion, key id and device id.
-        logger.info("[config] → GET \(request.path)")
-
-        let response = try await transport.perform(request)
-
-        // This body is `ConfigCredentialsPayload`, whose `credentials` block
-        // carries the card reader's secretKey and apiKey. The log gets its shape.
-        logger.info("[config] ← [\(response.statusCode)] bytes=\(response.body.count)")
+        let response = try await routes.get(.config, request)
 
         try throwRefusalToldByItsText(response, entry: entry, presented: headers)
         if response.statusCode == 401 {
