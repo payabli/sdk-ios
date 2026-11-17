@@ -178,8 +178,8 @@ public final class PayabliTTPTransactionResultObjC: NSObject {
 /// ObjC companion for `PayabliTTPPaymentDetails`.
 ///
 /// `amount` and `serviceFee` use `NSDecimalNumber` for lossless bridging to
-/// Swift `Decimal`. `currency` defaults to `.usd` and is always sent; Objective-C cannot
-/// express an optional enum.
+/// Swift `Decimal`. `currency` is always sent; an Objective-C caller passes
+/// `PayabliCurrencyUsd`.
 @objc(PayabliTTPPaymentDetailsObjC)
 public final class PayabliTTPPaymentDetailsObjC: NSObject {
     @objc public let amount: NSDecimalNumber
