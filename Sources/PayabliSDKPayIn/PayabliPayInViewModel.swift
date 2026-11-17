@@ -350,14 +350,10 @@ final class PayabliPayInViewModel: ObservableObject {
             if sendMark.mayHaveLeft {
                 clearSensitiveFieldsAfterFailure()
             }
-            // After the clear, because its edits take a mark off. A refusal of a flow replaced while
-            // it was in flight marks nothing.
+            // After the clear, because its edits take a mark off. A failure that marks no field shows its
+            // message, which the opt-out hides. A refusal of a flow replaced in flight draws nothing.
             if component === submittedFlow {
                 rejectedFields = PayabliPayInRejectedFields.fields(in: error).intersection(fields(for: method))
-            }
-            // A failure that marks no field on screen, or leaves the outcome unknown, shows its
-            // message, which the opt-out hides while the marks stay. A replaced flow's refusal draws nothing.
-            if component === submittedFlow {
                 drawFailureMessage(for: error, operation: operation.kind)
             }
             throw error
