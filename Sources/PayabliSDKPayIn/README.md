@@ -169,8 +169,26 @@ once the outcome is settled.
 Every `PayabliPayIn` in your app for the same entry point and environment shares the keys the SDK holds, so a retry
 from a `PayabliPayIn` you built again sends the payment's key. The SDK holds a key in memory for a few minutes after
 its latest send, and holds at most 16 for each entry point and environment. A retry after that, or after your app
-restarts, sends a new key, so a reference you keep is a name and not a guard against a second charge. Past that
-point, read the transaction back instead.
+restarts, sends a new key and can charge twice, so a reference you keep is a name and not a guard against a second
+charge. Past that point, read the transaction back instead, as
+[After your app restarts mid-payment](#after-your-app-restarts-mid-payment) describes.
+
+### After your app restarts mid-payment
+
+The SDK holds a payment's key in memory only. When your app is closed before a capture or authorization returns,
+the relaunched app holds no key for that payment, and the SDK doesn't look the payment up for you. Settle it from
+your own records:
+
+1. Set your own `orderId` on every capture and authorization, at most 255 characters, and store it before you
+   call the SDK.
+2. After a relaunch, for a payment whose outcome your app never received, read the payment back from your backend
+   by that `orderId` before paying again:
+   `GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`.
+3. When a record is there, show its outcome and send nothing. When none is, start a new payment with
+   `attempt: .newPayment` and a new `paymentReference`.
+
+Don't set `attempt: .retry` across a relaunch. The SDK no longer holds the key, so it sends a new one, and the
+payment is charged twice if the first attempt went through.
 
 ## Outcomes and errors
 
@@ -194,7 +212,7 @@ The outcomes are the ones in the root README's [Handle the outcome](../../README
 | `PayabliPayInError.ServiceError` | The service failed the call without declining it | Branch on its `type` |
 | `PayabliPayInError.InvalidInput`, `.AlreadySubmitting` | Not charged; refused before anything was sent | Fix the value its `field` names, or wait for the running submission |
 | A core `PayabliError` whose `type` is `.tokenProviderFailed` | Not charged; your token provider failed | Fix the token provider |
-| `PayabliPayInError.Unsettled` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, find the transaction by `orderId` in the Payabli portal. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
+| `PayabliPayInError.Unsettled` | Unknown | Read the transaction back with `readTransaction(_:)` before charging again: pass its `paymentTransId` when it carries one. Otherwise, after `capture(_:)` or `authorize(_:)`, read it back from your backend by your `orderId`, as [After your app restarts mid-payment](#after-your-app-restarts-mid-payment) describes. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, read back the transaction ID you passed. Then decide whether to call again |
 | A core `PayabliError`, such as a validation failure, a refused credential or a rate limit | On a charge, not charged; the service's answer | Branch on its `type` |
 | `PayabliPayInError.InvalidInput` or `.Refused` from `storeMethod(_:)` | The method wasn't saved | `InvalidInput` was refused before sending; `Refused` is the service refusing it. A failed status arrives as the core `PayabliError` for that status instead, and a 400 is `.validation` with the service's explanation in `detail` |
 | From `storeMethod(_:)` or a form storing a method: `PayabliPayInError.Undecodable`, a core `PayabliError` whose `type` is `.networkError` or `.serverError`, a `CancellationError`, or `PayabliPayInError.Interrupted` from the form | Unknown: the method may have been saved | Read the stored methods back before saving again |
