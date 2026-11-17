@@ -180,12 +180,19 @@ the relaunched app holds no key for that payment, and the SDK doesn't look the p
 your own records:
 
 1. Set your own `orderId` on every capture and authorization, one for each payment and at most 255 characters,
-   and store it before you call the SDK.
+   and store it before you call the SDK. The SDK sends it without spaces at either end, so store it that way too.
 2. After a relaunch, for a payment whose outcome your app never received, read the payment back from your backend
    by that `orderId` before paying again:
    [`GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`](https://docs.payabli.com/developers/api-reference/query/get-list-of-transactions-for-an-entrypoint).
-3. When a record is there, show its outcome and send nothing. When none is, start a new payment with
-   `attempt: .newPayment` and a new `paymentReference`.
+3. Read the `TransStatus` of every record returned, and act on the first case that matches:
+   - **Any record is paid**: `1` (captured), or `11` (authorized) after `authorize(_:)`. The payment went through.
+     Show it and send nothing.
+   - **Any record's outcome isn't known yet**: `10`, `11` after `capture(_:)`, `-1`, `0`, or any other value. Query
+     again later, and don't pay.
+   - **No record is paid, or there is no record**: every one is `2` or `3` (declined), `5` (voided) or `-2`
+     (blocked), or the query returned none. Start a new payment with `attempt: .newPayment`, a new
+     `paymentReference` and the same `orderId`.
+   - **The query failed**: query again. A failed query never means no record.
 
 Don't set `attempt: .retry` across a relaunch. The SDK no longer holds the key, so it sends a new one, and the
 payment can be charged twice if the first attempt went through.
