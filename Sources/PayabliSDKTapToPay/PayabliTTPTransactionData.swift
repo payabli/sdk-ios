@@ -137,8 +137,8 @@ public struct PayabliTTPCustomerData: Sendable, Equatable {
 public struct PayabliTTPPaymentDetails: Sendable, Equatable {
     public let amount: Decimal
     public let serviceFee: Decimal
-    /// The currency to charge in. When `nil`, the field is omitted from the
-    /// `/initiate` JSON.
+    /// The currency to charge in. When `nil`, the charge is sent in USD, the
+    /// currency the reader charges in.
     public let currency: PayabliCurrency?
     public let paymentDescription: String?
 

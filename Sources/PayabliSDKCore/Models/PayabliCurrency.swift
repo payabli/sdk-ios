@@ -12,3 +12,10 @@ import Foundation
         }
     }
 }
+
+package extension PayabliCurrency? {
+    /// The currency a payment is sent in: the one named, or USD when none is.
+    var asSent: PayabliCurrency {
+        self ?? .usd
+    }
+}

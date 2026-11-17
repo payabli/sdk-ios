@@ -156,6 +156,30 @@ public final class PayabliTTPChargeRequestObjC: NSObject {
         self.paymentDetails = paymentDetails
         super.init()
     }
+
+    /// The attempt as the host set it. Objective-C passes an enum as a plain integer, so a number that names no case
+    /// can arrive, and a switch over it traps.
+    ///
+    /// - Returns: the attempt.
+    /// - Throws: a ``TapToPayError`` of type `.validation` naming `attempt`, for a number that names no case.
+    func validatedAttempt() throws -> PayabliAttempt {
+        guard let read = PayabliAttempt(rawValue: attempt.rawValue) else {
+            throw objCValueRefusal(attempt.rawValue, of: PayabliAttempt.self, member: "attempt")
+        }
+        return read
+    }
+}
+
+/// - Parameter value: the number the host passed.
+/// - Parameter type: the enum it names no case of.
+/// - Parameter member: the request member it fills.
+/// - Returns: the refusal, naming that member.
+private func objCValueRefusal(_ value: Int, of type: (some Any).Type, member: String) -> TapToPayError {
+    TapToPayError(
+        type: .validation,
+        reason: PayabliErrorType.validation.message,
+        detail: "\(member): \(value) is not a \(type) value."
+    )
 }
 
 /// ObjC companion for `TransactionResult`.
@@ -200,11 +224,17 @@ public final class PayabliTTPPaymentDetailsObjC: NSObject {
         super.init()
     }
 
-    func toSwift() -> PayabliTTPPaymentDetails {
-        PayabliTTPPaymentDetails(
+    /// - Returns: the payment details.
+    /// - Throws: a ``TapToPayError`` of type `.validation` naming `paymentDetails.currency`, when `currency` is a
+    ///   number that names no case.
+    func toSwift() throws -> PayabliTTPPaymentDetails {
+        guard let read = PayabliCurrency(rawValue: currency.rawValue) else {
+            throw objCValueRefusal(currency.rawValue, of: PayabliCurrency.self, member: "paymentDetails.currency")
+        }
+        return PayabliTTPPaymentDetails(
             amount: amount.decimalValue,
             serviceFee: serviceFee.decimalValue,
-            currency: currency,
+            currency: read,
             paymentDescription: paymentDescription
         )
     }

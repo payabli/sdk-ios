@@ -55,7 +55,8 @@ public enum PayabliPayInSummaryRows {
     /// A figure as the form writes it: the device locale's separators, the currency's symbol, two places.
     ///
     /// - Parameter amount: the figure to write, rounded here to the wire's two places.
-    /// - Parameter currency: the charge's currency, which names the symbol; nil writes the figure without one.
+    /// - Parameter currency: the charge's currency, which names the symbol; nil is drawn as USD, the currency an omitted
+    ///   one is sent in.
     /// - Returns: the figure as text, in the device locale's separators.
     public static func formattedAmount(_ amount: Decimal, currency: PayabliCurrency?) -> String {
         formattedAmount(amount, currency: currency, locale: .current)
@@ -64,12 +65,8 @@ public enum PayabliPayInSummaryRows {
     static func formattedAmount(_ amount: Decimal, currency: PayabliCurrency?, locale: Locale) -> String {
         let formatter = NumberFormatter()
         formatter.locale = locale
-        if let currency {
-            formatter.numberStyle = .currency
-            formatter.currencyCode = currency.code
-        } else {
-            formatter.numberStyle = .decimal
-        }
+        formatter.numberStyle = .currency
+        formatter.currencyCode = currency.asSent.code
         // The two places the wire carries, whatever the currency's own convention, so the text is the figure sent.
         formatter.minimumFractionDigits = PayInAmount.wireFractionDigits
         formatter.maximumFractionDigits = PayInAmount.wireFractionDigits

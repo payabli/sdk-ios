@@ -349,6 +349,8 @@ extension PayabliTTP {
     /// with its catalog number as the code. The completion is always invoked
     /// on the main thread.
     ///
+    /// A `currency` or `attempt` that names no case completes with `VALIDATION_ERROR` before anything is sent.
+    ///
     /// - Parameters:
     ///   - request: the payment details, and the customer, invoice, description and attempt where they are set.
     ///   - completion: the result, or the error the charge failed with.
@@ -356,11 +358,18 @@ extension PayabliTTP {
         _ request: PayabliTTPChargeRequestObjC,
         completion: @escaping (PayabliTTPTransactionResultObjC?, NSError?) -> Void
     ) {
-        let swiftDetails = request.paymentDetails.toSwift()
+        let swiftDetails: PayabliTTPPaymentDetails
+        let attempt: PayabliAttempt
+        do {
+            swiftDetails = try request.paymentDetails.toSwift()
+            attempt = try request.validatedAttempt()
+        } catch {
+            Task { @MainActor in completion(nil, error.toPayabliNSError()) }
+            return
+        }
         let swiftCustomer = request.customer?.toSwift() ?? PayabliTTPCustomerData()
         let swiftInvoice = request.invoice?.toSwift() ?? PayabliTTPInvoiceData()
         let orderDescription = request.orderDescription
-        let attempt = request.attempt
 
         Task { @MainActor in
             do {
@@ -548,7 +557,7 @@ extension PayabliTTP {
         // `.public`, so only fields that carry no subject belong in it.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
-                "currency=\(paymentDetails.currency?.code ?? "<nil>") " +
+                "currency=\(paymentDetails.currency.asSent.code) " +
                 "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
                 "orderDescription=\(orderDescription ?? "<nil>")"
         )

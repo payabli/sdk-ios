@@ -391,7 +391,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   `capture`, `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
   A payment's currency is a `PayabliCurrency`. `PayabliTTPPaymentDetailsObjC` takes it as `PayabliCurrencyUsd`, and
-  the two card-not-present requests default to it. Objective-C always sends it.
+  the two card-not-present requests default to it. Objective-C always sends it. A `currency` or `attempt` set to a
+  number that names no case completes with 1016 `VALIDATION_ERROR` before anything is sent.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. `PayabliErrorTypeCode` names every catalog
   number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:

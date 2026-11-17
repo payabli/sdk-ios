@@ -4,11 +4,13 @@ enum PayInFieldPath {
     static let entryPoint = "entryPoint"
     static let transId = "transId"
     static let paymentReference = "paymentReference"
+    static let attempt = "attempt"
     static let idempotencyKey = "idempotencyKey"
     static let paymentMethod = "paymentMethod"
     static let totalAmount = details("totalAmount")
     static let serviceFee = details("serviceFee")
     static let surchargeFee = details("surchargeFee")
+    static let currency = details("currency")
 
     /// - Parameter key: the payment method member, as the payment encoder writes it.
     /// - Returns: the member's path under `paymentMethod.`.

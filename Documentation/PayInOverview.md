@@ -226,7 +226,8 @@ whenever it is not zero. With a $1.00 total and a $0.10 fee it reads:
 | Fee | $0.10 |
 | Total | $1.00 |
 
-The device locale writes the number and `currency` supplies the symbol. Mark a
+The device locale writes the number and `currency` supplies the symbol; an omitted
+currency is drawn as USD, the currency it is sent in. Mark a
 section `style: .summary` to place the rows and title them; without one, the
 form adds a summary after the inputs. `showsBaseAmount: false` drops the Amount
 row.

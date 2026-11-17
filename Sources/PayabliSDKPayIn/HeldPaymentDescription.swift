@@ -16,7 +16,7 @@ struct HeldPaymentDescription: Equatable, CustomStringConvertible {
     private let total: Decimal
     private let serviceFee: Decimal
     private let surchargeFee: Decimal
-    private let currency: PayabliCurrency?
+    private let currency: PayabliCurrency
     private let methodKind: MethodKind
     private let orderId: String?
 
@@ -25,7 +25,7 @@ struct HeldPaymentDescription: Equatable, CustomStringConvertible {
         total = Self.asSent(request.paymentDetails.totalAmount)
         serviceFee = Self.asSent(request.paymentDetails.serviceFee ?? 0)
         surchargeFee = Self.asSent(request.paymentDetails.surchargeFee ?? 0)
-        currency = request.paymentDetails.currency
+        currency = request.paymentDetails.currency.asSent
         methodKind = Self.kind(of: request.paymentMethod)
         orderId = request.options.orderId?.payabliCaptureTrimmed.payabliCaptureNilIfEmpty
     }

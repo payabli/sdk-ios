@@ -159,6 +159,23 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         XCTAssertEqual(details["serviceFee"] as? Double, 5)
     }
 
+    func testAPaymentNamingNoCurrencySendsUSD() async throws {
+        let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
+        let client = PayInPaymentFlowClient(transport: transport)
+        _ = try await client.capture(entryPoint: "entry", request: cardRequest(currency: nil))
+        _ = try await client.captureAuthorized(PayabliPayInAuthorizedRequest(
+            transId: "t-1",
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 105)
+        ))
+
+        let sent = await transport.requests
+        XCTAssertEqual(sent.count, 2)
+        for request in sent {
+            let details = try XCTUnwrap(parseBody(request)["paymentDetails"] as? [String: Any], request.path)
+            XCTAssertEqual(details["currency"] as? String, "USD", request.path)
+        }
+    }
+
     func testCaptureAuthorizedEscapesPathSeparatorsInTransactionId() async throws {
         let transport = MockPaymentCaptureTransport(responseBody: Self.approvedResponse)
         let client = PayInPaymentFlowClient(
@@ -324,6 +341,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
         totalAmount: Double = 100,
         serviceFee: Double? = 5,
         surchargeFee: Double? = nil,
+        currency: PayabliCurrency? = .usd,
         achValidation: Bool? = nil,
         forceCustomerCreation: Bool? = nil,
         additionalData: [String: String]? = nil
@@ -345,7 +363,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                     totalAmount: totalAmount,
                     serviceFee: serviceFee,
                     surchargeFee: surchargeFee,
-                    currency: .usd
+                    currency: currency
                 ),
                 customerData: PayabliPayInCustomerData(
                     additionalData: additionalData,

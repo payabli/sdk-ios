@@ -138,7 +138,7 @@ package final class TTPTransactionClient: Sendable {
         InitiatePaymentDetails(
             totalAmount: details.amount,
             serviceFee: details.serviceFee,
-            currency: details.currency?.code,
+            currency: details.currency.asSent.code,
             paymentDescription: details.paymentDescription
         )
     }

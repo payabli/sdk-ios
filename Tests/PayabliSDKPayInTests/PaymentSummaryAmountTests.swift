@@ -181,9 +181,9 @@ final class PaymentSummaryAmountTests: XCTestCase {
         XCTAssertEqual(formatted("1234.56", .usd, "de_DE"), "1.234,56\u{00A0}$")
     }
 
-    func testAnOmittedCurrencyWritesTheNumberAlone() {
-        XCTAssertEqual(formatted("1234.56", nil, "en_US"), "1,234.56")
-        XCTAssertEqual(formatted("1234.56", nil, "de_DE"), "1.234,56")
+    func testAnOmittedCurrencyIsDrawnAsTheUSDItIsSentIn() {
+        XCTAssertEqual(formatted("12.34", nil, "en_US"), "$12.34")
+        XCTAssertEqual(formatted("1234.56", nil, "de_DE"), "1.234,56\u{00A0}$")
     }
 
     func testANegativeFigureIsWrittenWithItsSign() {

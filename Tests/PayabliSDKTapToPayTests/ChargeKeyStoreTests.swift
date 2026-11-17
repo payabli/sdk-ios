@@ -86,7 +86,6 @@ final class ChargeKeyStoreTests: XCTestCase {
         let others: [(Decimal, Decimal, PayabliCurrency?, String?)] = [
             (11, 1, .usd, "INV-1"),
             (10, 2, .usd, "INV-1"),
-            (10, 1, nil, "INV-1"),
             (10, 1, .usd, "INV-2")
         ]
         for (amount, fee, currency, invoice) in others {
@@ -107,6 +106,14 @@ final class ChargeKeyStoreTests: XCTestCase {
         let held = try endUnknown(reserve(.newPayment, amount: 10, currency: .usd))
 
         let retry = try reserve(.retry, amount: 10.00, currency: .usd, invoice: "INV-ADDED")
+
+        XCTAssertEqual(retry.key, held.key)
+    }
+
+    func testARetryNamingNoCurrencyRepeatsOneThatNamedUSD() throws {
+        let held = try endUnknown(reserve(.newPayment, amount: 10, currency: .usd))
+
+        let retry = try reserve(.retry, amount: 10, currency: nil)
 
         XCTAssertEqual(retry.key, held.key)
     }

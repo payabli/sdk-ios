@@ -6,7 +6,7 @@ import PayabliSDKCore
 struct ChargeDescription: CustomStringConvertible {
     private let amount: Decimal
     private let serviceFee: Decimal
-    private let currency: PayabliCurrency?
+    private let currency: PayabliCurrency
     private let invoiceNumber: String?
 
     /// - Parameter paymentDetails: the amounts and currency the charge sends, already normalised.
@@ -14,7 +14,7 @@ struct ChargeDescription: CustomStringConvertible {
     init(paymentDetails: PayabliTTPPaymentDetails, invoice: PayabliTTPInvoiceData) {
         amount = paymentDetails.amount.roundedAsCharged
         serviceFee = paymentDetails.serviceFee.roundedAsCharged
-        currency = paymentDetails.currency
+        currency = paymentDetails.currency.asSent
         invoiceNumber = invoice.invoiceNumber
     }
 

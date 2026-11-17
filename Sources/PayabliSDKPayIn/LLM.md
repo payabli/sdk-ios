@@ -308,7 +308,7 @@ recognizable on the store route, so a key sent there is read by nothing.
 | `totalAmount` | Required. The amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional. Must not be negative. Currency JSON is normalized to two decimals such as `0.10`. |
 | `surchargeFee` | Optional. Already included in `totalAmount`. Must not be negative. Currency JSON is normalized to two decimals such as `0.30`. |
-| `currency` | Optional `PayabliCurrency`, for example `.usd`. |
+| `currency` | Optional `PayabliCurrency`, for example `.usd`. When omitted, the payment is sent in USD. |
 | `checkNumber` | Optional for check flows. |
 | `checkUniqueId` | Optional for check flows. |
 
@@ -327,7 +327,7 @@ authorize forms:
 | `subdomain` | Optional subdomain query value. |
 | `subscriptionId` | Optional subscription ID. |
 | `paymentReference` | Optional. Your app's own name for the payment, kept on the device and never sent. Left unset on a new payment, the SDK names the payment and returns the name on `PayabliPayInError.Unsettled`. A call your app cancels throws `CancellationError`, whose outcome is unknown and which carries no name, so an app that cancels charges names each payment. A blank one is refused with `PayabliPayInError.InvalidInput`, field `paymentReference`, reason "The paymentReference cannot be blank.". The SDK makes and keeps every idempotency key; the app never sets one. |
-| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `Unsettled`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `Unsettled` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. A retry that names no `paymentReference` is refused unsent with `InvalidInput`, field `paymentReference`; a retry naming a reference with nothing held sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`, as is any call, a retry included, on a payment or transaction another `PayabliPayIn` is still sending. Every `PayabliPayIn` for the same entry point and environment shares the held keys. |
+| `attempt` | `.newPayment` by default, which sends a new key. `.retry` after `Unsettled`, naming the same `paymentReference`, sends that payment's held key, so the service refuses a repeat; a refused retry ends in `Unsettled` with type `.retryRefused`. A retry must describe the same payment (amount, fee, surcharge, currency with an omitted one read as USD, kind of method, and the order ID if the first attempt set one), or it is refused unsent with `.retryNotSamePayment` and the key stays. A retry that names no `paymentReference` is refused unsent with `InvalidInput`, field `paymentReference`; a retry naming a reference with nothing held sends a new key. A new payment naming a reference whose payment is still unresolved is refused unsent with `.paymentReferenceOpen`, as is any call, a retry included, on a payment or transaction another `PayabliPayIn` is still sending. Every `PayabliPayIn` for the same entry point and environment shares the held keys. |
 | `achValidation` | Verifies a bank account before it is debited. `true` adds the check to any the merchant's account already applies, and never turns one off. A failed check is a decline. |
 | `forceCustomerCreation` | Applies only when the payer can't be matched to an existing customer: `true` creates a new customer record each time. No effect when the payer is identified. |
 | `validation` | Client validation toggles. |
@@ -558,7 +558,7 @@ every figure is nil and the form draws no summary. A card or bank account submit
 empty the summary. Amount is the total amount less the service
 fee and any surcharge, and Total is the total amount, which includes any surcharge sent.
 `formattedAmount(_:currency:)` writes a
-figure the way the form does. Pass the payment details' `PayabliCurrency?`; nil writes the number without a symbol.
+figure the way the form does. Pass the payment details' `PayabliCurrency?`; nil is drawn as USD, the currency an omitted one is sent in.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 

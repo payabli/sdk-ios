@@ -209,7 +209,7 @@ order.paymentTransId = result.paymentTransId // store it; don't log it
 
 | Parameter | Type | Notes |
 |---|---|---|
-| `paymentDetails` | `PayabliTTPPaymentDetails` | `amount`, the total charged, is required. `serviceFee` defaults to `0`. `serviceFee` is part of `amount`, not added to it: the card is charged `amount`. Leave `currency` out to charge in the paypoint's currency. `paymentDescription` is optional. |
+| `paymentDetails` | `PayabliTTPPaymentDetails` | `amount`, the total charged, is required. `serviceFee` defaults to `0`. `serviceFee` is part of `amount`, not added to it: the card is charged `amount`. Leave `currency` out to charge in USD. `paymentDescription` is optional. |
 | `customer` | `PayabliTTPCustomerData` | Name the payer with at least one of `firstName`, `lastName`, `customerNumber` or `customerId`. A charge that names nobody can be refused. The other fields (email, phone, billing and shipping address) are optional, and blank values are ignored. |
 | `invoice` | `PayabliTTPInvoiceData` | Optional. `invoiceNumber`. |
 | `orderDescription` | `String?` | Optional. |
@@ -228,9 +228,9 @@ and environment, so the service refuses a repeat while it still recognises the k
 card is read, the charge fails with `.chargeNotFinished` (3034): the earlier charge reached the service and hasn't
 finished. Check that payment before charging again, or wait four minutes.
 
-A retry describes the same payment as the charge it repeats: the same amount, service fee, currency and, if that charge
-set one, invoice number. A retry that describes another payment is refused before anything is sent, with
-`.retryNotSamePayment` (1022), and the earlier charge's key stays for the right retry. Only the most recent charge
+A retry describes the same payment as the charge it repeats: the same amount, service fee, currency (an omitted one
+is USD) and, if that charge set one, invoice number. A retry that describes another payment is refused before
+anything is sent, with `.retryNotSamePayment` (1022), and the earlier charge's key stays for the right retry. Only the most recent charge
 whose outcome is unknown can be retried: a later one with an unknown outcome replaces it.
 
 One charge runs at a time across every `PayabliTTP` in the process. A charge made while another runs is refused

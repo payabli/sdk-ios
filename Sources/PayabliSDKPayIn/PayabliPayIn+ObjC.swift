@@ -168,7 +168,11 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        capture(request.toSwift(), completion: completion)
+        do {
+            try capture(request.toSwift(), completion: completion)
+        } catch {
+            refuse(error, completion: completion)
+        }
     }
 
     /// Charges a payment the request carries, closing the request's digit buffers at the task's
@@ -200,7 +204,11 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        authorize(request.toSwift(), completion: completion)
+        do {
+            try authorize(request.toSwift(), completion: completion)
+        } catch {
+            refuse(error, completion: completion)
+        }
     }
 
     /// Holds an amount the request carries, closing the request's digit buffers at the task's end,
@@ -232,8 +240,12 @@ public final class PayabliPayInObjC: NSObject {
         _ request: PayabliPayInAuthorizedRequestObjC,
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
-        let swiftRequest = request.toSwift()
-        complete(completion) { try await $0.captureAuthorizedTransaction(swiftRequest) }
+        do {
+            let swiftRequest = try request.toSwift()
+            complete(completion) { try await $0.captureAuthorizedTransaction(swiftRequest) }
+        } catch {
+            refuse(error, completion: completion)
+        }
     }
 
     /// Reverses a transaction, as ``PayabliPayIn/voidTransaction(_:)`` does.
@@ -247,6 +259,14 @@ public final class PayabliPayInObjC: NSObject {
         completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void
     ) {
         complete(completion) { try await $0.voidTransaction(transId) }
+    }
+
+    /// Completes a payment call refused before anything was sent, on the main actor as every payment call completes.
+    ///
+    /// - Parameter error: the refusal.
+    /// - Parameter completion: the call's completion.
+    private func refuse(_ error: Error, completion: @escaping (PayabliPayInResultObjC?, NSError?) -> Void) {
+        complete(completion) { _ in throw error }
     }
 
     private func complete(
@@ -284,27 +304,55 @@ public final class PayabliPayInObjC: NSObject {
         holderType: PayabliPayInAccountHolderTypeCode
     ) throws -> BankValues {
         guard let account = PayabliPayInAccountTypeCode(rawValue: accountType.rawValue) else {
-            throw refusal(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: .achAccountType)
+            throw refusal(accountType.rawValue, of: PayabliPayInAccountTypeCode.self, field: PayInFieldPath.storedMethod(.achAccountType))
         }
         guard let sec = PayabliPayInSecCodeCode(rawValue: secCode.rawValue) else {
-            throw refusal(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: .achCode)
+            throw refusal(secCode.rawValue, of: PayabliPayInSecCodeCode.self, field: PayInFieldPath.storedMethod(.achCode))
         }
         guard let holder = PayabliPayInAccountHolderTypeCode(rawValue: holderType.rawValue) else {
-            throw refusal(holderType.rawValue, of: PayabliPayInAccountHolderTypeCode.self, field: .achHolderType)
+            throw refusal(
+                holderType.rawValue,
+                of: PayabliPayInAccountHolderTypeCode.self,
+                field: PayInFieldPath.storedMethod(.achHolderType)
+            )
         }
         return BankValues(accountType: account.accountType, secCode: sec.secCode, holderType: holder.holderType)
     }
 
+    /// Reads a payment's currency as an Objective-C host set it.
+    ///
+    /// - Parameter currency: the currency the host set.
+    /// - Returns: the currency.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` naming `paymentDetails.currency`, for a number that names no case.
+    nonisolated static func validated(currency: PayabliCurrency) throws -> PayabliCurrency {
+        guard let read = PayabliCurrency(rawValue: currency.rawValue) else {
+            throw refusal(currency.rawValue, of: PayabliCurrency.self, field: PayInFieldPath.currency)
+        }
+        return read
+    }
+
+    /// Reads a payment's attempt as an Objective-C host set it.
+    ///
+    /// - Parameter attempt: the attempt the host set.
+    /// - Returns: the attempt.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` naming `attempt`, for a number that names no case.
+    nonisolated static func validated(attempt: PayabliAttempt) throws -> PayabliAttempt {
+        guard let read = PayabliAttempt(rawValue: attempt.rawValue) else {
+            throw refusal(attempt.rawValue, of: PayabliAttempt.self, field: PayInFieldPath.attempt)
+        }
+        return read
+    }
+
     /// - Parameter value: the number the host passed.
     /// - Parameter type: the enum it names no case of.
-    /// - Parameter field: the request member it fills.
+    /// - Parameter field: where the member it fills sits in the request.
     /// - Returns: the refusal, naming that member.
     private nonisolated static func refusal(
         _ value: Int,
         of type: (some Any).Type,
-        field: PayabliPayInMethodInput.CodingKeys
+        field: String
     ) -> PayabliPayInError.InvalidInput {
-        PayabliPayInError.InvalidInput(field: PayInFieldPath.storedMethod(field), reason: "\(value) is not a \(type) value.")
+        PayabliPayInError.InvalidInput(field: field, reason: "\(value) is not a \(type) value.")
     }
 }
 

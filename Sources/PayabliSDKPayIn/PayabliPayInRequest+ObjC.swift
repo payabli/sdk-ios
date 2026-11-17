@@ -3,7 +3,8 @@ import PayabliSDKCore
 
 /// A capture or an authorization, for an Objective-C caller. Each property is ``PayabliPayInRequestConfiguration``'s,
 /// and a factory method per kind sets the payment method. `currency` is not optional: it defaults to `.usd` and is
-/// always sent.
+/// always sent. A `currency` or `attempt` set to a number that names no case is refused with `VALIDATION_ERROR`
+/// before anything is sent.
 @objc(PayabliPayInRequestObjC)
 public final class PayabliPayInRequestObjC: NSObject {
     let paymentMethod: PayabliPayInPaymentMethod
@@ -156,13 +157,16 @@ public final class PayabliPayInRequestObjC: NSObject {
 
     /// The Swift request this wrapper carries, holding copies of the wrapper's digit buffers: a
     /// payment spends its own copies and leaves the wrapper's digits for its next use.
-    func toSwift() -> PayabliPayInRequest {
-        let options = PayabliPayInRequestConfiguration(
+    ///
+    /// - Returns: the request.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when `currency` or `attempt` is a number that names no case.
+    func toSwift() throws -> PayabliPayInRequest {
+        let options = try PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(
                 totalAmount: totalAmount,
                 serviceFee: serviceFee?.doubleValue,
                 surchargeFee: surchargeFee?.doubleValue,
-                currency: currency,
+                currency: PayabliPayInObjC.validated(currency: currency),
                 checkNumber: checkNumber,
                 checkUniqueId: checkUniqueId
             ),
@@ -175,7 +179,7 @@ public final class PayabliPayInRequestObjC: NSObject {
             subdomain: subdomain,
             subscriptionId: subscriptionId?.int64Value,
             paymentReference: paymentReference,
-            attempt: attempt,
+            attempt: PayabliPayInObjC.validated(attempt: attempt),
             achValidation: achValidation?.boolValue,
             forceCustomerCreation: forceCustomerCreation?.boolValue,
             validation: PayabliPayInValidation(
@@ -309,7 +313,8 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
 }
 
 /// A capture of an authorization, for an Objective-C caller. Each property is ``PayabliPayInAuthorizedRequest``'s.
-/// `currency` is not optional: it defaults to `.usd` and is always sent.
+/// `currency` is not optional: it defaults to `.usd` and is always sent. One set to a number that names no case is
+/// refused with `VALIDATION_ERROR` before anything is sent.
 @objc(PayabliPayInAuthorizedRequestObjC)
 public final class PayabliPayInAuthorizedRequestObjC: NSObject {
     @objc public let transId: String
@@ -326,14 +331,16 @@ public final class PayabliPayInAuthorizedRequestObjC: NSObject {
         super.init()
     }
 
-    func toSwift() -> PayabliPayInAuthorizedRequest {
-        PayabliPayInAuthorizedRequest(
+    /// - Returns: the request.
+    /// - Throws: ``PayabliPayInError/InvalidInput`` when `currency` is a number that names no case.
+    func toSwift() throws -> PayabliPayInAuthorizedRequest {
+        try PayabliPayInAuthorizedRequest(
             transId: transId,
             paymentDetails: PayabliPayInPaymentDetails(
                 totalAmount: totalAmount,
                 serviceFee: serviceFee?.doubleValue,
                 surchargeFee: surchargeFee?.doubleValue,
-                currency: currency
+                currency: PayabliPayInObjC.validated(currency: currency)
             )
         )
     }
