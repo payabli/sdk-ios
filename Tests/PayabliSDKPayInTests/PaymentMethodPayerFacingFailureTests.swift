@@ -188,8 +188,6 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         XCTAssertNil(viewModel.failureMessage)
     }
 
-    /// The opt-out hides the message rather than dropping it, so turning it off again shows the
-    /// failure's message.
     func testAnUpdateThatRestoresTheMessageAfterTheOptOutShowsItAgain() async {
         let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
         let viewModel = filledForm(on: flow)

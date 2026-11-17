@@ -316,8 +316,6 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertNil(viewModel.submittingOperation)
     }
 
-    /// The refusal belongs to the payment that was sent: hidden on the save form the host changed to while
-    /// it ran, and shown in the payment's wording once the form pays again.
     func testAFailureInFlightIsHiddenOnAnotherOperationAndShowsInTheWordingOfTheOperationItSent() async {
         let transport = BlockingFacadeTransport(statusCode: 402, responseBody: """
         {"code": "D0200", "reason": "Insufficient Funds", "explanation": "Declined.", "data": null, "token": null}
