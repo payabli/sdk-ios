@@ -102,8 +102,8 @@ final class PayabliPayInViewModel: ObservableObject {
     @Published private(set) var submittingOperation: PayabliPayInOperation.Kind?
     @Published private(set) var failureMessage: String?
     /// The last submission's failure where it has a message, by its category and the operation it sent.
-    /// The message is worked out from it whenever the form changes, so it shows only on that operation
-    /// and while the opt-out is off. Cleared by the next submission and by a new component.
+    /// Its message shows only while the form saves or pays as that submission did and the opt-out is off.
+    /// Cleared by the next submission and by a new component.
     private var drawnFailure: (category: PayabliErrorCategory, operation: PayabliPayInOperation.Kind)?
     /// The fields the last refusal named, until the payer edits one or its box leaves the screen.
     @Published var rejectedFields: Set<PayabliPayInField> = []
@@ -378,10 +378,13 @@ final class PayabliPayInViewModel: ObservableObject {
     }
 
     /// Shows the kept failure's message in the form's current wording, or none while the opt-out is on
-    /// or the form's operation is not the one the failure sent.
+    /// or the form saves a method where the failure paid, or the reverse.
     private func showDrawnFailure() {
         var shown: String?
-        if let failure = drawnFailure, failure.operation == operation.kind, configuration.showsFailureMessage {
+        if let failure = drawnFailure,
+           (failure.operation == .storePaymentMethod) == (operation.kind == .storePaymentMethod),
+           configuration.showsFailureMessage
+        {
             shown = PayabliPayInFailureMessage.text(for: failure.category, operation: failure.operation, labels: labels)
         }
         // A published property republishes on every set, and a host re-renders on each publish.
