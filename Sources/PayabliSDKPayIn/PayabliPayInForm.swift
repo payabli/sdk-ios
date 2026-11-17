@@ -464,7 +464,7 @@ public struct PayabliPayInForm: View {
 
     func summarySection(_ drawn: PayInDrawnSection) -> some View {
         let summary = configuration.paymentSummary
-        let currency = viewModel.operation.requestConfiguration?.paymentDetails.currency?.code
+        let currency = viewModel.operation.requestConfiguration?.paymentDetails.currency
 
         return VStack(alignment: .leading, spacing: drawn.title == nil ? 0 : resolvedStyle.layout.sectionTitleSpacing) {
             if let title = drawn.title {

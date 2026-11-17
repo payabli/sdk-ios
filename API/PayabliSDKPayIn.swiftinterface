@@ -846,7 +846,7 @@ public enum PayabliPayInSummaryRows {
   public static func totalLabelText(labels: PayabliSDKPayIn::PayabliPayInFormLabels) -> Swift::String
   public static func rowAmount(for field: PayabliSDKPayIn::PayabliPayInField, paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
   public static func totalRowAmount(paymentDetails: PayabliSDKPayIn::PayabliPayInPaymentDetails?) -> Foundation::Decimal?
-  public static func formattedAmount(_ amount: Foundation::Decimal, currency: Swift::String?) -> Swift::String
+  public static func formattedAmount(_ amount: Foundation::Decimal, currency: PayabliSDKCore::PayabliCurrency?) -> Swift::String
 }
 public enum PayabliPayInTransactionStatus : Swift::Sendable, Swift::Hashable {
   case initiated

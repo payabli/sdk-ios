@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKPayIn
 import XCTest
 
@@ -163,7 +164,7 @@ final class PaymentSummaryAmountTests: XCTestCase {
 
     // MARK: - Formatting
 
-    private func formatted(_ text: String, _ currency: String?, _ locale: String) -> String {
+    private func formatted(_ text: String, _ currency: PayabliCurrency?, _ locale: String) -> String {
         PayabliPayInSummaryRows.formattedAmount(
             amount(text),
             currency: currency,
@@ -172,31 +173,20 @@ final class PaymentSummaryAmountTests: XCTestCase {
     }
 
     func testTheTextIsTheFigureSentAtTwoPlaces() {
-        XCTAssertEqual(formatted("12.345", "USD", "en_US"), "$12.35")
-        XCTAssertEqual(formatted("1234.5", "USD", "en_US"), "$1,234.50")
+        XCTAssertEqual(formatted("12.345", .usd, "en_US"), "$12.35")
+        XCTAssertEqual(formatted("1234.5", .usd, "en_US"), "$1,234.50")
     }
 
     func testTheDeviceLocaleWritesTheSeparatorsAndTheCurrencyGivesTheSymbol() {
-        XCTAssertEqual(formatted("1234.56", "EUR", "de_DE"), "1.234,56\u{00A0}€")
-        XCTAssertEqual(formatted("1234.56", "EUR", "en_US"), "€1,234.56")
+        XCTAssertEqual(formatted("1234.56", .usd, "de_DE"), "1.234,56\u{00A0}$")
     }
 
-    func testACurrencyWithNoMinorUnitStillShowsTheTwoPlacesSent() {
-        XCTAssertEqual(formatted("1234.56", "JPY", "en_US"), "¥1,234.56")
-    }
-
-    func testACurrencyTheRequestDoesNotNameWritesTheNumberAlone() {
+    func testAnOmittedCurrencyWritesTheNumberAlone() {
         XCTAssertEqual(formatted("1234.56", nil, "en_US"), "1,234.56")
         XCTAssertEqual(formatted("1234.56", nil, "de_DE"), "1.234,56")
-        XCTAssertEqual(formatted("1234.56", "dollars", "en_US"), "1,234.56")
-    }
-
-    func testACodeInLowerCaseOrWithSpacesIsStillTheCurrencyItNames() {
-        XCTAssertEqual(formatted("12.34", " usd ", "en_US"), "$12.34")
-        XCTAssertEqual(formatted("12.34", "USD\n", "en_US"), "$12.34")
     }
 
     func testANegativeFigureIsWrittenWithItsSign() {
-        XCTAssertEqual(formatted("-0.31", "USD", "en_US"), "-$0.31")
+        XCTAssertEqual(formatted("-0.31", .usd, "en_US"), "-$0.31")
     }
 }

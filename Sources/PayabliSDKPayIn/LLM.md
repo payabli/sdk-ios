@@ -558,7 +558,7 @@ every figure is nil and the form draws no summary. A card or bank account submit
 empty the summary. Amount is the total amount less the service
 fee and any surcharge, and Total is the total amount, which includes any surcharge sent.
 `formattedAmount(_:currency:)` writes a
-figure the way the form does.
+figure the way the form does. Pass the payment details' `PayabliCurrency?`; nil writes the number without a symbol.
 
 `PayabliPayInPaymentSummaryConfiguration`:
 
