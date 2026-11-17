@@ -179,8 +179,8 @@ The SDK holds a payment's key in memory only. When your app is closed before a c
 the relaunched app holds no key for that payment, and the SDK doesn't look the payment up for you. Settle it from
 your own records:
 
-1. Set your own `orderId` on every capture and authorization, at most 255 characters, and store it before you
-   call the SDK.
+1. Set your own `orderId` on every capture and authorization, one for each payment and at most 255 characters,
+   and store it before you call the SDK.
 2. After a relaunch, for a payment whose outcome your app never received, read the payment back from your backend
    by that `orderId` before paying again:
    `GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`.
@@ -188,7 +188,7 @@ your own records:
    `attempt: .newPayment` and a new `paymentReference`.
 
 Don't set `attempt: .retry` across a relaunch. The SDK no longer holds the key, so it sends a new one, and the
-payment is charged twice if the first attempt went through.
+payment can be charged twice if the first attempt went through.
 
 ## Outcomes and errors
 
