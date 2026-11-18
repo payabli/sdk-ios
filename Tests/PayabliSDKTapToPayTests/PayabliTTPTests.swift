@@ -464,7 +464,7 @@ final class PayabliTTPTests: XCTestCase {
         }
 
         XCTAssertTrue(attestation.isAlreadyAttested, "a binding the refusal did not name as gone was dropped")
-        XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .tokenExpired)
+        XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .deviceSetupRequired)
     }
 
     /// An Objective-C host is told about every state `initialize()` passes through, and reads each one.

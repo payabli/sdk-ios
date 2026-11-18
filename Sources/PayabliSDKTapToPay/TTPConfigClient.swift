@@ -28,7 +28,7 @@ final class TTPConfigClient: Sendable {
     }
 
     /// Fetches the TTP config for `entry` on a pinned credential. Only a 401 saying the binding is gone drops it, throwing
-    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `.tokenExpired`. A 403
+    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `deviceSetupRequired`. A 403
     /// naming the entry point throws `entryPointRefused`; one naming nothing classified is the device owing its code.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
@@ -79,9 +79,6 @@ final class TTPConfigClient: Sendable {
                         )
                     }
                     throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
-                }
-                if code == 401 {
-                    throw PayabliGenericError(type: .tokenExpired, reason: reason, httpStatus: response.statusCode, rawCode: nil)
                 }
                 if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
                     throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
