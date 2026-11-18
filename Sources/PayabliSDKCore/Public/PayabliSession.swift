@@ -245,6 +245,7 @@ public final class PayabliSession: @unchecked Sendable {
             )
             session.machine.markReady()
             installed = session
+            TelemetryRecorders.install(session.telemetry)
 
             if let current {
                 if !inherits {
@@ -286,6 +287,7 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock {
             installed?.machine.finish()
             installed = nil
+            TelemetryRecorders.clear()
             sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
         }

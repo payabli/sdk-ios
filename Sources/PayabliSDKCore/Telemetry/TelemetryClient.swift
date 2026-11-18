@@ -214,13 +214,26 @@ package actor TelemetryClient {
     ///   dropped, and an event the catalog does not name is dropped whole.
     /// - Parameter occurredAt: when the reported thing happened.
     /// - Parameter waitsForBatch: holds even a failure for its batch, for a report the send-at-once rule must not move.
+    /// - Parameter session: the session the reported work began under, which the event carries; `nil` for this client's
+    ///   own. One for another entry point or environment is dropped, since this channel cannot deliver it.
     package func emit(
         _ name: String,
         properties: [String: String] = [:],
         occurredAt: Date,
-        waitsForBatch: Bool = false
+        waitsForBatch: Bool = false,
+        session: TelemetrySessionContext? = nil
     ) async {
-        enqueue(name, properties: properties, occurredAt: occurredAt, waitsForBatch: waitsForBatch)
+        if let session, session.entry != configuration.entry || session.environment != configuration.environment {
+            logger.debug("telemetry_event_foreign_session: the session this event belongs to is not this channel's; dropped")
+            return
+        }
+        enqueue(
+            name,
+            properties: properties,
+            occurredAt: occurredAt,
+            waitsForBatch: waitsForBatch,
+            sessionId: session?.sessionId ?? sessionId
+        )
     }
 
     /// Enqueue events in order, with nothing another caller records between them.
@@ -229,11 +242,17 @@ package actor TelemetryClient {
     package func emit(_ records: [(name: String, properties: [String: String])]) async {
         let now = Date()
         for record in records {
-            enqueue(record.name, properties: record.properties, occurredAt: now, waitsForBatch: false)
+            enqueue(record.name, properties: record.properties, occurredAt: now, waitsForBatch: false, sessionId: sessionId)
         }
     }
 
-    private func enqueue(_ name: String, properties: [String: String], occurredAt: Date, waitsForBatch: Bool) {
+    private func enqueue(
+        _ name: String,
+        properties: [String: String],
+        occurredAt: Date,
+        waitsForBatch: Bool,
+        sessionId: String
+    ) {
         guard let properties = TelemetryCatalog.scrub(name, properties) else {
             logger.warning("telemetry_event_unknown: event not in the catalog; dropped")
             return

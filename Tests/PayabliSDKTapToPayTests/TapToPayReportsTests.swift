@@ -26,7 +26,7 @@ final class TapToPayReportsTests: XCTestCase {
         let (ttp, _, _, transport) = try makeTTP()
 
         try await ttp.initialize()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let events = await sent(transport).filter { $0.event.hasPrefix("ttp.") }
@@ -44,10 +44,10 @@ final class TapToPayReportsTests: XCTestCase {
         let before = await ttp.session.telemetry.bufferedCount
 
         ttp.reports.attestationFailed(PinnedTokenRefusal(), after: .zero)
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         let whileHeld = await ttp.session.telemetry.bufferedCount
         ttp.reports.releaseHeld()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
 
         XCTAssertEqual(whileHeld, before, "held until the renewal, so no batch it fills can carry the token being renewed")
         let buffered = await ttp.session.telemetry.bufferedCount
@@ -60,7 +60,7 @@ final class TapToPayReportsTests: XCTestCase {
         let (ttp, _, _, transport) = try makeTTP()
 
         ttp.reports.attestationFailed(PayabliTTPError.attestationFailed(reason: Self.sentinel), after: .zero)
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
 
         let sent = await sent(transport).map(\.event).filter { $0.hasPrefix("ttp.") }
         XCTAssertEqual(sent, ["ttp.attestation.failed"])
@@ -107,7 +107,7 @@ final class TapToPayReportsTests: XCTestCase {
         ))
 
         try await initializeToItsEnd(ttp, expecting: .userCancelled)
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         let beforeTheBatch = await sent(transport).map(\.event)
         XCTAssertFalse(beforeTheBatch.contains("ttp.initialize.cancelled"), "a choice waits for the batch")
         await ttp.session.telemetry.flush()
@@ -136,7 +136,7 @@ final class TapToPayReportsTests: XCTestCase {
             arrange(provider, attestation)
 
             try await initializeToItsEnd(ttp, expecting: told)
-            await ttp.reports.sent()
+            await TelemetryRecorders.settled()
             let beforeTheBatch = await sent(transport).map(\.event)
             XCTAssertFalse(beforeTheBatch.contains("ttp.initialize.pending"), "\(state): waits for the batch")
             await ttp.session.telemetry.flush()
@@ -158,7 +158,7 @@ final class TapToPayReportsTests: XCTestCase {
             try await ttp.initialize()
             XCTFail("expected a cancellation")
         } catch {}
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let events = await sent(transport)
@@ -174,7 +174,7 @@ final class TapToPayReportsTests: XCTestCase {
         async let second: Void = ttp.initialize()
         _ = try? await first
         _ = try? await second
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let events = await sent(transport).map(\.event)
@@ -182,49 +182,23 @@ final class TapToPayReportsTests: XCTestCase {
         XCTAssertEqual(events.filter { $0 == "ttp.initialize.failed" }.count, 1, "\(events)")
     }
 
-    func testWorkStartedUnderOneSessionReportsToThatSessionAfterAnotherIsInstalled() async throws {
-        PayabliSession.resetForTesting()
-        defer { PayabliSession.resetForTesting() }
-        let firstTransport = InMemoryTelemetryTransport()
-        let first = try PayabliSession.install(
-            config: PayabliConfig(entryPoint: "first", environment: .sandbox, tokenProvider: { "seed_token" }),
-            urlSession: StubURLProtocol.makeSession(),
-            telemetryTransport: firstTransport
-        )
-        let ttp = PayabliTTP(
-            session: first,
-            provider: MockTapToPayProvider(),
-            attestation: MockDeviceAttestationService(),
-            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
-        )
-        // Another session is installed while the run fetches its configuration, so the work has already started.
-        let secondTransport = InMemoryTelemetryTransport()
-        let second = InstalledLater()
-        let answerConfig = Self.configHandler(status: 200)
-        StubURLProtocol.handler = { request in
-            guard second.value == nil else { return try answerConfig(request) }
-            PayabliSession.resetForTesting()
-            second.value = try PayabliSession.install(
-                config: PayabliConfig(entryPoint: "second", environment: .sandbox, tokenProvider: { "seed_token" }),
-                urlSession: StubURLProtocol.makeSession(),
-                telemetryTransport: secondTransport
-            )
-            return try answerConfig(request)
-        }
+    func testWorkFinishingAfterASessionOnTheSameEntryPointIsInstalledKeepsTheSessionItStartedUnder() async throws {
+        let run = try await initializeWhileAnotherSessionIsInstalled(entryPoint: "first")
 
-        _ = try? await ttp.initialize()
-        let installed = try XCTUnwrap(second.value)
-        await ttp.reports.sent()
-        await first.telemetry.flush()
-        await installed.telemetry.flush()
+        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
+        let after = await sent(run.secondTransport).filter { $0.event.hasPrefix("ttp.") }
+        XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
+        XCTAssertEqual(after.map(\.event), ["ttp.initialize.failed"], "the end leaves on the installed channel")
+        XCTAssertTrue((before + after).allSatisfy { $0.sessionId == run.first.telemetry.sessionId })
+    }
 
-        let reported = await sent(firstTransport).filter { $0.event.hasPrefix("ttp.") }
-        XCTAssertEqual(
-            reported.map(\.event),
-            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.initialize.failed"]
-        )
-        XCTAssertTrue(reported.allSatisfy { $0.sessionId == first.telemetry.sessionId && $0.entry == "first" })
-        let installedSinceGotOnlyItsOwnStart = await sent(secondTransport).map(\.event)
+    func testWorkFinishingAfterASessionOnAnotherEntryPointIsInstalledIsNotReportedThere() async throws {
+        let run = try await initializeWhileAnotherSessionIsInstalled(entryPoint: "second")
+
+        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
+        XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
+        XCTAssertTrue(before.allSatisfy { $0.sessionId == run.first.telemetry.sessionId && $0.entry == "first" })
+        let installedSinceGotOnlyItsOwnStart = await sent(run.secondTransport).map(\.event)
         XCTAssertEqual(installedSinceGotOnlyItsOwnStart, ["sdk.initialized"])
     }
 
@@ -238,7 +212,9 @@ final class TapToPayReportsTests: XCTestCase {
             deviceId: { nil },
             queued: []
         )
-        let reports = TapToPayReports(telemetry: client)
+        TelemetryRecorders.install(client)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        let reports = TapToPayReports(session: client.context)
 
         reports.initializeEnded(PayabliTTPError.readerCredentialsUnusable, after: .milliseconds(5))
         await transport.waitUntilHeld()
@@ -246,7 +222,7 @@ final class TapToPayReportsTests: XCTestCase {
         let made = Date()
         try await Task.sleep(for: .milliseconds(200))
         await transport.release()
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await client.flush()
 
         let sent = await transport.sent
@@ -255,6 +231,47 @@ final class TapToPayReportsTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// Runs `initialize` on a session for entry point "first", and installs another for `entryPoint` while the run
+    /// fetches its configuration, so the work has already started under the first.
+    private func initializeWhileAnotherSessionIsInstalled(entryPoint: String) async throws
+        -> (first: PayabliSession, firstTransport: InMemoryTelemetryTransport, secondTransport: InMemoryTelemetryTransport)
+    {
+        PayabliSession.resetForTesting()
+        addTeardownBlock { PayabliSession.resetForTesting() }
+        let firstTransport = InMemoryTelemetryTransport()
+        let first = try PayabliSession.install(
+            config: PayabliConfig(entryPoint: "first", environment: .sandbox, tokenProvider: { "seed_token" }),
+            urlSession: StubURLProtocol.makeSession(),
+            telemetryTransport: firstTransport
+        )
+        let ttp = PayabliTTP(
+            session: first,
+            provider: MockTapToPayProvider(),
+            attestation: MockDeviceAttestationService(),
+            retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0)
+        )
+        let secondTransport = InMemoryTelemetryTransport()
+        let second = InstalledLater()
+        let answerConfig = Self.configHandler(status: 200)
+        StubURLProtocol.handler = { request in
+            guard second.value == nil else { return try answerConfig(request) }
+            PayabliSession.resetForTesting()
+            second.value = try PayabliSession.install(
+                config: PayabliConfig(entryPoint: entryPoint, environment: .sandbox, tokenProvider: { "seed_token" }),
+                urlSession: StubURLProtocol.makeSession(),
+                telemetryTransport: secondTransport
+            )
+            return try answerConfig(request)
+        }
+
+        _ = try? await ttp.initialize()
+        let installed = try XCTUnwrap(second.value)
+        await TelemetryRecorders.settled()
+        await first.telemetry.flush()
+        await installed.telemetry.flush()
+        return (first, firstTransport, secondTransport)
+    }
 
     /// Runs `initialize` to its failure and reads what reached the transport without flushing it, so the
     /// failure's own send is what is proved.
@@ -273,7 +290,7 @@ final class TapToPayReportsTests: XCTestCase {
             told = error as? TapToPayError
         }
         let code = try XCTUnwrap(told?.code, "\(path)", file: file, line: line)
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
 
         let failures = await sent(transport).filter { $0.event == "ttp.initialize.failed" }
         XCTAssertEqual(failures.count, 1, "\(path): sent at once, and once", file: file, line: line)
