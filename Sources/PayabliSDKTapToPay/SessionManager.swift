@@ -28,6 +28,10 @@ final class SessionManager: ObservableObject {
     @Published private(set) var isReady: Bool = false
     private(set) var lastError: Error?
 
+    /// Told of each move from one state to another; a move between two charge activities or two progress readings is
+    /// not one.
+    var onMove: ((_ from: PayabliTTPSessionState, _ to: PayabliTTPSessionState) -> Void)?
+
     init() {}
 
     /// Attempt to transition to a new state. Rejects invalid transitions.
@@ -132,8 +136,12 @@ final class SessionManager: ObservableObject {
     ///
     /// - Parameter target: the state the session moves to.
     private func move(to target: PayabliTTPSessionState) {
+        let from = sessionState
         sessionState = target
         isReady = (target == .ready)
+        if from.diagnosticName != target.diagnosticName {
+            onMove?(from, target)
+        }
     }
 
     // MARK: - Transition matrix
@@ -242,6 +250,34 @@ final class SessionManager: ObservableObject {
             return to != .opening
         case .closing:
             return false
+        }
+    }
+}
+
+extension PayabliTTPSessionState {
+    /// The state's name in telemetry, the same on both platforms.
+    var diagnosticName: String {
+        switch self {
+        case .idle: "idle"
+        case .attestingDevice: "attesting_device"
+        case .fetchingConfig: "fetching_config"
+        case .initializingReader: "initializing_reader"
+        case .ready: "ready"
+        case .charging: "charging"
+        case .sessionExpired: "session_expired"
+        case .reinitializing: "reinitializing"
+        case .pendingActivation: "pending_activation"
+        case .pendingTerms: "pending_terms"
+        case .failed: "failed"
+        }
+    }
+}
+
+extension PayabliTTPFailureReason {
+    /// The reason's name in telemetry, the same on both platforms.
+    var diagnosticName: String {
+        String(describing: self).reduce(into: "") { name, character in
+            name += character.isUppercase ? "_" + character.lowercased() : String(character)
         }
     }
 }
