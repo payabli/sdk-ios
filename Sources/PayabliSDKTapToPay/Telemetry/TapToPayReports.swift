@@ -51,6 +51,9 @@ final class TapToPayReports {
             if let told {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
+            if let cause = told?.underlying as? RedactedCause {
+                properties[TelemetryProperty.failureType.rawValue] = cause.simpleTypeName
+            }
         }
         record(name, properties: properties, occurredAt: now)
     }
