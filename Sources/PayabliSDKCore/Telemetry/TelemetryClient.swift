@@ -345,8 +345,6 @@ package actor TelemetryClient {
         TelemetryEventName.ttpChargeFailed,
         TelemetryEventName.ttpCloseFailed,
         TelemetryEventName.ttpNfcFailed,
-        TelemetryEventName.ttpAttestationQuotaExhausted,
-        TelemetryEventName.authTokenFailed,
         TelemetryEventName.sdkInitializeFailed
     ]
 
