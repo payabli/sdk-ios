@@ -80,7 +80,7 @@ final class DeviceServiceClient: Sendable {
         on route: DeviceRoute,
         answer: PayabliResponse?
     ) -> (outcome: String, code: Int?) {
-        // A refused token, a timeout and a rate limit are the transport's, not the route's answer.
+        // Otherwise a refused token, a timeout and a rate limit are the transport's, not the route's answer.
         if let refusal = error as? DeviceRouteRefusal {
             return refusal.isRefusal ? ("refused", refusal.rawCode.flatMap { Int($0) }) : ("failed", nil)
         }
@@ -144,7 +144,7 @@ final class DeviceServiceClient: Sendable {
     ///   gone, before the status mapping.
     /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
-    ///   service sent, or `nil` where the words name nothing the route classifies, so the status mapping answers.
+    ///   service sent, or `nil` where the words name nothing the route classifies, so the code decides.
     /// - Returns: the raw response, for the caller to decode.
     func post(
         _ route: DeviceRoute,
