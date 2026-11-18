@@ -15,11 +15,15 @@ final class TTPConfigClient: Sendable {
     private let attestation: DeviceAttestationService
     private let logger = PayabliLogger(category: .taptopay)
 
+    /// - Parameter transport: what the request is sent over, the session's.
+    /// - Parameter attestation: what signs the request's assertion.
+    /// - Parameter telemetry: where the route's outcome is reported, or `nil` to report nothing.
     init(
         transport: any PayabliTransport,
-        attestation: DeviceAttestationService
+        attestation: DeviceAttestationService,
+        telemetry: TelemetryClient? = nil
     ) {
-        routes = DeviceRouteClient(transport: transport)
+        routes = DeviceRouteClient(transport: transport, telemetry: telemetry)
         self.attestation = attestation
     }
 
@@ -40,60 +44,62 @@ final class TTPConfigClient: Sendable {
             pinsCredential: true
         )
 
-        let response = try await routes.get(.config, request)
+        return try await routes.measured(.config) {
+            let response = try await routes.get(.config, request)
 
-        try throwRefusalToldByItsText(response, entry: entry, presented: headers)
-        if response.statusCode == 401 {
-            throw PinnedTokenRefusal()
-        }
-
-        try mapPayabliHTTPError(response: response) { code in
-            if code == 403 {
-                return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
+            try throwRefusalToldByItsText(response, entry: entry, presented: headers)
+            if response.statusCode == 401 {
+                throw PinnedTokenRefusal()
             }
-            return nil
-        }
 
-        // Shared envelope helpers live in `PayabliSDKCore/Networking/ResponseEnvelope.swift`.
-        if let (rawCode, reason) = PayabliEnvelope.declineOutcome(from: response.body) {
-            let code = rawCode ?? 0
-            // Same as the attestation path: the code, not the service's sentence.
-            logger.error("[config] declined (isSuccess=false code=\(code))")
-            // A binding the service no longer holds is dropped here, where which handle the request presented is
-            // known. Any other 401 in the body keeps it.
-            if BindingRefusal.isBindingGone(code: code, reason: reason) {
-                guard dropRefusedBinding(entry: entry, presented: headers) else {
-                    throw PayabliTTPError.attestationRevoked(
-                        reason: "\(reason) — the stored binding could not be dropped",
-                        httpStatus: response.statusCode
-                    )
+            try mapPayabliHTTPError(response: response) { code in
+                if code == 403 {
+                    return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
                 }
-                throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
+                return nil
             }
-            if code == 401 {
-                throw PayabliGenericError(type: .tokenExpired, reason: reason, httpStatus: response.statusCode, rawCode: nil)
-            }
-            if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
-                throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
-            }
-            if code == 403 {
-                throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
-            }
-            throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
-        }
 
-        let decoder = JSONDecoder()
-        guard let envelope = try? decoder.decode(
-            PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
-            from: response.body
-        ),
-            let credentials = envelope.responseData?.credentials
-        else {
-            logger.error("[config] payload decode failed")
-            throw PayabliTTPError.configFailed(reason: "Invalid config envelope", httpStatus: response.statusCode)
-        }
+            // Shared envelope helpers live in `PayabliSDKCore/Networking/ResponseEnvelope.swift`.
+            if let (rawCode, reason) = PayabliEnvelope.declineOutcome(from: response.body) {
+                let code = rawCode ?? 0
+                // Same as the attestation path: the code, not the service's sentence.
+                logger.error("[config] declined (isSuccess=false code=\(code))")
+                // A binding the service no longer holds is dropped here, where which handle the request presented is
+                // known. Any other 401 in the body keeps it.
+                if BindingRefusal.isBindingGone(code: code, reason: reason) {
+                    guard dropRefusedBinding(entry: entry, presented: headers) else {
+                        throw PayabliTTPError.attestationRevoked(
+                            reason: "\(reason) — the stored binding could not be dropped",
+                            httpStatus: response.statusCode
+                        )
+                    }
+                    throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
+                }
+                if code == 401 {
+                    throw PayabliGenericError(type: .tokenExpired, reason: reason, httpStatus: response.statusCode, rawCode: nil)
+                }
+                if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
+                    throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
+                }
+                if code == 403 {
+                    throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
+                }
+                throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
+            }
 
-        return TTPConfig(providerCredentials: credentials)
+            let decoder = JSONDecoder()
+            guard let envelope = try? decoder.decode(
+                PayabliEnvelope.Success<ConfigCredentialsPayload>.self,
+                from: response.body
+            ),
+                let credentials = envelope.responseData?.credentials
+            else {
+                logger.error("[config] payload decode failed")
+                throw PayabliTTPError.configFailed(reason: "Invalid config envelope", httpStatus: response.statusCode)
+            }
+
+            return TTPConfig(providerCredentials: credentials)
+        }
     }
 
     /// Throws the refusals told apart by their text before the status is mapped: an app the paypoint has not registered,
