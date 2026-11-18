@@ -16,7 +16,8 @@ enum AttestFixture {
         storage: SecureStorage = InMemorySecureStorage(),
         hardwareIdProvider: @Sendable @escaping () throws -> String = { "fixed-hw-id" },
         appIdProvider: @Sendable @escaping () throws -> String? = { "TEAM.bundle.id" },
-        tokenProvider: @escaping PayabliTokenRefresh = { "seed" }
+        tokenProvider: @escaping PayabliTokenRefresh = { "seed" },
+        telemetry: TelemetryClient? = nil
     ) throws -> (AppAttestService, MockAppAttestor, PayabliAuth) {
         let urlSession = StubURLProtocol.makeSession()
         let config = try PayabliConfig(
@@ -41,6 +42,7 @@ enum AttestFixture {
         let attestor = MockAppAttestor()
         let sut = AppAttestService(
             transport: transport,
+            telemetry: telemetry,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: hardwareIdProvider,

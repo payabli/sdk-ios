@@ -86,6 +86,11 @@ package enum TelemetryEventName {
     package static let ttpReinitializeStarted = "ttp.reinitialize.started"
     package static let ttpReinitializeSucceeded = "ttp.reinitialize.succeeded"
     package static let ttpStateChanged = "ttp.session.stateChanged"
+    package static let ttpDeviceChallengeCompleted = "ttp.device.challenge.completed"
+    package static let ttpDeviceRegisterCompleted = "ttp.device.register.completed"
+    package static let ttpDeviceAttestCompleted = "ttp.device.attest.completed"
+    package static let ttpDeviceActivateCompleted = "ttp.device.activate.completed"
+    package static let ttpDeviceConfigCompleted = "ttp.device.config.completed"
 
     // System
     package static let sdkInitialized = "sdk.initialized"

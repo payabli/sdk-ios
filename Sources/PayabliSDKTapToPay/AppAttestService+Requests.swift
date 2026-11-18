@@ -65,16 +65,26 @@ extension AppAttestService {
             PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws -> Payload {
-        let response = try await routes.post(
-            route,
-            path: path,
-            body: body,
-            assertion: assertion,
-            readsRefusalBeforeStatus: readsRefusalBeforeStatus,
-            pinsCredential: pinsCredential,
-            makeDeclineError: makeDeclineError
-        )
+        try await routes.measured(route) {
+            let response = try await routes.post(
+                route,
+                path: path,
+                body: body,
+                assertion: assertion,
+                readsRefusalBeforeStatus: readsRefusalBeforeStatus,
+                pinsCredential: pinsCredential,
+                makeDeclineError: makeDeclineError
+            )
+            return try decodedPayload(of: response, on: route)
+        }
+    }
 
+    /// The envelope's `responseData`, decoded as `Payload`.
+    ///
+    /// - Parameter response: the route's answer, already read for a refusal.
+    /// - Parameter route: the route answered, which names the answer in its logs and errors.
+    /// - Returns: the decoded payload, or throws `decodingError` where it is missing or unreadable.
+    private func decodedPayload<Payload: Decodable>(of response: PayabliResponse, on route: DeviceRoute) throws -> Payload {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
@@ -124,14 +134,16 @@ extension AppAttestService {
             PayabliTTPError.attestationFailed(reason: reason)
         }
     ) async throws {
-        _ = try await routes.post(
-            route,
-            path: path,
-            body: body,
-            assertion: assertion,
-            readsRefusalBeforeStatus: readsRefusalBeforeStatus,
-            pinsCredential: pinsCredential,
-            makeDeclineError: makeDeclineError
-        )
+        try await routes.measured(route) {
+            _ = try await routes.post(
+                route,
+                path: path,
+                body: body,
+                assertion: assertion,
+                readsRefusalBeforeStatus: readsRefusalBeforeStatus,
+                pinsCredential: pinsCredential,
+                makeDeclineError: makeDeclineError
+            )
+        }
     }
 }

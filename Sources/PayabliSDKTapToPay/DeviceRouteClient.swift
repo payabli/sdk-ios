@@ -8,17 +8,100 @@ enum DeviceRoute: String, Sendable {
     case attest
     case activate
     case config
+
+    var completedEvent: String {
+        switch self {
+        case .challenge: TelemetryEventName.ttpDeviceChallengeCompleted
+        case .register: TelemetryEventName.ttpDeviceRegisterCompleted
+        case .attest: TelemetryEventName.ttpDeviceAttestCompleted
+        case .activate: TelemetryEventName.ttpDeviceActivateCompleted
+        case .config: TelemetryEventName.ttpDeviceConfigCompleted
+        }
+    }
+}
+
+/// The answer a measured route call received, written by the client as it reads one.
+final class RouteAnswer: @unchecked Sendable {
+    @TaskLocal static var current: RouteAnswer?
+
+    private let lock = NSLock()
+    private var held: PayabliResponse?
+
+    var response: PayabliResponse? {
+        get { lock.withLock { held } }
+        set { lock.withLock { held = newValue } }
+    }
 }
 
 /// The one client every card-present device route is sent through: the four attestation-family POSTs and the
 /// configuration GET. The bearer and its refresh are the transport's.
 final class DeviceRouteClient: Sendable {
     private let transport: any PayabliTransport
+    private let telemetry: TelemetryClient?
     private let logger = PayabliLogger(category: .taptopay)
 
     /// - Parameter transport: what every device route is sent over, the session's.
-    init(transport: any PayabliTransport) {
+    /// - Parameter telemetry: where each route call's outcome is reported, or `nil` to report nothing.
+    init(transport: any PayabliTransport, telemetry: TelemetryClient? = nil) {
         self.transport = transport
+        self.telemetry = telemetry
+    }
+
+    /// Runs one route call and reports how it ended: `succeeded` when it returned, `refused` with the service's code
+    /// when the service answered no, and `failed` when no usable answer arrived. A cancelled call reports nothing.
+    ///
+    /// - Parameter route: the route the call sends.
+    /// - Parameter call: the request and the reading of its answer.
+    /// - Returns: what `call` answered.
+    func measured<Result>(_ route: DeviceRoute, _ call: () async throws -> Result) async throws -> Result {
+        let answer = RouteAnswer()
+        let started = ContinuousClock.now
+        do {
+            let result = try await RouteAnswer.$current.withValue(answer, operation: call)
+            await report(route, outcome: "succeeded", code: nil, since: started)
+            return result
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            let (outcome, code) = Self.outcome(of: error, on: route, answer: answer.response)
+            await report(route, outcome: outcome, code: code, since: started)
+            throw error
+        }
+    }
+
+    /// How a route call that threw ended.
+    ///
+    /// - Parameter error: what the call threw.
+    /// - Parameter route: the route the call sent.
+    /// - Parameter answer: the response the call read, or `nil` when none arrived.
+    /// - Returns: `refused` and the service's code when the service answered no, `failed` and no code otherwise.
+    static func outcome(
+        of error: Error,
+        on route: DeviceRoute,
+        answer: PayabliResponse?
+    ) -> (outcome: String, code: Int?) {
+        guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500 else { return ("failed", nil) }
+        if let (code, _) = PayabliEnvelope.declineOutcome(from: answer.body) {
+            return ("refused", code)
+        }
+        // The gateway refuses `/config` with a bare 403 when the device owes its activation code.
+        if route == .config, answer.statusCode == 403 {
+            return ("refused", 403)
+        }
+        return ("failed", nil)
+    }
+
+    private func report(_ route: DeviceRoute, outcome: String, code: Int?, since started: ContinuousClock.Instant) async {
+        guard let telemetry else { return }
+        let (seconds, attoseconds) = (ContinuousClock.now - started).components
+        var properties = [
+            TelemetryProperty.outcome.rawValue: outcome,
+            TelemetryProperty.durationMs.rawValue: String(seconds * 1000 + attoseconds / 1_000_000_000_000_000)
+        ]
+        if let code {
+            properties[TelemetryProperty.code.rawValue] = String(code)
+        }
+        await telemetry.emit(route.completedEvent, properties: properties, occurredAt: Date())
     }
 
     /// Sends a device-route GET and answers its raw response, for the caller to classify.
@@ -30,6 +113,7 @@ final class DeviceRouteClient: Sendable {
         // The headers carry the App Attest assertion, key id and device id.
         logger.info("[\(route.rawValue)] → GET \(request.path)")
         let response = try await transport.perform(request)
+        RouteAnswer.current?.response = response
         // A configuration body carries the card reader's credentials. The log gets its shape.
         logger.info("[\(route.rawValue)] ← [\(response.statusCode)] bytes=\(response.body.count)")
         return response
@@ -76,6 +160,7 @@ final class DeviceRouteClient: Sendable {
         let response: PayabliResponse
         do {
             response = try await transport.perform(request)
+            RouteAnswer.current?.response = response
         } catch {
             // `AuthenticatedTransport` answers a spent token as a typed error, so
             // this catch is not only URLSession failures and not only Foundation's

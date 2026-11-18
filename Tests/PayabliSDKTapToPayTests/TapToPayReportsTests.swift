@@ -32,7 +32,10 @@ final class TapToPayReportsTests: XCTestCase {
         let events = await sent(transport).filter { $0.event.hasPrefix("ttp.") }
         XCTAssertEqual(
             events.map(\.event),
-            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.initialize.succeeded"]
+            [
+                "ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded",
+                "ttp.device.config.completed", "ttp.initialize.succeeded"
+            ]
         )
         let succeeded = try XCTUnwrap(events.last)
         XCTAssertEqual(Set(succeeded.properties.keys), ["duration_ms"])
@@ -187,7 +190,10 @@ final class TapToPayReportsTests: XCTestCase {
 
         let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
         let after = await sent(run.secondTransport).filter { $0.event.hasPrefix("ttp.") }
-        XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
+        XCTAssertEqual(
+            before.map(\.event),
+            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.device.config.completed"]
+        )
         XCTAssertEqual(after.map(\.event), ["ttp.initialize.failed"], "the end leaves on the installed channel")
         XCTAssertTrue((before + after).allSatisfy { $0.sessionId == run.first.telemetry.sessionId })
     }
@@ -196,7 +202,10 @@ final class TapToPayReportsTests: XCTestCase {
         let run = try await initializeWhileAnotherSessionIsInstalled(entryPoint: "second")
 
         let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
-        XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
+        XCTAssertEqual(
+            before.map(\.event),
+            ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded", "ttp.device.config.completed"]
+        )
         XCTAssertTrue(before.allSatisfy { $0.sessionId == run.first.telemetry.sessionId && $0.entry == "first" })
         let installedSinceGotOnlyItsOwnStart = await sent(run.secondTransport).map(\.event)
         XCTAssertEqual(installedSinceGotOnlyItsOwnStart, ["sdk.initialized"])

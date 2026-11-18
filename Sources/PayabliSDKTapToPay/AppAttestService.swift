@@ -32,14 +32,17 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     ///   - attestor: what signs and attests on this device.
     ///   - storage: the Keychain the bindings and the install identifier are held in.
     ///   - deviceIdentity: the install identifier `hardwareId()` sends.
+    ///   - telemetry: where each attestation route's outcome is reported, or `nil` to report nothing.
     package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: KeychainStorage,
-        deviceIdentity: DeviceIdentity
+        deviceIdentity: DeviceIdentity,
+        telemetry: TelemetryClient? = nil
     ) {
         self.init(
             transport: transport,
+            telemetry: telemetry,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: { try deviceIdentity.value() },
@@ -53,6 +56,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     init(
         transport: any PayabliTransport,
+        telemetry: TelemetryClient? = nil,
         attestor: AppAttestor,
         storage: SecureStorage,
         hardwareIdProvider: @Sendable @escaping () throws -> String,
@@ -61,7 +65,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         osVersionProvider: @Sendable @escaping () -> String
     ) {
         self.transport = transport
-        routes = DeviceRouteClient(transport: transport)
+        routes = DeviceRouteClient(transport: transport, telemetry: telemetry)
         self.attestor = attestor
         self.storage = storage
         bindingStore = AttestedDeviceStore(storage: storage)
