@@ -60,7 +60,6 @@ import Foundation
     case deviceNotPending = 3028
     case terminalNotReady = 3029
     case tooManyOpenCharges = 3030
-    case paymentNotHeld = 3031
     case deviceIdentityUnavailable = 3033
     case chargeNotFinished = 3034
     case paymentNotTaken = 3035

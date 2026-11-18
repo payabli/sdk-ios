@@ -259,7 +259,6 @@ final class PayabliErrorCatalogTests: XCTestCase {
             .invalidRequest,
             "Too many charges are waiting to be resolved."
         ),
-        (.paymentNotHeld, .paymentNotHeld, "PAYMENT_NOT_HELD", 3031, .invalidRequest, "No captured payment is held under that identifier."),
         (
             .deviceIdentityUnavailable,
             .deviceIdentityUnavailable,
@@ -308,9 +307,9 @@ final class PayabliErrorCatalogTests: XCTestCase {
         XCTAssertEqual(Set(PayabliErrorType.allCases.map(\.code)), Set(PayabliErrorTypeCode.allCases))
     }
 
-    /// 3032 was retired before publication, and a retired number is never reused.
-    func testNoTypeTakesTheRetiredNumber() {
-        XCTAssertFalse(PayabliErrorType.allCases.contains { $0.number == 3032 })
+    /// 3031 was published and is retired, 3032 was retired before publication, and a retired number is never reused.
+    func testNoTypeTakesARetiredNumber() {
+        XCTAssertFalse(PayabliErrorType.allCases.contains { [3031, 3032].contains($0.number) })
     }
 
     func testNoTwoCodesShareANumber() {
@@ -339,7 +338,7 @@ final class PayabliErrorCatalogTests: XCTestCase {
     /// a number that was allocated and then retired leaves a hole this test
     /// knows, and any other gap is an allocation nobody recorded.
     func testNumbersAreContiguousWithinEachAreaExceptRetiredHoles() {
-        let retired: Set = [3032]
+        let retired: Set = [3031, 3032]
         let byArea = Dictionary(grouping: PayabliErrorType.allCases, by: { $0.number / 1000 })
         for (area, cases) in byArea {
             let numbers = cases.map(\.number).sorted()

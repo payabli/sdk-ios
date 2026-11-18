@@ -94,7 +94,6 @@ public enum PayabliErrorType: String, Sendable, CaseIterable {
     case deviceNotPending = "DEVICE_NOT_PENDING"
     case terminalNotReady = "TERMINAL_NOT_READY"
     case tooManyOpenCharges = "TOO_MANY_OPEN_CHARGES"
-    case paymentNotHeld = "PAYMENT_NOT_HELD"
     case deviceIdentityUnavailable = "DEVICE_IDENTITY_UNAVAILABLE"
     case chargeNotFinished = "CHARGE_NOT_FINISHED"
     case paymentNotTaken = "PAYMENT_NOT_TAKEN"
@@ -196,7 +195,6 @@ public extension PayabliErrorType {
         case .deviceNotPending: .deviceNotPending
         case .terminalNotReady: .terminalNotReady
         case .tooManyOpenCharges: .tooManyOpenCharges
-        case .paymentNotHeld: .paymentNotHeld
         case .deviceIdentityUnavailable: .deviceIdentityUnavailable
         case .chargeNotFinished: .chargeNotFinished
         case .paymentNotTaken: .paymentNotTaken
@@ -273,7 +271,6 @@ public extension PayabliErrorType {
         case .deviceNotPending: "This device is not waiting for activation."
         case .terminalNotReady: "The terminal is not ready for this call."
         case .tooManyOpenCharges: "Too many charges are waiting to be resolved."
-        case .paymentNotHeld: "No captured payment is held under that identifier."
         case .deviceIdentityUnavailable: "This device cannot be identified."
         case .chargeNotFinished:
             "An earlier charge on this device hasn't finished. Check that payment before charging again, or wait four minutes."
@@ -301,7 +298,7 @@ public extension PayabliErrorType {
              .transactionNotFound, .paymentNotTaken:
             .retryLater
         case .validation, .sessionNotInitialized, .activationCodeMalformed, .activationCodeIncorrect, .deviceNotPending, .terminalNotReady,
-             .tooManyOpenCharges, .paymentNotHeld, .retryNotSamePayment, .paymentReferenceOpen:
+             .tooManyOpenCharges, .retryNotSamePayment, .paymentReferenceOpen:
             .invalidRequest
         case .deviceSetupUnsupported, .deviceSetupRefused, .deviceOSUnsupported, .deviceHardwareUnsupported,
              .readerDeviceRefused, .deviceIdentityUnavailable:

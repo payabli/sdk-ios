@@ -190,7 +190,6 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         ]
         let notProducedYet: Set<PayabliErrorType> = [
             .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
-            .paymentNotHeld, // no close call on this platform yet
             .contactlessDisabled // an iPhone has no switch for its contactless radio
         ]
         let produced = fromTheTable.union(fromActivation).union(raisedDirectly)
