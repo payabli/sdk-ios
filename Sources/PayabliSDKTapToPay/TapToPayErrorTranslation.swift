@@ -45,10 +45,18 @@ enum TapToPayErrorTranslation {
                 detail: displayedDetail(of: error),
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
                 httpStatus: answer.httpStatus,
-                rawCode: answer.rawCode
+                rawCode: answer.rawCode,
+                underlying: (error as? PayabliGenericError)?.underlying as? RedactedCause
             )
         default:
-            return TapToPayError(type: .unknown, reason: PayabliErrorType.unknown.message, detail: nil)
+            // An error the SDK did not expect: its type's name rides the cause, and its message never crosses.
+            guard let failure = error.payabliUnexpectedFailure else { return error }
+            return TapToPayError(
+                type: failure.type,
+                reason: failure.reason,
+                detail: nil,
+                underlying: failure.underlying as? RedactedCause
+            )
         }
     }
 
@@ -95,7 +103,8 @@ enum TapToPayErrorTranslation {
             retryAfter: failure.retryAfter,
             refusal: failure.refusal,
             httpStatus: failure.httpStatus,
-            rawCode: failure.rawCode
+            rawCode: failure.rawCode,
+            underlying: failure.underlying as? RedactedCause
         )
     }
 
