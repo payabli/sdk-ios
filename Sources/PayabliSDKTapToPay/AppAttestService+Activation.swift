@@ -86,7 +86,7 @@ package extension AppAttestService {
             throw error
         } catch let error as TapToPayError {
             throw ActivationSigningFailed(hostError: error)
-        } catch PayabliTTPError.attestationFailed {
+        } catch PayabliTTPError.deviceSetupRequired {
             throw ActivationSigningFailed(hostError: TapToPayError(
                 type: .deviceSetupRequired,
                 reason: "No device binding is held to sign the activation with",

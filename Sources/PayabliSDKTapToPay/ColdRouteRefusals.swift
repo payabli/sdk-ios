@@ -29,7 +29,10 @@ enum ColdRouteRefusals {
         case 404 where reason == deviceNotFound,
              403 where reason == notPending:
             return PayabliTTPError.deviceSetupRequired(reason: reason)
-        case 400 where reason != attestationRootUnavailable && reason.hasPrefix(verificationFailedPrefix):
+        case 400 where reason == attestationRootUnavailable:
+            // The service cannot verify anything, so it is the service failing, not the device.
+            return DeviceRouteRefusal(type: .serverError, detail: reason, httpStatus: 400, rawCode: nil)
+        case 400 where reason.hasPrefix(verificationFailedPrefix):
             return PayabliTTPError.deviceSetupRefused(reason: reason)
         default:
             return nil
@@ -41,6 +44,6 @@ enum ColdRouteRefusals {
     private static let deviceNotFound = "Device not found."
     private static let notPending = "Device is not in a state that allows this operation."
     private static let verificationFailedPrefix = "Attestation verification failed: "
-    /// Ruled to keep the status's own answer, so the prefix match above cannot swallow it.
+    /// Matched on the whole text before the prefix, which would otherwise read it as the device refused.
     private static let attestationRootUnavailable = "Attestation verification failed: Apple attestation root is unavailable."
 }

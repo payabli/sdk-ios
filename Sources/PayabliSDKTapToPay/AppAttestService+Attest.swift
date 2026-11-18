@@ -118,7 +118,7 @@ extension AppAttestService {
 
     package func generateAssertion(for entry: String) async throws -> AssertionHeaders {
         guard let binding = try binding(for: entry) else {
-            throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
+            throw PayabliTTPError.deviceSetupRequired(reason: "Missing attestation state")
         }
         let keyId = AppAttestKeyId(binding.keyId)
         let deviceId = binding.deviceId

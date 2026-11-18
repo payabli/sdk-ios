@@ -52,13 +52,13 @@ final class DeviceRefusalStatusTests: XCTestCase {
         XCTAssertNil(host.rawCode)
     }
 
-    func testADeclineOnASuccessStatusCarriesThatStatus() async throws {
+    func testADeclineOnASuccessStatusCarriesThatStatusAndItsCode() async throws {
         stubColdRoutes(refusing: Self.attest, status: 200, text: "Something the SDK does not classify")
 
         let host = try await attestFailure()
 
         XCTAssertEqual(host.httpStatus, 200)
-        XCTAssertNil(host.rawCode)
+        XCTAssertEqual(host.rawCode, "200", "the code the refusal named")
     }
 
     func testARefusedActivationCodeCarriesItsStatus() async throws {

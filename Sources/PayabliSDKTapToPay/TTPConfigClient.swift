@@ -52,6 +52,11 @@ final class TTPConfigClient: Sendable {
                 throw PinnedTokenRefusal()
             }
 
+            if [400, 404].contains(response.statusCode),
+               let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body)
+            {
+                throw DeviceRouteRefusal.of(code: code ?? response.statusCode, reason: reason, httpStatus: response.statusCode)
+            }
             try mapPayabliHTTPError(response: response) { code in
                 if code == 403 {
                     return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
@@ -84,7 +89,7 @@ final class TTPConfigClient: Sendable {
                 if code == 403 {
                     throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
                 }
-                throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
+                throw DeviceRouteRefusal.of(code: rawCode, reason: reason, httpStatus: response.statusCode)
             }
 
             let decoder = JSONDecoder()
@@ -95,7 +100,7 @@ final class TTPConfigClient: Sendable {
                 let credentials = envelope.responseData?.credentials
             else {
                 logger.error("[config] payload decode failed")
-                throw PayabliTTPError.configFailed(reason: "Invalid config envelope", httpStatus: response.statusCode)
+                throw DeviceRouteRefusal.undecodable(httpStatus: response.statusCode)
             }
 
             return TTPConfig(providerCredentials: credentials)

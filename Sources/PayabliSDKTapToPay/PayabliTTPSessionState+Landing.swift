@@ -95,7 +95,7 @@ extension PayabliTTPSessionState {
             return .failed(reason: .sdkInternalError)
         }
         switch payabliError.type {
-        case .permissionDenied:
+        case .permissionDenied, .devicePendingActivation:
             // The remedy offered is an activation code. A refusal that code does
             // not repair needs a classification this map is not given.
             return pendingActivation(registration)
