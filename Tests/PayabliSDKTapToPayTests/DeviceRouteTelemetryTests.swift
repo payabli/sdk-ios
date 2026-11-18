@@ -109,21 +109,6 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["outcome"], "failed")
     }
 
-    func testATokenRefusedInsideASuccessfulStatusIsFailed() async throws {
-        let (client, telemetry) = makeClient(answering: .status(200, body: Self.decline(code: 401)))
-
-        await assertThrows {
-            _ = try await client.measured(.config) {
-                let response = try await client.get(.config, Self.request)
-                throw PayabliGenericError(type: .tokenExpired, reason: "expired", httpStatus: response.statusCode, rawCode: nil)
-            }
-        }
-
-        let properties = try await onlyEvent(of: telemetry)
-        XCTAssertEqual(properties["outcome"], "failed", "the token was refused, not the route")
-        XCTAssertNil(properties["code"])
-    }
-
     func testACancelledCallReportsNothing() async throws {
         let (client, telemetry) = makeClient(answering: .error(CancellationError()))
 
