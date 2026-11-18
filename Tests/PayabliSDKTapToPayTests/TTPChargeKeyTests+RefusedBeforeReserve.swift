@@ -57,7 +57,7 @@ extension TTPChargeKeyTests {
         _ = waitOnActivation(ttp)
 
         let refused = await failure {
-            try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 2, currency: "USD"), attempt: .retry)
+            try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 2, currency: .usd), attempt: .retry)
         }
 
         XCTAssertEqual(refused?.type, .terminalNotReady)

@@ -345,7 +345,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
                     totalAmount: totalAmount,
                     serviceFee: serviceFee,
                     surchargeFee: surchargeFee,
-                    currency: "USD"
+                    currency: .usd
                 ),
                 customerData: PayabliPayInCustomerData(
                     additionalData: additionalData,

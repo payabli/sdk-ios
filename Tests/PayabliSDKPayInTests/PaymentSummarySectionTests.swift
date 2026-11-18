@@ -97,7 +97,7 @@ final class PaymentSummarySectionTests: XCTestCase {
         )
         let drawn = PayInSummaryPlacement.place(
             configuration.cardSections,
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, serviceFee: 0.5, currency: .usd),
             showsBaseAmount: true
         )
 

@@ -319,7 +319,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
             // The recovery stops inside the provider and stays there. If the
             // second setup is not made to wait, it walks in behind it.
             async let recovering: Void = { _ = try? await ttp.charge(
-                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
             ) }()
             await Task.yield()
 
@@ -404,7 +404,7 @@ final class PayabliTTPReaderSessionRecoveryTests: XCTestCase {
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
         try await bounded {
             try await ttp.charge(
-                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
             )
         }
     }

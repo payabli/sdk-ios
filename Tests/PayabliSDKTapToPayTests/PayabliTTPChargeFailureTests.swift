@@ -409,7 +409,7 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
     private func charge(_ ttp: PayabliTTP) async throws -> TransactionResult {
         try await bounded {
             try await ttp.charge(
-                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
             )
         }
     }

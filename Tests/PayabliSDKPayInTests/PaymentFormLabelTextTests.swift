@@ -198,7 +198,7 @@ final class PaymentFormLabelTextTests: XCTestCase {
 
     func testARequestCarriesTheConfigurationsOrderDescription() {
         let options = PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 1, currency: .usd),
             orderDescription: "Coffee"
         )
         XCTAssertEqual(options.request(paymentMethod: .cash).options.orderDescription, "Coffee")

@@ -548,7 +548,7 @@ extension PayabliTTP {
         // `.public`, so only fields that carry no subject belong in it.
         logger.info(
             "[charge] → amount=\(paymentDetails.amount) serviceFee=\(paymentDetails.serviceFee) " +
-                "currency=\(paymentDetails.currency ?? "<nil>") " +
+                "currency=\(paymentDetails.currency?.code ?? "<nil>") " +
                 "invoice={invoiceNumber=\(invoice.invoiceNumber ?? "<nil>")} " +
                 "orderDescription=\(orderDescription ?? "<nil>")"
         )

@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 /// The rows the payment summary draws, read one at a time by a host that draws its own summary.
 public enum PayabliPayInSummaryRows {
@@ -53,24 +54,19 @@ public enum PayabliPayInSummaryRows {
 
     /// A figure as the form writes it: the device locale's separators, the currency's symbol, two places.
     ///
-    /// A currency that is absent or not an ISO 4217 code writes the number alone, since the charge is then made
-    /// in a currency the request does not name.
-    ///
     /// - Parameter amount: the figure to write, rounded here to the wire's two places.
-    /// - Parameter currency: the charge's ISO 4217 code, which names the symbol; absent or not a code writes
-    ///   the figure without one.
+    /// - Parameter currency: the charge's currency, which names the symbol; nil writes the figure without one.
     /// - Returns: the figure as text, in the device locale's separators.
-    public static func formattedAmount(_ amount: Decimal, currency: String?) -> String {
+    public static func formattedAmount(_ amount: Decimal, currency: PayabliCurrency?) -> String {
         formattedAmount(amount, currency: currency, locale: .current)
     }
 
-    static func formattedAmount(_ amount: Decimal, currency: String?, locale: Locale) -> String {
+    static func formattedAmount(_ amount: Decimal, currency: PayabliCurrency?, locale: Locale) -> String {
         let formatter = NumberFormatter()
         formatter.locale = locale
-        let code = currency?.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
-        if let code, isoCurrencyCodes.contains(code) {
+        if let currency {
             formatter.numberStyle = .currency
-            formatter.currencyCode = code
+            formatter.currencyCode = currency.code
         } else {
             formatter.numberStyle = .decimal
         }
@@ -85,6 +81,4 @@ public enum PayabliPayInSummaryRows {
     private static func areValid(_ paymentDetails: PayabliPayInPaymentDetails) -> Bool {
         (try? paymentDetails.validate()) != nil
     }
-
-    private static let isoCurrencyCodes = Set(Locale.Currency.isoCurrencies.map(\.identifier))
 }

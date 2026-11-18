@@ -140,7 +140,7 @@ final class PayabliPayInTests: XCTestCase {
         component.newIdempotencyKey = { "idem-auth" }
 
         let request = PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 22, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 22, currency: .usd),
             source: "ios-sdk-test",
             achValidation: true,
             forceCustomerCreation: true
@@ -278,7 +278,7 @@ final class PayabliPayInTests: XCTestCase {
         let viewModel = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: .usd)
             )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
@@ -322,7 +322,7 @@ final class PayabliPayInTests: XCTestCase {
         """)
         let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let capture = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: "USD")
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: .usd)
         ))
         let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         let viewModel = PayabliPayInViewModel(component: component, operation: capture, configuration: configuration)
@@ -366,7 +366,7 @@ final class PayabliPayInTests: XCTestCase {
         let viewModel = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: .usd),
                 orderDescription: "Configured description",
                 source: "ios-form-test",
                 achValidation: true,
@@ -418,14 +418,14 @@ final class PayabliPayInTests: XCTestCase {
         let captureForm = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 12.34, currency: .usd)
             )),
             configuration: configuration
         )
         let authorizeForm = PayabliPayInViewModel(
             component: component,
             operation: .authorize(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 56.78, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 56.78, currency: .usd)
             )),
             configuration: configuration
         )
@@ -458,7 +458,7 @@ final class PayabliPayInTests: XCTestCase {
         let viewModel = PayabliPayInViewModel(
             component: component,
             operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: "USD")
+                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 0.001, currency: .usd)
             )),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
         )
@@ -554,7 +554,7 @@ extension PayabliPayInTests {
 
     func testAFormThePayerAddsNothingToSendsWhatADirectCaptureWithTheSameOptionsSends() async throws {
         let options = PayabliPayInRequestConfiguration(
-            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: "USD"),
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, serviceFee: 1, currency: .usd),
             accountId: "account-1",
             customerData: PayabliPayInCustomerData(customerNumber: "C-1"),
             ipAddress: "10.0.0.1",

@@ -1,4 +1,5 @@
 import Foundation
+import PayabliSDKCore
 
 // MARK: - Customer data
 
@@ -136,30 +137,21 @@ public struct PayabliTTPCustomerData: Sendable, Equatable {
 public struct PayabliTTPPaymentDetails: Sendable, Equatable {
     public let amount: Decimal
     public let serviceFee: Decimal
-    /// ISO-4217 currency code. When `nil`, the field is omitted from the
-    /// `/initiate` JSON and the backend authorizes in the merchant's
-    /// configured processor currency (the same currency the reader uses
-    /// from `/config`). Pass an explicit value only when you need to
-    /// override that default.
-    public let currency: String?
+    /// The currency to charge in. When `nil`, the field is omitted from the
+    /// `/initiate` JSON.
+    public let currency: PayabliCurrency?
     public let paymentDescription: String?
 
     public init(
         amount: Decimal,
         serviceFee: Decimal = 0,
-        currency: String? = nil,
+        currency: PayabliCurrency? = nil,
         paymentDescription: String? = nil
     ) {
         self.amount = amount
         self.serviceFee = serviceFee
-        self.currency = PayabliTTPPaymentDetails.normalizeCurrency(currency)
+        self.currency = currency
         self.paymentDescription = PayabliTTPPaymentDetails.sanitize(paymentDescription)
-    }
-
-    private static func normalizeCurrency(_ value: String?) -> String? {
-        guard let value else { return nil }
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed.uppercased()
     }
 
     private static func sanitize(_ value: String?) -> String? {

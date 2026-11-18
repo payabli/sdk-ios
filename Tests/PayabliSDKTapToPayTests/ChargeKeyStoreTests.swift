@@ -82,12 +82,12 @@ final class ChargeKeyStoreTests: XCTestCase {
     // MARK: - Which payment a retry describes
 
     func testARetryDescribingAnotherPaymentIsRefusedAndTheHeldKeyStays() throws {
-        let held = try endUnknown(reserve(.newPayment, amount: 10, serviceFee: 1, currency: "USD", invoice: "INV-1"))
-        let others: [(Decimal, Decimal, String?, String?)] = [
-            (11, 1, "USD", "INV-1"),
-            (10, 2, "USD", "INV-1"),
-            (10, 1, "CAD", "INV-1"),
-            (10, 1, "USD", "INV-2")
+        let held = try endUnknown(reserve(.newPayment, amount: 10, serviceFee: 1, currency: .usd, invoice: "INV-1"))
+        let others: [(Decimal, Decimal, PayabliCurrency?, String?)] = [
+            (11, 1, .usd, "INV-1"),
+            (10, 2, .usd, "INV-1"),
+            (10, 1, nil, "INV-1"),
+            (10, 1, .usd, "INV-2")
         ]
         for (amount, fee, currency, invoice) in others {
             XCTAssertThrowsError(
@@ -98,15 +98,15 @@ final class ChargeKeyStoreTests: XCTestCase {
         }
 
         XCTAssertEqual(
-            try reserve(.retry, amount: 10, serviceFee: 1, currency: "USD", invoice: "INV-1").key,
+            try reserve(.retry, amount: 10, serviceFee: 1, currency: .usd, invoice: "INV-1").key,
             held.key
         )
     }
 
     func testARetryTheServiceWouldChargeTheSameWayClaimsTheHeldKey() throws {
-        let held = try endUnknown(reserve(.newPayment, amount: 10, currency: "usd"))
+        let held = try endUnknown(reserve(.newPayment, amount: 10, currency: .usd))
 
-        let retry = try reserve(.retry, amount: 10.00, currency: " USD ", invoice: "INV-ADDED")
+        let retry = try reserve(.retry, amount: 10.00, currency: .usd, invoice: "INV-ADDED")
 
         XCTAssertEqual(retry.key, held.key)
     }
@@ -369,7 +369,7 @@ final class ChargeKeyStoreTests: XCTestCase {
         entry: String = "e",
         amount: Decimal = 1,
         serviceFee: Decimal = 0,
-        currency: String? = nil,
+        currency: PayabliCurrency? = nil,
         invoice: String? = nil
     ) throws -> ChargeKeyStore.Reservation {
         try store.reserve(
@@ -393,7 +393,7 @@ final class ChargeKeyStoreTests: XCTestCase {
     private static func payment(
         amount: Decimal = 1,
         serviceFee: Decimal = 0,
-        currency: String? = nil,
+        currency: PayabliCurrency? = nil,
         invoice: String? = nil
     ) -> ChargeDescription {
         ChargeDescription(

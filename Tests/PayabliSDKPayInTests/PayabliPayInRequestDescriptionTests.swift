@@ -212,7 +212,7 @@ final class PayabliPayInRequestDescriptionTests: XCTestCase {
     private static let details = PayabliPayInPaymentDetails(
         totalAmount: 15.25,
         serviceFee: 1.5,
-        currency: "USD"
+        currency: .usd
     )
 
     private static let methodDescription = "House account"

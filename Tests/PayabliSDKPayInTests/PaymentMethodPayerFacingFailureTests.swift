@@ -441,7 +441,7 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
     }
 
     private static let requestConfiguration = PayabliPayInRequestConfiguration(
-        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: "USD")
+        paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10, currency: .usd)
     )
 
     private func flowOnTransport(_ transport: any PayabliTransport) -> PayabliPayIn {

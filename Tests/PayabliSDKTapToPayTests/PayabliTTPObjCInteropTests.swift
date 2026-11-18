@@ -16,7 +16,7 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
     func testAChargeRequestLeftUnsetTakesTheSwiftDefaults() {
         let request = PayabliTTPChargeRequestObjC(
             paymentDetails: PayabliTTPPaymentDetailsObjC(
-                amount: 1, serviceFee: 0, currency: "USD", paymentDescription: nil
+                amount: 1, serviceFee: 0, currency: .usd, paymentDescription: nil
             )
         )
 
@@ -122,29 +122,19 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         let details = PayabliTTPPaymentDetails(amount: 25.00)
         XCTAssertEqual(details.amount, 25.00)
         XCTAssertEqual(details.serviceFee, 0)
-        // currency defaults to nil so the wire JSON omits the field and the
-        // backend authorizes in the merchant's configured processor currency.
         XCTAssertNil(details.currency)
         XCTAssertNil(details.paymentDescription)
     }
 
-    func testPaymentDetailsSwiftSanitizesCurrencyAndDescription() {
+    func testPaymentDetailsSwiftSanitizesDescription() {
         let details = PayabliTTPPaymentDetails(
             amount: 10,
             serviceFee: 1,
-            currency: "  usd  ",
+            currency: .usd,
             paymentDescription: "  Coffee  "
         )
-        XCTAssertEqual(details.currency, "USD")
+        XCTAssertEqual(details.currency, .usd)
         XCTAssertEqual(details.paymentDescription, "Coffee")
-    }
-
-    func testPaymentDetailsSwiftDropsBlankCurrency() {
-        let details = PayabliTTPPaymentDetails(
-            amount: 10,
-            currency: "   "
-        )
-        XCTAssertNil(details.currency)
     }
 
     func testPaymentDetailsSwiftDropsBlankPaymentDescription() {
@@ -159,18 +149,18 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         let objc = PayabliTTPPaymentDetailsObjC(
             amount: NSDecimalNumber(string: "25.00"),
             serviceFee: NSDecimalNumber(string: "1.50"),
-            currency: "USD",
+            currency: .usd,
             paymentDescription: "Coffee"
         )
         XCTAssertEqual(objc.amount, NSDecimalNumber(string: "25.00"))
         XCTAssertEqual(objc.serviceFee, NSDecimalNumber(string: "1.50"))
-        XCTAssertEqual(objc.currency, "USD")
+        XCTAssertEqual(objc.currency, .usd)
         XCTAssertEqual(objc.paymentDescription, "Coffee")
 
         let swift = objc.toSwift()
         XCTAssertEqual(swift.amount, Decimal(string: "25.00"))
         XCTAssertEqual(swift.serviceFee, Decimal(string: "1.50"))
-        XCTAssertEqual(swift.currency, "USD")
+        XCTAssertEqual(swift.currency, .usd)
         XCTAssertEqual(swift.paymentDescription, "Coffee")
     }
 

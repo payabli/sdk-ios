@@ -318,9 +318,12 @@ When the outcome is unknown, look the transaction up before you charge again. On
 `readTransaction(_:)` and check its `status`. From your backend, use
 [`GET /api/MoneyIn/details/{transId}`](https://docs.payabli.com/developers/api-reference/moneyin/get-details-for-a-processed-transaction).
 `TapToPayError` and `PayabliPayInError.Unsettled` carry the `paymentTransId` to look up when there is
-one. When there isn't one, find the transaction in the
-Payabli portal before you charge again. On card-not-present, setting `orderId` on each request lets you find it
-by your own reference. After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed.
+one. When there isn't one, on card-not-present, read the transaction back from your backend by the `orderId` you
+set on the request, with
+[`GET /api/Query/transactions/{entry}?orderId(eq)=<orderId>`](https://docs.payabli.com/developers/api-reference/query/get-list-of-transactions-for-an-entrypoint); on Tap to Pay, find it in the
+Payabli portal. Do this before you charge again, and after your app restarts mid-payment too: the SDK holds no
+key across a relaunch, so a retry there can charge twice.
+After `captureAuthorizedTransaction(_:)` or `voidTransaction(_:)`, look up the transaction ID you passed.
 
 ### What an error carries
 
@@ -387,6 +390,8 @@ The SDK is written in Swift, and the card-not-present form is a SwiftUI view.
   a named value is none of those listed — and completes with a `PayabliPayInStoredMethodObjC`. It also offers
   `capture`, `authorize`, `captureAuthorizedTransaction` and `voidTransaction`, which take a `PayabliPayInRequestObjC` or
   `PayabliPayInAuthorizedRequestObjC` and complete with a `PayabliPayInResultObjC`.
+  A payment's currency is a `PayabliCurrency`. `PayabliTTPPaymentDetailsObjC` takes it as `PayabliCurrencyUsd`, and
+  the two card-not-present requests default to it. Objective-C always sends it.
 - **Objective-C errors.** An SDK error reaches Objective-C as an `NSError` whose `code` is its catalog
   number, with the type's name in `userInfo["PayabliErrorType"]`. `PayabliErrorTypeCode` names every catalog
   number, so compare the code of an error carrying `PayabliErrorType` against a case rather than a number:

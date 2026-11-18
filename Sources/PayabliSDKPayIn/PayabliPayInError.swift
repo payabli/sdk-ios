@@ -156,7 +156,8 @@ public class PayabliPayInError: PayabliError, @unchecked Sendable {
 
         /// The transaction the answer named; pass it to ``PayabliPayIn/readTransaction(_:)``. `nil` when the
         /// answer named none: after `voidTransaction(_:)` or `captureAuthorizedTransaction(_:)`, read back the ID you
-        /// passed; after `capture(_:)` or `authorize(_:)`, find the transaction in the Payabli portal by its `orderId`.
+        /// passed; after `capture(_:)` or `authorize(_:)`, read the payment back from your backend by the `orderId`
+        /// you set on the request.
         public let paymentTransId: String?
 
         /// The payment's name after `capture(_:)` or `authorize(_:)`: the one you set, or the one the SDK made. `nil`

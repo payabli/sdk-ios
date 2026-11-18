@@ -109,7 +109,7 @@ final class TapToPayErrorStatusTests: XCTestCase {
                 entryPoint: "myEntry",
                 deviceId: "dev_1",
                 idempotencyKey: "key-1",
-                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD")
+                paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd)
             )
         } catch {
             return try XCTUnwrap(TapToPayErrorTranslation.hostError(for: error) as? TapToPayError, "\(error)")

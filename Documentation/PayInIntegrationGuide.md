@@ -221,7 +221,7 @@ let payment = PayabliPayInRequestConfiguration(
     paymentDetails: PayabliPayInPaymentDetails(
         totalAmount: 1.00,
         serviceFee: 0.10,
-        currency: "USD"
+        currency: .usd
     ),
     orderDescription: "iOS checkout",
     source: "ios-sdk",
@@ -273,7 +273,7 @@ let result = try await paymentFlow.capture(PayabliPayInRequest(
         paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
-            currency: "USD"
+            currency: .usd
         ),
         orderDescription: "iOS checkout",
         source: "ios-sdk"
@@ -314,7 +314,7 @@ let hold = PayabliPayInRequestConfiguration(
     paymentDetails: PayabliPayInPaymentDetails(
         totalAmount: 1.00,
         serviceFee: 0.10,
-        currency: "USD"
+        currency: .usd
     ),
     orderDescription: "iOS authorization",
     source: "ios-sdk"
@@ -344,7 +344,7 @@ let result = try await paymentFlow.authorize(PayabliPayInRequest(
         paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
-            currency: "USD"
+            currency: .usd
         ),
         orderDescription: "iOS authorization",
         source: "ios-sdk"
@@ -363,7 +363,7 @@ let result = try await paymentFlow.captureAuthorizedTransaction(
         paymentDetails: PayabliPayInPaymentDetails(
             totalAmount: 1.00,
             serviceFee: 0.10,
-            currency: "USD"
+            currency: .usd
         )
     )
 )
@@ -774,7 +774,7 @@ let sheetConfiguration = PayabliPayInSheetConfiguration(
 | `totalAmount` | Required amount charged, including any surcharge sent. Must be greater than 0, and greater than `serviceFee` plus `surchargeFee`. |
 | `serviceFee` | Optional service fee. Must not be negative. Serialized as currency, for example `0.10`. |
 | `surchargeFee` | Optional surcharge, already included in `totalAmount`. Must not be negative. Serialized as currency, for example `0.30`. |
-| `currency` | Optional currency, for example `USD`. |
+| `currency` | Optional `PayabliCurrency`, for example `.usd`. |
 | `checkNumber` | Optional check number for check workflows. |
 | `checkUniqueId` | Optional check unique ID for check workflows. |
 

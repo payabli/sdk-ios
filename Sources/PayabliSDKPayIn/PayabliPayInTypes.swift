@@ -136,7 +136,8 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
     public let totalAmount: Double
     public let serviceFee: Double?
     public let surchargeFee: Double?
-    public let currency: String?
+    /// The currency to charge in. When `nil`, the field is omitted from the request.
+    public let currency: PayabliCurrency?
     public let checkNumber: String?
     public let checkUniqueId: String?
 
@@ -144,7 +145,7 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
         totalAmount: Double,
         serviceFee: Double? = nil,
         surchargeFee: Double? = nil,
-        currency: String? = nil,
+        currency: PayabliCurrency? = nil,
         checkNumber: String? = nil,
         checkUniqueId: String? = nil
     ) {
@@ -155,6 +156,46 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
         self.checkNumber = checkNumber
         self.checkUniqueId = checkUniqueId
     }
+
+    private enum CodingKeys: String, CodingKey {
+        case totalAmount, serviceFee, surchargeFee, currency, checkNumber, checkUniqueId
+    }
+
+    /// Reads payment details whose currency is written as its code, such as `"USD"`.
+    ///
+    /// - Parameter decoder: the decoder to read from.
+    /// - Throws: `DecodingError.dataCorrupted` when the currency is a code no ``PayabliCurrency`` has.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        totalAmount = try container.decode(Double.self, forKey: .totalAmount)
+        serviceFee = try container.decodeIfPresent(Double.self, forKey: .serviceFee)
+        surchargeFee = try container.decodeIfPresent(Double.self, forKey: .surchargeFee)
+        currency = try container.decodeIfPresent(String.self, forKey: .currency).map { code in
+            guard let currency = PayabliCurrency.allCases.first(where: { $0.code == code }) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .currency,
+                    in: container,
+                    debugDescription: "Not a supported currency."
+                )
+            }
+            return currency
+        }
+        checkNumber = try container.decodeIfPresent(String.self, forKey: .checkNumber)
+        checkUniqueId = try container.decodeIfPresent(String.self, forKey: .checkUniqueId)
+    }
+
+    /// Writes the payment details, the currency as its code.
+    ///
+    /// - Parameter encoder: the encoder to write to.
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(totalAmount, forKey: .totalAmount)
+        try container.encodeIfPresent(serviceFee, forKey: .serviceFee)
+        try container.encodeIfPresent(surchargeFee, forKey: .surchargeFee)
+        try container.encodeIfPresent(currency?.code, forKey: .currency)
+        try container.encodeIfPresent(checkNumber, forKey: .checkNumber)
+        try container.encodeIfPresent(checkUniqueId, forKey: .checkUniqueId)
+    }
 }
 
 extension PayabliPayInPaymentDetails {
@@ -163,7 +204,7 @@ extension PayabliPayInPaymentDetails {
             "totalAmount:\(totalAmount)",
             "serviceFee:\(serviceFee.map { "\($0)" } ?? "")",
             "surchargeFee:\(surchargeFee.map { "\($0)" } ?? "")",
-            "currency:\(currency ?? "")",
+            "currency:\(currency?.code ?? "")",
             "checkNumber:\(checkNumber ?? "")",
             "checkUniqueId:\(checkUniqueId ?? "")"
         ]

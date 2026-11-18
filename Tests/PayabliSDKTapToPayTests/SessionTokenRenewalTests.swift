@@ -165,7 +165,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         let ttp = try await makeExpiredTTP()
         stub.configStatuses = [401]
 
-        let result = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+        let result = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd))
 
         XCTAssertEqual(result.paymentTransId, RenewalStub.paymentTransId)
         XCTAssertEqual(stub.configBearers.count, 3, "initialize, the refused repair, the renewed repair")

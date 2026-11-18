@@ -2,7 +2,8 @@ import Foundation
 import PayabliSDKCore
 
 /// A capture or an authorization, for an Objective-C caller. Each property is ``PayabliPayInRequestConfiguration``'s,
-/// and a factory method per kind sets the payment method.
+/// and a factory method per kind sets the payment method. `currency` is not optional: it defaults to `.usd` and is
+/// always sent.
 @objc(PayabliPayInRequestObjC)
 public final class PayabliPayInRequestObjC: NSObject {
     let paymentMethod: PayabliPayInPaymentMethod
@@ -10,7 +11,7 @@ public final class PayabliPayInRequestObjC: NSObject {
     @objc public var totalAmount: Double
     @objc public var serviceFee: NSNumber?
     @objc public var surchargeFee: NSNumber?
-    @objc public var currency: String?
+    @objc public var currency: PayabliCurrency = .usd
     @objc public var checkNumber: String?
     @objc public var checkUniqueId: String?
     @objc public var accountId: String?
@@ -308,13 +309,14 @@ public final class PayabliPayInStoreRequestObjC: NSObject {
 }
 
 /// A capture of an authorization, for an Objective-C caller. Each property is ``PayabliPayInAuthorizedRequest``'s.
+/// `currency` is not optional: it defaults to `.usd` and is always sent.
 @objc(PayabliPayInAuthorizedRequestObjC)
 public final class PayabliPayInAuthorizedRequestObjC: NSObject {
     @objc public let transId: String
     @objc public var totalAmount: Double
     @objc public var serviceFee: NSNumber?
     @objc public var surchargeFee: NSNumber?
-    @objc public var currency: String?
+    @objc public var currency: PayabliCurrency = .usd
 
     /// - Parameter transId: the authorization to capture.
     /// - Parameter totalAmount: the amount to capture.
