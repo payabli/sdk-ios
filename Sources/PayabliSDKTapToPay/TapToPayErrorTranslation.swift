@@ -50,12 +50,11 @@ enum TapToPayErrorTranslation {
             )
         default:
             // An error the SDK did not expect: its type's name rides the cause, and its message never crosses.
-            guard let failure = error.payabliUnexpectedFailure else { return error }
             return TapToPayError(
-                type: failure.type,
-                reason: failure.reason,
+                type: .unknown,
+                reason: PayabliErrorType.unknown.message,
                 detail: nil,
-                underlying: failure.underlying as? RedactedCause
+                underlying: RedactedCause(error)
             )
         }
     }
