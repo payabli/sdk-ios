@@ -80,7 +80,10 @@ final class DeviceRouteClient: Sendable {
         on route: DeviceRoute,
         answer: PayabliResponse?
     ) -> (outcome: String, code: Int?) {
-        guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500 else { return ("failed", nil) }
+        // A refused token, a timeout and a rate limit are the transport's, not the route's answer.
+        guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500,
+              ![408, 429].contains(answer.statusCode)
+        else { return ("failed", nil) }
         if let (code, _) = PayabliEnvelope.declineOutcome(from: answer.body) {
             return ("refused", code)
         }

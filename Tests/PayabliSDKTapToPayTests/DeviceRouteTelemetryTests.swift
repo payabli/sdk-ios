@@ -143,6 +143,53 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(events.map { $0.properties["outcome"] }, ["succeeded", "succeeded", "succeeded"])
     }
 
+    func testARouteRefusalReadByTheRealClientIsRefusedWithItsCode() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Self.decline(code: 404)
+            )
+        }
+        defer { StubURLProtocol.handler = nil }
+        let (sut, _, _) = try AttestFixture.makeService(telemetry: telemetry)
+
+        await assertThrows { _ = try await sut.attest(entry: "myEntry") }
+
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "refused")
+        XCTAssertEqual(properties["code"], "404")
+    }
+
+    func testARefusedTokenWithADeclineBodyIsFailed() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Self.decline(code: 401)
+            )
+        }
+        defer { StubURLProtocol.handler = nil }
+        let (sut, _, _) = try AttestFixture.makeService(telemetry: telemetry)
+
+        await assertThrows { _ = try await sut.attest(entry: "myEntry") }
+
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "failed", "the token was refused, not the route")
+        XCTAssertNil(properties["code"])
+    }
+
+    func testARateLimitIsFailed() async throws {
+        let (client, telemetry) = makeClient(answering: .status(429, body: Self.decline(code: 429)))
+
+        await assertThrows {
+            _ = try await client.measured(.config) { try await Self.readRefusal(client.get(.config, Self.request)) }
+        }
+
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "failed")
+    }
+
     // MARK: - Fixtures
 
     private static let request = PayabliRequest(method: .get, path: "/api/v2/device/taptopay/config/e")
