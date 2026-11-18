@@ -18,6 +18,12 @@ final class PaymentDetailsCodingTests: XCTestCase {
         XCTAssertEqual(json["currency"] as? String, "USD")
     }
 
+    func testAnOmittedCurrencyIsWrittenAsUSD() throws {
+        let json = try encoded(PayabliPayInPaymentDetails(totalAmount: 1))
+
+        XCTAssertEqual(json["currency"] as? String, "USD")
+    }
+
     func testACurrencyCodeReadsAsItsCurrency() throws {
         XCTAssertEqual(try decode(#"{"totalAmount":1,"currency":"USD"}"#).currency, .usd)
     }

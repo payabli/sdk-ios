@@ -154,10 +154,10 @@ sent, so treat its outcome as unknown. If your app cancels charges, name each pa
 retry under it with `attempt: .retry`. The form reports a cancelled charge to its failure handler
 as `PayabliPayInError.Interrupted`, or as `Unsettled` with type `.userCancelled` when it may have been sent.
 
-A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency, kind of
-payment method and, if the first attempt set one, order identifier. A retry that describes another payment is refused
-before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key stays for the right
-retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
+A retry describes the same payment as the attempt it repeats: the same amount, fee, surcharge, currency (an omitted
+one is USD), kind of payment method and, if the first attempt set one, order identifier. A retry that describes
+another payment is refused before anything is sent, with type `.retryNotSamePayment`, and the earlier attempt's key
+stays for the right retry. A new payment that names a reference whose payment is still unresolved is refused before anything is sent,
 with type `.paymentReferenceOpen`. So is any call on a payment another `PayabliPayIn` is still sending, a declared
 retry included, and a capture or void of a transaction another one is still capturing or voiding. A blank reference
 is refused as invalid input, and so is a retry that names no reference.

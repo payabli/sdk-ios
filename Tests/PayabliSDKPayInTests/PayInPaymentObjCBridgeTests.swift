@@ -96,6 +96,54 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(transport.count, 0)
     }
 
+    func testACurrencyNamingNoCaseIsRefusedUnsentByEveryCallThatSendsIt() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let unknown = unsafeBitCast(99, to: PayabliCurrency.self)
+        let captured = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        captured.currency = unknown
+        let authorized = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        authorized.currency = unknown
+        let settled = PayabliPayInAuthorizedRequestObjC(transId: "t-1", totalAmount: 10)
+        settled.currency = unknown
+
+        let errors = [
+            await call { bridge.capture(captured, completion: $0) }.1,
+            await call { bridge.authorize(authorized, completion: $0) }.1,
+            await call { bridge.captureAuthorizedTransaction(settled, completion: $0) }.1
+        ]
+
+        for error in errors {
+            let failure = try XCTUnwrap(error)
+            XCTAssertEqual(failure.code, PayabliErrorType.validation.number)
+            XCTAssertEqual(failure.userInfo["field"] as? String, "paymentDetails.currency")
+            XCTAssertEqual(failure.userInfo["capture"] as? Int, 0)
+        }
+        XCTAssertEqual(transport.count, 0)
+    }
+
+    func testAnAttemptNamingNoCaseIsRefusedUnsentByEveryCallThatSendsIt() async throws {
+        let transport = RecordingIdempotencyTransport(body: PayInFixture.approved)
+        let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(transport: transport, key: "reserved-1"))
+        let captured = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        captured.attempt = unsafeBitCast(-1, to: PayabliAttempt.self)
+        let authorized = PayabliPayInRequestObjC.cash(totalAmount: 10)
+        authorized.attempt = unsafeBitCast(99, to: PayabliAttempt.self)
+
+        let errors = [
+            await call { bridge.capture(captured, completion: $0) }.1,
+            await call { bridge.authorize(authorized, completion: $0) }.1
+        ]
+
+        for error in errors {
+            let failure = try XCTUnwrap(error)
+            XCTAssertEqual(failure.code, PayabliErrorType.validation.number)
+            XCTAssertEqual(failure.userInfo["field"] as? String, "attempt")
+            XCTAssertEqual(failure.userInfo["capture"] as? Int, 0)
+        }
+        XCTAssertEqual(transport.count, 0)
+    }
+
     func testAPaymentReferenceOpenOnCaptureSaysThePaymentMayHaveBeenTaken() async throws {
         let bridge = PayabliPayInObjC(component: PayInFixture.makeFlow(
             transport: RecordingIdempotencyTransport(body: Self.interrupted, status: 500),
@@ -217,7 +265,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         XCTAssertEqual(failure.userInfo["paymentReference"] as? String, "order-42")
     }
 
-    func testTheRequestCarriesEverySettingItIsGiven() {
+    func testTheRequestCarriesEverySettingItIsGiven() throws {
         let request = PayabliPayInRequestObjC.cash(totalAmount: 12.5)
         request.serviceFee = 0.5
         request.surchargeFee = 0.25
@@ -233,7 +281,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         customer.additionalData = ["k": "v"]
         request.customerData = customer
 
-        let options = request.toSwift().options
+        let options = try request.toSwift().options
 
         XCTAssertEqual(options.paymentDetails.totalAmount, 12.5)
         XCTAssertEqual(options.paymentDetails.serviceFee, 0.5)
@@ -307,8 +355,8 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
         )
     }
 
-    func testTheRequestHoldsItsOwnCopiesOfTheWrappersDigitBuffers() {
-        let cardDigits: [SensitiveDigits] = autoreleasepool {
+    func testTheRequestHoldsItsOwnCopiesOfTheWrappersDigitBuffers() throws {
+        let cardDigits: [SensitiveDigits] = try autoreleasepool {
             let wrapper = PayabliPayInRequestObjC.card(
                 cardNumber: "4111111111111111",
                 expiryMonth: 2,
@@ -319,9 +367,9 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
                 saveIfSuccess: false,
                 totalAmount: 10
             )
-            return wrapper.toSwift().paymentMethod.sensitiveDigits
+            return try wrapper.toSwift().paymentMethod.sensitiveDigits
         }
-        let bankDigits: [SensitiveDigits] = autoreleasepool {
+        let bankDigits: [SensitiveDigits] = try autoreleasepool {
             guard let wrapper = PayabliPayInRequestObjC.bankAccount(
                 accountNumber: "1111111111",
                 routingNumber: "021000021",
@@ -331,7 +379,7 @@ final class PayInPaymentObjCBridgeTests: XCTestCase {
                 secCode: .unspecified,
                 totalAmount: 10
             ) else { return [] }
-            return wrapper.toSwift().paymentMethod.sensitiveDigits
+            return try wrapper.toSwift().paymentMethod.sensitiveDigits
         }
 
         XCTAssertEqual(cardDigits[0].length, 16, "the request's card number is its own copy")

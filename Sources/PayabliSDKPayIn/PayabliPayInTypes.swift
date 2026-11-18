@@ -136,7 +136,7 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
     public let totalAmount: Double
     public let serviceFee: Double?
     public let surchargeFee: Double?
-    /// The currency to charge in. When `nil`, the field is omitted from the request.
+    /// The currency to charge in. When `nil`, the request is sent in USD.
     public let currency: PayabliCurrency?
     public let checkNumber: String?
     public let checkUniqueId: String?
@@ -184,7 +184,7 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
         checkUniqueId = try container.decodeIfPresent(String.self, forKey: .checkUniqueId)
     }
 
-    /// Writes the payment details, the currency as its code.
+    /// Writes the payment details, the currency as its code, and an omitted one as USD.
     ///
     /// - Parameter encoder: the encoder to write to.
     public func encode(to encoder: Encoder) throws {
@@ -192,7 +192,7 @@ public struct PayabliPayInPaymentDetails: Codable, Sendable, Equatable {
         try container.encode(totalAmount, forKey: .totalAmount)
         try container.encodeIfPresent(serviceFee, forKey: .serviceFee)
         try container.encodeIfPresent(surchargeFee, forKey: .surchargeFee)
-        try container.encodeIfPresent(currency?.code, forKey: .currency)
+        try container.encode(currency.asSent.code, forKey: .currency)
         try container.encodeIfPresent(checkNumber, forKey: .checkNumber)
         try container.encodeIfPresent(checkUniqueId, forKey: .checkUniqueId)
     }

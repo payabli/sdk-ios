@@ -32,7 +32,6 @@ final class PayInRetrySamePaymentTests: XCTestCase {
             ("total", payment(.retry, total: 10.01, orderId: "order-1")),
             ("service fee", payment(.retry, fee: 0.5, orderId: "order-1")),
             ("surcharge", payment(.retry, surcharge: 0.5, orderId: "order-1")),
-            ("currency", payment(.retry, currency: .usd, orderId: "order-1")),
             ("method kind", payment(.retry, method: .bankAccount, orderId: "order-1")),
             ("order", payment(.retry, orderId: "order-2"))
         ]
@@ -114,6 +113,16 @@ final class PayInRetrySamePaymentTests: XCTestCase {
         _ = try await flow.authorize(
             payment(.retry, total: 10.001, fee: 0, currency: .usd, method: .cloudDevice, orderId: "o")
         )
+
+        XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
+    }
+
+    func testARetryNamingNoCurrencyRepeatsOneThatNamedUSD() async throws {
+        let flow = makeFlow()
+        transport.script = [.lost, .approved]
+
+        _ = await failure { try await flow.capture(self.payment(.newPayment, currency: .usd)) }
+        _ = try await flow.capture(payment(.retry, currency: nil))
 
         XCTAssertEqual(transport.sentKeys, ["k1", "k1"])
     }

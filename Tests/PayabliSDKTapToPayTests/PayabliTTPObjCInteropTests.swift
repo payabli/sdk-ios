@@ -145,7 +145,7 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         XCTAssertNil(details.paymentDescription)
     }
 
-    func testPaymentDetailsObjCRoundTripPreservesAllFields() {
+    func testPaymentDetailsObjCRoundTripPreservesAllFields() throws {
         let objc = PayabliTTPPaymentDetailsObjC(
             amount: NSDecimalNumber(string: "25.00"),
             serviceFee: NSDecimalNumber(string: "1.50"),
@@ -157,7 +157,7 @@ final class PayabliTTPObjCInteropTests: XCTestCase {
         XCTAssertEqual(objc.currency, .usd)
         XCTAssertEqual(objc.paymentDescription, "Coffee")
 
-        let swift = objc.toSwift()
+        let swift = try objc.toSwift()
         XCTAssertEqual(swift.amount, Decimal(string: "25.00"))
         XCTAssertEqual(swift.serviceFee, Decimal(string: "1.50"))
         XCTAssertEqual(swift.currency, .usd)

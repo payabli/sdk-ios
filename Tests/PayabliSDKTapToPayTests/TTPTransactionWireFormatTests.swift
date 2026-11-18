@@ -1,3 +1,4 @@
+import PayabliSDKCore
 @testable import PayabliSDKTapToPay
 import XCTest
 
@@ -74,21 +75,21 @@ final class TTPTransactionWireFormatTests: XCTestCase {
         XCTAssertEqual(parsed["currency"] as? String, "USD")
     }
 
-    /// When the host doesn't pass a `currency`, the field must be omitted from
-    /// the wire payload. The backend then authorizes in the merchant's
-    /// configured processor currency (the same one the reader uses from
-    /// `/config`), so the backend record and processor transaction can't
-    /// disagree on currency for non-USD merchants.
-    func test_initiatePaymentDetails_omitsCurrencyWhenNil() throws {
-        let pd = InitiatePaymentDetails(
-            totalAmount: 10,
-            serviceFee: 0,
-            currency: nil,
-            paymentDescription: nil
+    func test_initiate_sendsUSDWhenTheChargeNamesNoCurrency() async throws {
+        let transport = InitiateRecordingTransport()
+        let client = TTPTransactionClient(transport: transport)
+
+        _ = try await client.initiate(
+            entryPoint: "myEntry",
+            deviceId: "dev_1",
+            idempotencyKey: "key-1",
+            paymentDetails: PayabliTTPPaymentDetails(amount: 10)
         )
-        let wire = try JSONEncoder().encode(pd)
-        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: wire) as? [String: Any])
-        XCTAssertNil(parsed["currency"], "currency should be omitted when nil")
+
+        let body = try XCTUnwrap(transport.sentBodies.first)
+        let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let details = try XCTUnwrap(parsed["paymentDetails"] as? [String: Any])
+        XCTAssertEqual(details["currency"] as? String, "USD")
     }
 
     // MARK: - Initiate request — customerData
@@ -238,5 +239,25 @@ final class TTPTransactionWireFormatTests: XCTestCase {
         let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: wire) as? [String: Any])
         let invoice = try XCTUnwrap(parsed["invoiceData"] as? [String: Any])
         XCTAssertEqual(invoice["invoiceNumber"] as? String, "INV-1")
+    }
+}
+
+/// Answers `initiate` as opened and keeps each body it was sent.
+private final class InitiateRecordingTransport: PayabliTransport, @unchecked Sendable {
+    private let lock = NSLock()
+    private var bodies: [Data] = []
+
+    var sentBodies: [Data] {
+        lock.withLock { bodies }
+    }
+
+    func perform(_ request: PayabliRequest) async throws -> PayabliResponse {
+        lock.withLock { bodies.append(request.body ?? Data()) }
+        let opened = Data(#"{"code":"A01","data":{"paymentTransId":"pay-1"}}"#.utf8)
+        return PayabliResponse(statusCode: 200, headers: [:], body: opened)
+    }
+
+    func performV2<T: Decodable & Sendable>(_: PayabliRequest, decoding _: T.Type) async throws -> PayabliV2Envelope<T> {
+        throw CancellationError()
     }
 }
