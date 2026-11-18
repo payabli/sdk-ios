@@ -61,9 +61,7 @@ extension AppAttestService {
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
         pinsCredential: Bool = false,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, reason in
-            PayabliTTPError.attestationFailed(reason: reason)
-        }
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, _ in nil }
     ) async throws -> Payload {
         try await routes.measured(route) {
             let response = try await routes.post(
@@ -120,9 +118,7 @@ extension AppAttestService {
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
         pinsCredential: Bool = false,
-        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, reason in
-            PayabliTTPError.attestationFailed(reason: reason)
-        }
+        makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, _ in nil }
     ) async throws {
         try await routes.measured(route) {
             let response = try await routes.post(

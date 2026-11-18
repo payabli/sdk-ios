@@ -81,6 +81,9 @@ final class DeviceServiceClient: Sendable {
         answer: PayabliResponse?
     ) -> (outcome: String, code: Int?) {
         // A refused token, a timeout and a rate limit are the transport's, not the route's answer.
+        if let refusal = error as? DeviceRouteRefusal {
+            return refusal.isRefusal ? ("refused", refusal.rawCode.flatMap { Int($0) }) : ("failed", nil)
+        }
         guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500,
               ![408, 429].contains(answer.statusCode)
         else { return ("failed", nil) }
@@ -197,11 +200,13 @@ final class DeviceServiceClient: Sendable {
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
            [400, 403, 404].contains(response.statusCode)
-           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason),
-           let decline = makeDeclineError(code ?? response.statusCode, reason)
+           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
         {
             logger.error("[\(route.rawValue)] refused (code=\(code.map(String.init) ?? "nil"))")
-            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            if let decline = makeDeclineError(code ?? response.statusCode, reason) {
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            }
+            throw DeviceRouteRefusal.of(code: code ?? response.statusCode, reason: reason, httpStatus: response.statusCode)
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
@@ -220,8 +225,10 @@ final class DeviceServiceClient: Sendable {
             // sent. The code says which decline this was, and a classifier that
             // knows the words answers with its own failure.
             logger.error("[\(route.rawValue)] declined (code=\(code.map(String.init) ?? "nil"))")
-            let decline = makeDeclineError(code, reason) ?? PayabliTTPError.attestationFailed(reason: reason)
-            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            if let decline = makeDeclineError(code, reason) {
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            }
+            throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
         }
 
         return response
