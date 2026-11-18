@@ -67,7 +67,8 @@ final class PayabliTTPActivationIdTests: XCTestCase {
 
     /// A 403 is about the registration the request presented. One replaced while the request was in
     /// flight gets no id it was not answered for.
-    func testAPendingAnswerAboutAReplacedRegistrationHandsOverNoId() async throws {
+    /// CFG-24: the registration held when the answer is settled is the truth, so a replaced one lands pending on it.
+    func testAPendingAnswerAboutAReplacedRegistrationLandsPendingOnTheOneHeld() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.bindings = ["e": "dev_old"]
         StubURLProtocol.handler = { request in
@@ -78,15 +79,13 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         do {
             try await ttp.initialize()
             XCTFail("expected a failure")
-        } catch let error as TapToPayError
-            where error.type == .unknown && error.detail?.contains("registration changed") == true
-        {
+        } catch let error as TapToPayError where error.type == .devicePendingActivation {
         } catch {
             XCTFail("wrong error: \(error)")
         }
 
-        XCTAssertEqual(ttp.sessionState, .failed(reason: .serviceUnavailable))
-        XCTAssertNil(ttp.activationId)
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_new"))
+        XCTAssertEqual(ttp.activationId, "dev_new")
     }
 
     /// Removed rather than replaced: the request had a registration, so this is not a paypoint that
