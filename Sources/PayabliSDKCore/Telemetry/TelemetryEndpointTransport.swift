@@ -1,8 +1,8 @@
 import Foundation
 
-/// Best-effort transport posting telemetry batches through the SDK's own request path, with the same
-/// credential and timeouts as every other route. Failures are swallowed so telemetry never blocks or
-/// degrades a payment, and a batch that did not arrive is dropped, never retried.
+/// Posts telemetry batches through the SDK's own request path, with its credential and timeouts. Failures are
+/// swallowed so telemetry never blocks a payment. A batch that did not arrive is kept for the next flush, except
+/// one the service refused as too large, which is discarded.
 package actor TelemetryEndpointTransport: TelemetryTransport {
     package static let defaultPath = "/api/v2/telemetry/sdk"
 
