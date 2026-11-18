@@ -169,6 +169,7 @@ final class PayabliPayInViewModel: ObservableObject {
         if replacesFlow {
             clearMarks()
             keptFailure = nil
+            dropEveryValue()
         }
         showKeptFailure()
 
