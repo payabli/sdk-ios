@@ -89,10 +89,22 @@ final class TokenFailureReportingTests: XCTestCase {
         XCTAssertEqual(properties["failure_type"], "HostBrokerDown")
     }
 
+    func testASessionReleasesItsCredentialHolderOnceNothingHoldsIt() throws {
+        weak var released: PayabliAuth?
+        do {
+            let config = try PayabliConfig(entryPoint: "test_entry", environment: .sandbox, tokenProvider: { "token" })
+            let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
+            released = session.auth
+        }
+        XCTAssertNil(released, "the holder outlived its session")
+    }
+
     func testCallersThatJoinedAFailingCallRecordNothingOfTheirOwn() async throws {
         let entered = Slot<Bool>()
         let release = Latch()
-        let (auth, telemetry) = try makeAuth {
+        let joined = Latch()
+        let joiners = AdmissionCounter(occurrence: 2, admitted: joined)
+        let (auth, telemetry) = try makeAuth(onJoinedInFlightMint: { joiners.admit() }) {
             entered.set(true)
             await release.wait()
             throw HostBrokerDown()
@@ -104,7 +116,7 @@ final class TokenFailureReportingTests: XCTestCase {
         }
         let second = Task { try await auth.currentAccessToken() }
         let third = Task { try await auth.currentAccessToken() }
-        try await Task.sleep(nanoseconds: 50_000_000)
+        await joined.wait()
         release.open()
         for task in [first, second, third] {
             _ = await task.result
@@ -153,12 +165,14 @@ final class TokenFailureReportingTests: XCTestCase {
 
     private func makeAuth(
         clock retryClock: any RetryClock = SystemRetryClock(),
+        onJoinedInFlightMint: (@Sendable () -> Void)? = nil,
         provider: @escaping PayabliTokenRefresh
     ) throws -> (PayabliAuth, TelemetryClient) {
         let auth = PayabliAuth(
             config: try PayabliConfig(entryPoint: "test_entry", environment: .sandbox, tokenProvider: provider),
             logger: PayabliLogger(category: .auth),
-            clock: retryClock
+            clock: retryClock,
+            onJoinedInFlightMint: onJoinedInFlightMint
         )
         let telemetry = TelemetryClient(
             configuration: .init(entry: "test_entry", environment: "sandbox"),
