@@ -293,7 +293,8 @@ It also carries `capture` and `paymentTransId`:
 including one kept from before the app restarted. A close that already succeeded can be sent again. A close that
 isn't confirmed fails with `.paymentNotClosed` (3022) and `capture` `.unknown`, or with `.permissionDenied` (1006)
 when your credentials may not act on that payment. A close waits for a charge running on its entry point, and a
-charge made on that entry point while a close runs fails with `.terminalNotReady` (3029) before anything is sent.
+charge made on that entry point while a close runs fails before anything is sent: with `.terminalNotReady` (3029),
+or with `.paymentReferenceOpen` (1023) for a declared retry whose key a running charge is still sending.
 
 `PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
 has been started: call `PayabliSession.initialize` first. A `PayabliTTP` whose session was replaced or ended

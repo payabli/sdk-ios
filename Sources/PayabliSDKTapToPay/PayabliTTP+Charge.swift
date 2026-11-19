@@ -541,7 +541,8 @@ extension PayabliTTP {
             return response
         }
 
-        // A non-2xx is raised as its mapped error, and whether it is retried is the retry policy's call alone.
+        // A non-2xx is raised as its mapped error for the retry policy to classify; a refusal of the caller is raised
+        // as `permissionDenied`, which the policy does not retry.
         try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
             let response = try await performOnce(attempt: String(attempt))
             if let refusal = TTPTransactionClient.notPermitted(response) {

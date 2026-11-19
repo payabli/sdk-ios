@@ -114,11 +114,16 @@ package final class TTPTransactionClient: Sendable {
     /// and would name a route instead.
     ///
     /// - Parameter paymentTransId: the payment an approved opening named.
-    /// - Returns: `false` when it is blank, `.` or `..` once trimmed.
+    /// - Returns: `false` when it is blank, `.` or `..` once ``blank`` is trimmed.
     static func isAddressable(_ paymentTransId: String) -> Bool {
-        let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = paymentTransId.trimmingCharacters(in: blank)
         return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
     }
+
+    /// Unicode's spaces, separators and the information separators U+001C to U+001F, without U+0085 or U+200B.
+    private static let blank = CharacterSet.whitespacesAndNewlines
+        .union(CharacterSet(charactersIn: "\u{1C}\u{1D}\u{1E}\u{1F}"))
+        .subtracting(CharacterSet(charactersIn: "\u{85}\u{200B}"))
 
     /// The words a refusal's body gives, when it gives any.
     ///

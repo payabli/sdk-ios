@@ -9,8 +9,9 @@ public extension PayabliTTP {
     /// A close may be sent again whether or not an earlier one reached the service: it moves no money. Any identifier
     /// a charge returned or failed with can be closed, including one kept from before the app restarted.
     ///
-    /// A call made while a charge on this entry point runs waits for that charge, and a charge started while this runs
-    /// is refused with `TERMINAL_NOT_READY`. The session state does not change.
+    /// A call made while a charge on this entry point runs waits for that charge. A charge started while this runs is
+    /// refused unsent: `TERMINAL_NOT_READY`, or `PAYMENT_REFERENCE_OPEN` for a retry whose key is still being sent.
+    /// The session state does not change.
     ///
     /// - Parameter paymentTransId: the payment to close, as a charge's result or failure named it.
     /// - Throws: ``TapToPayError``: `PAYMENT_NOT_CLOSED` when the close was not confirmed, carrying the payment and
@@ -28,12 +29,10 @@ public extension PayabliTTP {
             )
         }
         let gate = SessionSetupGate.shared
-        let runningCharge = gate.admitClose(entryPoint)
+        gate.admitClose(entryPoint)
         defer { gate.releaseClose(entryPoint) }
         // The charge on this entry point sends its own close first.
-        if let runningCharge {
-            _ = try? await runningCharge.value
-        }
+        try await gate.waitForCharge(on: entryPoint)
         try Task.checkCancellation()
 
         // Its own task, so a caller that cancels does not stop a close already sent.

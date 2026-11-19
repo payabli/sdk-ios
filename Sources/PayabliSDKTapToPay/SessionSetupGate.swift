@@ -34,8 +34,9 @@ final class SessionSetupGate {
     /// waiting for the operation before it, or has setups queued behind it.
     private(set) var runningCharge: RunningCharge?
 
-    /// Ends when the running charge returns: what a close on its entry point waits for.
-    private var runningChargeEnds: Task<Void, Error>?
+    /// The closes waiting for the running charge to return, each resumed when it does or when its caller is cancelled.
+    /// `Task.value` does not resume a cancelled awaiting task.
+    private var closesWaiting: [UUID: CheckedContinuation<Void, Error>] = [:]
 
     /// The closes holding each entry point, counted from the call until it returns, whether sending or waiting.
     private var closes: [String: Int] = [:]
@@ -105,10 +106,11 @@ final class SessionSetupGate {
         // A setup call made from here on waits for this charge, so no earlier setup can be joined.
         setups.removeAll()
         runningCharge = charge
-        runningChargeEnds = claim.task
         defer {
             runningCharge = nil
-            runningChargeEnds = nil
+            let waiting = closesWaiting
+            closesWaiting = [:]
+            waiting.values.forEach { $0.resume() }
             release.finish()
             self.release(claim.id)
         }
@@ -122,11 +124,37 @@ final class SessionSetupGate {
     /// Counts a close on `entryPoint` until ``releaseClose(_:)``, so a charge arriving there meanwhile is refused.
     ///
     /// - Parameter entryPoint: the entry point the close is for.
-    /// - Returns: what the close waits for before it sends: the end of the charge running on `entryPoint`, or nil when
-    ///   none runs there.
-    func admitClose(_ entryPoint: String) -> Task<Void, Error>? {
+    func admitClose(_ entryPoint: String) {
         closes[entryPoint, default: 0] += 1
-        return runningCharge?.entryPoint == entryPoint ? runningChargeEnds : nil
+    }
+
+    /// Returns once no charge runs on `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point the close is for.
+    /// - Throws: `CancellationError` as soon as the caller is cancelled.
+    func waitForCharge(on entryPoint: String) async throws {
+        guard runningCharge?.entryPoint == entryPoint else { return }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                // Nothing suspends between this check and the insert, so a caller cancelled on arrival is not
+                // left waiting with no handler to resume it.
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                closesWaiting[id] = continuation
+            }
+        } onCancel: {
+            Task { @MainActor in self.abandonWait(id) }
+        }
+    }
+
+    /// Resumes a cancelled close's wait, unless the charge's return already resumed it.
+    ///
+    /// - Parameter id: the wait to resume.
+    private func abandonWait(_ id: UUID) {
+        closesWaiting.removeValue(forKey: id)?.resume(throwing: CancellationError())
     }
 
     /// Removes one close from `entryPoint`.

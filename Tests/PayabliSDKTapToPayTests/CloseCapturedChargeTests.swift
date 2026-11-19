@@ -88,7 +88,7 @@ final class CloseCapturedChargeTests: XCTestCase {
     func testAnIdentifierThatCannotNameOneTransactionIsRefusedUnsent() async throws {
         let terminal = try makeTerminal()
 
-        for unaddressable in ["", " ", ".", ".."] {
+        for unaddressable in ["", " ", ".", "..", "\u{1C}", " .\u{1F}"] {
             let failure = await Self.failure { try await terminal.closeCapturedCharge(paymentTransId: unaddressable) }
 
             XCTAssertEqual(failure?.type, .paymentNotClosed, "\"\(unaddressable)\"")
@@ -96,6 +96,16 @@ final class CloseCapturedChargeTests: XCTestCase {
             XCTAssertEqual(failure?.capture, .unknown, "\"\(unaddressable)\"")
         }
         XCTAssertTrue(Self.wire.updates.isEmpty, "a close was sent: \(Self.wire.updates.map(\.path))")
+    }
+
+    /// U+0085 and U+200B are not blank, so an identifier of either names a transaction.
+    func testAnIdentifierOfCharactersThatAreNotBlankIsSent() async throws {
+        let terminal = try makeTerminal()
+
+        for addressable in ["\u{85}", "\u{200B}"] {
+            try await terminal.closeCapturedCharge(paymentTransId: addressable)
+        }
+        XCTAssertEqual(Self.wire.updates.count, 2, "\(Self.wire.updates.map(\.path))")
     }
 
     /// The charge's own close carried the read's failure, and the second close carries no outcome.
@@ -193,6 +203,31 @@ final class CloseCapturedChargeTests: XCTestCase {
         try await XCTUnwrap(during.closing).value
 
         XCTAssertTrue(during.sentDuringRead, "a close waited for a charge on another entry point")
+    }
+
+    /// The wait is bounded at a second, so a close that keeps waiting for the charge fails rather than hangs.
+    func testACloseCancelledWhileItWaitsForTheChargeEndsAtOnceAndSendsNothing() async throws {
+        let (charging, provider) = try await makeReadyTerminal()
+        let closer = try makeTerminal()
+        let during = Overlap()
+        provider.whileReading = {
+            let closing = Task { try await closer.closeCapturedCharge(paymentTransId: Self.notHeld) }
+            await Task.yield()
+            closing.cancel()
+            Task { during.closeResult = await closing.result }
+            for _ in 0 ..< 100 where during.closeResult == nil {
+                try? await Task.sleep(for: .milliseconds(10))
+            }
+            during.heldAfterCancel = SessionSetupGate.shared.isClosing("e")
+        }
+
+        _ = try await charging.charge(paymentDetails: Self.sale)
+
+        let result = try XCTUnwrap(during.closeResult, "the cancelled close waited for the charge to end")
+        XCTAssertThrowsError(try result.get()) { XCTAssertTrue($0 is CancellationError, "\($0)") }
+        XCTAssertFalse(during.heldAfterCancel, "the cancelled close still held its entry point")
+        let sent = await Self.wire.anUpdateArrives(for: Self.notHeld)
+        XCTAssertFalse(sent, "the cancelled close was sent")
     }
 
     func testAChargeArrivingWhileACloseRunsOnItsEntryPointIsRefusedUnsent() async throws {
@@ -311,6 +346,8 @@ final class CloseCapturedChargeTests: XCTestCase {
         var closing: Task<Void, Error>?
         var sentDuringRead = false
         var refusal: TapToPayError?
+        var closeResult: Result<Void, Error>?
+        var heldAfterCancel = true
     }
 
     /// Counts the token provider's calls, and can keep each call waiting until ``release()``.
