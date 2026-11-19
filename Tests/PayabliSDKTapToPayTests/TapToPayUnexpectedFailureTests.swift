@@ -148,6 +148,24 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         }
     }
 
+    /// A throwing token provider reaches the entry point already classified, its cause already redacted.
+    func testATokenProviderFailureKeepsItsClassificationAndRedactedCause() async throws {
+        let (ttp, _, _, _) = try makeTTP(tokenProvider: { throw HostThrew() })
+
+        do {
+            try await ttp.initialize()
+            return XCTFail("expected initialize to fail")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .tokenProviderFailed)
+            XCTAssertEqual((error.underlying as? RedactedCause)?.simpleTypeName, "HostThrew")
+            XCTAssertFalse("\(error)".contains("MESSAGE-SENTINEL"))
+            let bridged = error.toPayabliNSError()
+            let cause = try XCTUnwrap(bridged.userInfo[NSUnderlyingErrorKey] as? NSError)
+            XCTAssertTrue(cause.localizedDescription.hasSuffix("HostThrew"), cause.localizedDescription)
+            XCTAssertFalse("\(bridged.userInfo)".contains("MESSAGE-SENTINEL"))
+        }
+    }
+
     // MARK: - Objective-C
 
     func testTheObjectiveCErrorNamesTheTypeUnderTheUnderlyingKey() async throws {
