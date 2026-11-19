@@ -17,13 +17,56 @@ public extension PayabliTTP {
     ///   whether its card was charged; `PERMISSION_DENIED` when the credentials may not act on that payment, which a
     ///   retry does not change.
     func closeCapturedCharge(paymentTransId: String) async throws {
-        throw TapToPayError(
-            type: .paymentNotClosed,
-            reason: PayabliErrorType.paymentNotClosed.message,
-            detail: nil,
-            paymentTransId: paymentTransId,
-            capture: .unknown
-        )
+        // Sent, a dot segment would reach another route.
+        guard TTPTransactionClient.isAddressable(paymentTransId) else {
+            throw TapToPayError(
+                type: .paymentNotClosed,
+                reason: "That identifier cannot name one transaction",
+                detail: nil,
+                paymentTransId: paymentTransId,
+                capture: .unknown
+            )
+        }
+        let gate = SessionSetupGate.shared
+        let runningCharge = gate.admitClose(entryPoint)
+        defer { gate.releaseClose(entryPoint) }
+        // A close sent while the card is read records the payment failed.
+        if let runningCharge {
+            _ = try? await runningCharge.value
+        }
+        try Task.checkCancellation()
+
+        // Its own task, so a caller that cancels does not stop a close already sent.
+        let closed = await Task { @MainActor in await self.sendClose(paymentTransId) }.value
+        try Task.checkCancellation()
+        try closed.get()
+    }
+
+    /// Sends the close for a payment this process holds no reader answer for.
+    ///
+    /// - Parameter paymentTransId: the payment to close.
+    /// - Returns: success once the service confirmed the close; otherwise the host's error, with the capture unknown.
+    private func sendClose(_ paymentTransId: String) async -> Result<Void, TapToPayError> {
+        do {
+            try await sendUpdate(paymentTransId: paymentTransId, payload: .noOutcome)
+            return .success(())
+        } catch {
+            // Waiting and sending again cannot change a refusal of the caller.
+            let type: PayabliErrorType = (error as? any PayabliError)?.type == .permissionDenied
+                ? .permissionDenied
+                : .paymentNotClosed
+            let answer = TapToPayErrorTranslation.answer(of: error)
+            return .failure(TapToPayError(
+                type: type,
+                reason: type.message,
+                detail: nil,
+                paymentTransId: paymentTransId,
+                capture: .unknown,
+                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
+            ))
+        }
     }
 
     /// `@objc` companion to ``closeCapturedCharge(paymentTransId:)``.

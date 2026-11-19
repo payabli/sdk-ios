@@ -115,7 +115,7 @@ package final class TTPTransactionClient: Sendable {
     ///
     /// - Parameter paymentTransId: the payment an approved opening named.
     /// - Returns: `false` when it is blank, `.` or `..` once trimmed.
-    private static func isAddressable(_ paymentTransId: String) -> Bool {
+    static func isAddressable(_ paymentTransId: String) -> Bool {
         let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
         return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
     }
@@ -177,7 +177,8 @@ package final class TTPTransactionClient: Sendable {
     /// shape.
     ///
     /// - Parameter payload: what the reader did, as the success or failure to encode.
-    /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error` object on a failure.
+    /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error`
+    ///   object on a failure, `{}` for no outcome.
     static func updateBody(for payload: TTPUpdatePayload) -> Data {
         let encoder = JSONEncoder()
         switch payload {
@@ -192,7 +193,25 @@ package final class TTPTransactionClient: Sendable {
                 failureReason: "nfc_read"
             ))
             return (try? encoder.encode(body)) ?? Data()
+
+        case .noOutcome:
+            return Data("{}".utf8)
         }
+    }
+
+    /// The refusal of a caller that may not act on the payment's paypoint, which the update route answers 400 with
+    /// code `E9001`.
+    ///
+    /// - Parameter response: the update's answer.
+    /// - Returns: `permissionDenied` carrying the status and code, or nil for any other answer.
+    static func notPermitted(_ response: PayabliResponse) -> PayabliGenericError? {
+        guard response.statusCode == 400, serviceCode(of: response) == "E9001" else { return nil }
+        return PayabliGenericError(
+            type: .permissionDenied,
+            reason: PayabliErrorType.permissionDenied.message,
+            httpStatus: response.statusCode,
+            rawCode: "E9001"
+        )
     }
 
     /// Prefer the provider's own response JSON when it's available (atomic

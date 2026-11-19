@@ -34,6 +34,12 @@ final class SessionSetupGate {
     /// waiting for the operation before it, or has setups queued behind it.
     private(set) var runningCharge: RunningCharge?
 
+    /// Ends when the running charge returns: what a close on its entry point waits for.
+    private var runningChargeEnds: Task<Void, Error>?
+
+    /// The closes holding each entry point, counted from the call until it returns, whether sending or waiting.
+    private var closes: [String: Int] = [:]
+
     /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of an equal `kind`.
     ///
     /// - Parameters:
@@ -99,8 +105,10 @@ final class SessionSetupGate {
         // A setup call made from here on waits for this charge, so no earlier setup can be joined.
         setups.removeAll()
         runningCharge = charge
+        runningChargeEnds = claim.task
         defer {
             runningCharge = nil
+            runningChargeEnds = nil
             release.finish()
             self.release(claim.id)
         }
@@ -109,6 +117,32 @@ final class SessionSetupGate {
             _ = try? await previous.value
         }
         return try await body()
+    }
+
+    /// Counts a close on `entryPoint` until ``releaseClose(_:)``, so a charge arriving there meanwhile is refused.
+    ///
+    /// - Parameter entryPoint: the entry point the close is for.
+    /// - Returns: what the close waits for before it sends: the end of the charge running on `entryPoint`, or nil when
+    ///   none runs there.
+    func admitClose(_ entryPoint: String) -> Task<Void, Error>? {
+        closes[entryPoint, default: 0] += 1
+        return runningCharge?.entryPoint == entryPoint ? runningChargeEnds : nil
+    }
+
+    /// Removes one close from `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point the close was for.
+    func releaseClose(_ entryPoint: String) {
+        guard let count = closes[entryPoint] else { return }
+        closes[entryPoint] = count > 1 ? count - 1 : nil
+    }
+
+    /// Whether a close holds `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point a charge is for.
+    /// - Returns: `true` from a close's call until it returns.
+    func isClosing(_ entryPoint: String) -> Bool {
+        closes[entryPoint] != nil
     }
 
     /// The charge holding the gate: the entry point it is for and the sale it describes.

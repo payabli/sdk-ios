@@ -126,11 +126,12 @@ struct InitiateData: Decodable, Sendable {
 // MARK: - Update request (success/NFC failure)
 
 /// Typed payload for `PATCH /api/v2/MoneyIn/update/{paymentTransId}`.
-/// Keeps the two shapes the backend accepts (success vs NFC failure) in one
-/// semantic type so the facade never handles raw `Data` bodies.
+/// Keeps the shapes the backend accepts in one semantic type so the facade never handles raw `Data` bodies.
 enum TTPUpdatePayload {
     case success(CardReadResult)
     case nfcFailure(description: String)
+    /// An empty object, for a close that holds no reader answer and claims no outcome.
+    case noOutcome
 }
 
 /// Success update body — forwards the processor response to the backend.

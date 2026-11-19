@@ -484,8 +484,7 @@ extension PayabliTTP {
         return deviceId
     }
 
-    /// Runs `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
-    /// `session.transport`'s. Returns a typed outcome rather than a `Bool`.
+    /// Runs ``sendUpdate(paymentTransId:payload:)`` and returns a typed outcome rather than a `Bool`.
     ///
     /// - Parameter paymentTransId: the transaction the update is sent for, minted at initiate.
     /// - Parameter payload: what the reader did, as the success or failure the update carries.
@@ -494,6 +493,35 @@ extension PayabliTTP {
         paymentTransId: String,
         payload: TTPUpdatePayload
     ) async -> TTPUpdateOutcome {
+        do {
+            try await sendUpdate(paymentTransId: paymentTransId, payload: payload)
+            return .succeeded
+        } catch is CancellationError {
+            // Nothing below retries a cancelled request any more. What the caller is told depends on what
+            // the tap did.
+            return .cancelled
+        } catch {
+            // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
+            // layer underneath produced the failure.
+            let answer = TapToPayErrorTranslation.answer(of: error)
+            return .failed(
+                reason: error.localizedDescription,
+                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
+                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error),
+                httpStatus: answer.httpStatus,
+                rawCode: answer.rawCode
+            )
+        }
+    }
+
+    /// Sends `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
+    /// `session.transport`'s.
+    ///
+    /// - Parameter paymentTransId: the transaction the update is sent for.
+    /// - Parameter payload: what the update carries.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller the route says may not act
+    ///   on the payment.
+    func sendUpdate(paymentTransId: String, payload: TTPUpdatePayload) async throws {
         let body = TTPTransactionClient.updateBody(for: payload)
         let logger = self.logger
         let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
@@ -514,29 +542,14 @@ extension PayabliTTP {
             return response
         }
 
-        do {
-            // Raise a non-2xx as its mapped error and let the policy classify it. Deciding here would
-            // make retryability this call site's opinion, which the next call site is free to differ on.
-            try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
-                let response = try await performOnce(attempt: String(attempt))
-                try mapPayabliHTTPError(response: response)
+        // Raise a non-2xx as its mapped error and let the policy classify it. Deciding here would
+        // make retryability this call site's opinion, which the next call site is free to differ on.
+        try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
+            let response = try await performOnce(attempt: String(attempt))
+            if let refusal = TTPTransactionClient.notPermitted(response) {
+                throw refusal
             }
-            return .succeeded
-        } catch is CancellationError {
-            // Nothing below retries a cancelled request any more. What the caller is told depends on what
-            // the tap did.
-            return .cancelled
-        } catch {
-            // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
-            // layer underneath produced the failure.
-            let answer = TapToPayErrorTranslation.answer(of: error)
-            return .failed(
-                reason: error.localizedDescription,
-                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
-                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error),
-                httpStatus: answer.httpStatus,
-                rawCode: answer.rawCode
-            )
+            try mapPayabliHTTPError(response: response)
         }
     }
 
