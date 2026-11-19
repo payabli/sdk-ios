@@ -35,8 +35,8 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         try await assertConverted { try await ttp.initialize() }
     }
 
-    func testInitializeConvertsAForeignErrorFromEitherReaderStage() async throws {
-        for ttp in try terminalsFailingTheirReaderStages(with: HostThrew()) {
+    func testInitializeConvertsAForeignErrorFromEachSetupStage() async throws {
+        for ttp in try terminalsFailingEachSetupStage(with: HostThrew()) {
             try await assertConverted { try await ttp.initialize() }
         }
     }
@@ -109,15 +109,15 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         }
     }
 
-    func testACancellationFromEitherReaderStagePassesThroughInitialize() async throws {
-        for ttp in try terminalsFailingTheirReaderStages(with: CancellationError()) {
+    func testACancellationFromEachSetupStagePassesThroughInitialize() async throws {
+        for ttp in try terminalsFailingEachSetupStage(with: CancellationError()) {
             try await assertPassesThrough(CancellationError.self) { try await ttp.initialize() }
         }
     }
 
-    func testAnErrorTheSDKClassifiedFromEitherReaderStagePassesThroughInitialize() async throws {
+    func testAnErrorTheSDKClassifiedFromEachSetupStagePassesThroughInitialize() async throws {
         let classified = TapToPayError(type: .deviceSetupRequired, reason: "already classified", detail: "kept")
-        for ttp in try terminalsFailingTheirReaderStages(with: classified) {
+        for ttp in try terminalsFailingEachSetupStage(with: classified) {
             do {
                 try await ttp.initialize()
                 XCTFail("expected initialize to fail")
@@ -221,10 +221,10 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         }
     }
 
-    private func makeTTP() throws -> (
+    private func makeTTP(tokenProvider: @escaping PayabliTokenRefresh = { "seed_token" }) throws -> (
         PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService, InMemoryTelemetryTransport
     ) {
-        let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" })
+        let config = try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: tokenProvider)
         let provider = MockTapToPayProvider()
         let attestation = MockDeviceAttestationService()
         let transport = InMemoryTelemetryTransport()
@@ -239,13 +239,16 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         return (ttp, provider, attestation, transport)
     }
 
-    /// Two terminals, one whose reader fails to configure with `failure` and one whose reader fails to prepare with it.
-    private func terminalsFailingTheirReaderStages(with failure: Error) throws -> [PayabliTTP] {
+    /// Three terminals failing with `failure` after attesting: one signing the `/config` request, one configuring its
+    /// reader and one preparing it.
+    private func terminalsFailingEachSetupStage(with failure: Error) throws -> [PayabliTTP] {
+        let (signing, _, signingAttestation, _) = try makeTTP()
+        signingAttestation.assertionFailure = failure
         let (configuring, configureProvider, _, _) = try makeTTP()
         configureProvider.configureResult = .failure(failure)
         let (preparing, prepareProvider, _, _) = try makeTTP()
         prepareProvider.prepareReaderResult = .failure(failure)
-        return [configuring, preparing]
+        return [signing, configuring, preparing]
     }
 
     private func makeReadyTTP() async throws -> (
