@@ -68,7 +68,6 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
             }
             return .delivered
         } catch let refusal as PayabliGenericError where refusal.type == .missingToken {
-            // Every flush lands here until host work mints a token, so it is not a failure.
             logger.debug("telemetry_batch_waiting: no token ready; the batch waits for the next flush")
             return .kept
         } catch {

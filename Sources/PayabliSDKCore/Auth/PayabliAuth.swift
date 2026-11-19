@@ -14,8 +14,6 @@ actor PayabliAuth {
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
     private var pinnedRefusal: String?
-    /// The refusal this holder raised into the provider call named by `mintID`, so that call reports `reentered` only
-    /// when the provider threw that refusal back, and `threw` for an error it built in its place.
     private var reentryRefusal: (mintID: UUID, error: PayabliGenericError)?
 
     /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`
@@ -192,8 +190,6 @@ actor PayabliAuth {
             do {
                 minted = try await Self.racedMint(holder: self, mintID: mintID, provider: provider, clock: clock)
             } catch is ProviderTimedOut {
-                // Named apart from every other provider throw below: a caller can tell a slow broker
-                // from a rejected credential or a thrown error, which is the whole point of the bound.
                 logger.error("The token provider did not return within the deadline")
                 self.reportFailure(.timedOut, since: startedAt)
                 throw PayabliGenericError(
@@ -202,9 +198,6 @@ actor PayabliAuth {
                     detail: "The tokenProvider did not return within \(Int(Self.providerTimeout)) seconds."
                 )
             } catch {
-                // Any throw from the provider is host code, this SDK's own error type included. The detail is
-                // fixed because a host's error can carry request data; its type name still reaches a caller
-                // through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
                 if self.raisedReentryRefusal(error, into: mintID) {
                     self.reportFailure(.reentered, since: startedAt)
