@@ -163,7 +163,7 @@ final class CloseCapturedChargeTests: XCTestCase {
 
     // MARK: - Sharing the entry point with a charge
 
-    /// A close sent mid-read would record the payment failed.
+    /// The charge's own close goes first, and no close is sent while its card is read.
     func testACloseDuringAChargeOnItsEntryPointWaitsForItThenSends() async throws {
         let (charging, provider) = try await makeReadyTerminal()
         let closer = try makeTerminal()

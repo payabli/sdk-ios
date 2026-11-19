@@ -30,7 +30,7 @@ public extension PayabliTTP {
         let gate = SessionSetupGate.shared
         let runningCharge = gate.admitClose(entryPoint)
         defer { gate.releaseClose(entryPoint) }
-        // A close sent while the card is read records the payment failed.
+        // The charge on this entry point sends its own close first.
         if let runningCharge {
             _ = try? await runningCharge.value
         }
