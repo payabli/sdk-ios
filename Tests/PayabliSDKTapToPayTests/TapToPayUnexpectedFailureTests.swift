@@ -56,7 +56,7 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         provider.readingResult = .failure(HostThrew())
 
         try await assertConverted {
-            _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: "USD"))
+            _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd))
         }
     }
 
