@@ -189,7 +189,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
             .deviceSetupNotConfigured, .deviceIdentityUnavailable, .tooManyOpenCharges, .chargeNotFinished
         ]
         let notProducedYet: Set<PayabliErrorType> = [
-            .deviceServicesOutdated, // a Google Play cause, which this platform has no counterpart for
+            .deviceServicesOutdated, // a Google Play cause, which this platform never raises
             .paymentNotHeld, // no close call on this platform yet
             .contactlessDisabled // an iPhone has no switch for its contactless radio
         ]

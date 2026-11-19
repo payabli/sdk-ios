@@ -24,7 +24,7 @@ name: Nightly
 on:
   workflow_dispatch:
   schedule:
-    # 10:00 UTC, matching the Android nightly so both platforms land in the channel together. GitHub cron is
+    # 10:00 UTC, the hour every nightly report in the channel lands at. GitHub cron is
     # UTC only, so this drifts an hour against local time twice a year. Scheduled runs also fire some tens of
     # minutes after the hour under load, which is what the reporter's liveness window allows for.
     - cron: '0 10 * * *'

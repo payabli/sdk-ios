@@ -4,8 +4,7 @@ import UIKit
 /// The Payabli style guide palette, taken from the PAY_Style-Guide Figma file.
 ///
 /// The names below are the token names as the guide spells them, so a colour can be traced back to
-/// its source. The Android sample app carries the same values under the same names; the two demos
-/// are meant to screenshot as one product.
+/// its source.
 enum PayabliPalette {
     static let black: UInt32 = 0x000000
     static let white: UInt32 = 0xFFFFFF
@@ -41,8 +40,7 @@ enum PayabliPalette {
 ///
 /// Each one resolves through a `UIColor` that reads the trait collection, so light and dark are
 /// decided at draw time exactly as the system colours these replaced were. Swapping to an asset
-/// catalogue would work too; this keeps the whole palette and its role mapping in one readable file,
-/// next to the Android file it mirrors.
+/// catalogue would work too; this keeps the whole palette and its role mapping in one readable file.
 ///
 /// Which token plays which role, and why the bright ones are not the filled-button colours: Blue 1
 /// is a light cyan, so white text on it clears no contrast bar. It is `primary` in dark, where it

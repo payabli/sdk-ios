@@ -6,9 +6,6 @@ import PayabliSDKPayIn
 /// prefill reaches the rendered fields by the `accessibilityIdentifier` the SDK
 /// assigns. That identifier is built from an SDK type, so it is named here rather
 /// than rebuilt by the screen that types into it.
-///
-/// The sibling seeds through the form's own `initialValues` instead, so nothing
-/// there reaches around the form. This platform has no such parameter.
 enum PayInPrefillField: CaseIterable {
     case cardholderName
     case cardNumber

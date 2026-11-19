@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 """Render the nightly facts into Slack: a summary in the channel, the failure detail in its thread.
 
-A port of `.github/scripts/nightly_slack.py` in `payabli/sdk-android`, which this repository's nightly
-reports alongside in one channel. The two are kept deliberately alike so a reader can tell at a glance
-which platform a message came from and nothing else; compare against that file before changing anything
-here, because a divergence in the message shape is a divergence in what the channel means. The Slack user
-mentions that file supports are not ported: the culprit is a labelled heuristic, and the version of this
-that pings people at 3am needs a team decision rather than a flag.
+Every report in the channel shares one message shape, so a reader can tell at a glance which platform a
+message came from and nothing else. A change to the shape here is a change to what the channel means. It
+mentions no Slack user: the culprit is a labelled heuristic, and a version of this that pings people at 3am
+needs a team decision rather than a flag.
 
 Runs from `nightly-report.yml`, which `workflow_run` starts when the nightly finishes. That is a
 credential boundary rather than a layout: the nightly is dispatchable, a dispatch selects a ref, and
@@ -221,7 +219,7 @@ def reported_run() -> dict[str, str]:
     the triggering run's values under names of its own.
 
     Falling back to the GITHUB_ ones keeps a hand run working, and keeps this correct for a reporter
-    invoked inside the run it describes, which is the shape the Android counterpart has.
+    invoked inside the run it describes.
 
     Trusted either way, and that is the point of reading them here rather than from the facts: GitHub
     fills both sets, the workflow_run values come from the event payload, and a branch can write to
@@ -678,8 +676,8 @@ def cancel_stale_switches(token: str, channel: str, keep: str, keep_post_at: int
 
     Filtered on the scoped marker rather than deleting everything the token has pending. The list is scoped
     to this token, which stops the bot touching a person's scheduled message, but it does not distinguish
-    the alarm from anything else this bot might ever schedule in the channel, and the sibling platform's
-    alarm is in this channel too.
+    the alarm from anything else this bot might ever schedule in the channel, and other reports' alarms
+    are in this channel too.
 
     Filtered on `post_at` as well. `cancel-in-progress` only *requests* cancellation, so two runs on the same
     ref can overlap. Both arm, then each lists both alarms and deletes the one that is not its own, leaving

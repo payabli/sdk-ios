@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Collect the nightly's own results into a verdict, a job summary, and a facts file for the Slack poster.
 
-The counterpart of `.github/scripts/nightly_report.py` in `payabli/sdk-android`, and it writes the same
-facts schema so both platforms render identically in one channel. The collector itself is not a port: that
-one parses JUnit XML written by Gradle, and there is no JUnit XML here. The source is the `.xcresult`
-bundle, read through `xcrun xcresulttool`, which ships with Xcode.
+It writes the channel's shared facts schema, so every report posted there renders the same way. The
+source is the `.xcresult` bundle, read through `xcrun xcresulttool`, which ships with Xcode.
 
 Runs in the test job, and must. The result bundles are here and so is the full git history the culprit
 lookup needs. It holds no credential, which is what lets it live in the job that runs the tests.
@@ -203,8 +201,7 @@ def coverage(bundle: Path) -> list[tuple[str, float | None, str]]:
     "this module was not measured tonight".
 
     Only line coverage exists here. `xccov` reports covered and executable lines and no branch counter, so
-    unlike the Android side there is one coverage group rather than two, and the `inapplicable` state the
-    facts schema allows is never produced.
+    there is one coverage group, and the `inapplicable` state the facts schema allows is never produced.
     """
     report: dict | None = None
     if bundle.exists():
@@ -528,8 +525,8 @@ def main() -> int:
 
     facts = {
         # Bumped whenever a consumer would misread an older file. The poster refuses an unknown version
-        # rather than rendering half a message from fields it does not recognise. The number tracks the
-        # Android collector's, because both feed the same reader.
+        # rather than rendering half a message from fields it does not recognise. The number is the shared
+        # facts schema's, because one poster reads every report in the channel.
         "schema": 4,
         "verdict": "red" if red else "green",
         "platform": platform,

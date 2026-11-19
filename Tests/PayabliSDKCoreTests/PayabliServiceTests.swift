@@ -408,7 +408,7 @@ final class PayabliServiceTests: XCTestCase {
     /// status code".
     ///
     /// The classification decides retrying now that the policy reads the code, so narrowing the branch
-    /// to the valid range would make one of these terminal here and repeatable on the sibling. The
+    /// to the valid range would make one of these terminal instead of repeatable. The
     /// status is carried through, so what arrived is still readable.
     func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
         for status in [599, 600, 999] {

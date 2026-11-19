@@ -276,7 +276,7 @@ final class PayInIdempotencyTests: XCTestCase {
 
     /// The same successful status carrying a code that is not a refusal: the service could not process
     /// the request rather than declining it, so whether the payment was taken is exactly what is not
-    /// known. The sibling separates these two the same way.
+    /// known.
     func testAServiceFailureOnASuccessfulStatusReportsTheKey() async {
         let transport = RecordingIdempotencyTransport(
             body: Data(#"{"code":"E0001","reason":"Unable to process","explanation":"Try again."}"#.utf8)
