@@ -35,6 +35,12 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         try await assertConverted { try await ttp.initialize() }
     }
 
+    func testInitializeConvertsAForeignErrorFromEitherReaderStage() async throws {
+        for ttp in try terminalsFailingTheirReaderStages(with: HostThrew()) {
+            try await assertConverted { try await ttp.initialize() }
+        }
+    }
+
     /// Activation is a setup run, which converts a foreign error itself to the SDK's internal error. It still names the
     /// type and never the message.
     func testActivateDeviceConvertsAForeignErrorInsideItsRun() async throws {
@@ -100,6 +106,26 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         pendingAttestation.activationResult = .failure(CancellationError())
         try await assertPassesThrough(CancellationError.self) {
             try await pending.activateDevice(activationCode: "123456")
+        }
+    }
+
+    func testACancellationFromEitherReaderStagePassesThroughInitialize() async throws {
+        for ttp in try terminalsFailingTheirReaderStages(with: CancellationError()) {
+            try await assertPassesThrough(CancellationError.self) { try await ttp.initialize() }
+        }
+    }
+
+    func testAnErrorTheSDKClassifiedFromEitherReaderStagePassesThroughInitialize() async throws {
+        let classified = TapToPayError(type: .deviceSetupRequired, reason: "already classified", detail: "kept")
+        for ttp in try terminalsFailingTheirReaderStages(with: classified) {
+            do {
+                try await ttp.initialize()
+                XCTFail("expected initialize to fail")
+            } catch let error as TapToPayError {
+                XCTAssertEqual(error.type, .deviceSetupRequired)
+                XCTAssertEqual(error.reason, "already classified")
+                XCTAssertEqual(error.detail, "kept")
+            }
         }
     }
 
@@ -211,6 +237,15 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
             telemetry: transport
         )
         return (ttp, provider, attestation, transport)
+    }
+
+    /// Two terminals, one whose reader fails to configure with `failure` and one whose reader fails to prepare with it.
+    private func terminalsFailingTheirReaderStages(with failure: Error) throws -> [PayabliTTP] {
+        let (configuring, configureProvider, _, _) = try makeTTP()
+        configureProvider.configureResult = .failure(failure)
+        let (preparing, prepareProvider, _, _) = try makeTTP()
+        prepareProvider.prepareReaderResult = .failure(failure)
+        return [configuring, preparing]
     }
 
     private func makeReadyTTP() async throws -> (
