@@ -17,13 +17,13 @@ final class TTPConfigClient: Sendable {
 
     /// - Parameter transport: what the request is sent over, the session's.
     /// - Parameter attestation: what signs the request's assertion.
-    /// - Parameter telemetry: where the route's outcome is reported, or `nil` to report nothing.
+    /// - Parameter telemetrySession: the session the route's report belongs to; `nil` for the installed one.
     init(
         transport: any PayabliTransport,
         attestation: DeviceAttestationService,
-        telemetry: TelemetryClient? = nil
+        telemetrySession: TelemetrySessionContext? = nil
     ) {
-        routes = DeviceRouteClient(transport: transport, telemetry: telemetry)
+        routes = DeviceRouteClient(transport: transport, telemetrySession: telemetrySession)
         self.attestation = attestation
     }
 

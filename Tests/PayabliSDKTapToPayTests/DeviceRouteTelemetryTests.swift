@@ -109,6 +109,26 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["outcome"], "failed")
     }
 
+    func testARefusedTokensReportIsHeldUntilTheRenewalReleasesIt() async throws {
+        let (client, telemetry) = makeClient(answering: .status(401, body: Data()))
+        let held = RenewalHeldReports()
+
+        await RenewalHeldReports.$current.withValue(held) {
+            await assertThrows {
+                _ = try await client.measured(.challenge) {
+                    _ = try await client.get(.challenge, Self.request)
+                    throw PinnedTokenRefusal()
+                }
+            }
+        }
+        let whileRenewing = try await sent(by: telemetry)
+        held.release()
+
+        XCTAssertEqual(whileRenewing, [], "a send before the renewal carries the refused token")
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "failed")
+    }
+
     func testACancelledCallReportsNothing() async throws {
         let (client, telemetry) = makeClient(answering: .error(CancellationError()))
 
@@ -131,7 +151,7 @@ final class DeviceRouteTelemetryTests: XCTestCase {
             }
         }
         defer { StubURLProtocol.handler = nil }
-        let (sut, _, _) = try AttestFixture.makeService(telemetry: telemetry)
+        let (sut, _, _) = try AttestFixture.makeService()
 
         _ = try await sut.attest(entry: "myEntry")
 
@@ -152,7 +172,7 @@ final class DeviceRouteTelemetryTests: XCTestCase {
             )
         }
         defer { StubURLProtocol.handler = nil }
-        let (sut, _, _) = try AttestFixture.makeService(telemetry: telemetry)
+        let (sut, _, _) = try AttestFixture.makeService()
 
         await assertThrows { _ = try await sut.attest(entry: "myEntry") }
 
@@ -170,7 +190,7 @@ final class DeviceRouteTelemetryTests: XCTestCase {
             )
         }
         defer { StubURLProtocol.handler = nil }
-        let (sut, _, _) = try AttestFixture.makeService(telemetry: telemetry)
+        let (sut, _, _) = try AttestFixture.makeService()
 
         await assertThrows { _ = try await sut.attest(entry: "myEntry") }
 
@@ -210,11 +230,12 @@ final class DeviceRouteTelemetryTests: XCTestCase {
 
     private func makeClient(answering answer: FixedTransport.Answer) -> (DeviceRouteClient, TelemetryClient) {
         let telemetry = makeTelemetry()
-        return (DeviceRouteClient(transport: FixedTransport(answer: answer), telemetry: telemetry), telemetry)
+        return (DeviceRouteClient(transport: FixedTransport(answer: answer)), telemetry)
     }
 
+    /// A channel installed as the process recorder's, removed when the test ends.
     private func makeTelemetry() -> TelemetryClient {
-        TelemetryClient(
+        let telemetry = TelemetryClient(
             configuration: .init(entry: "test_entry", environment: "sandbox"),
             transport: telemetryTransport,
             sleep: clock.sleep,
@@ -222,9 +243,13 @@ final class DeviceRouteTelemetryTests: XCTestCase {
             deviceId: { nil },
             queued: []
         )
+        TelemetryRecorders.install(telemetry)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        return telemetry
     }
 
     private func sent(by telemetry: TelemetryClient) async throws -> [SentEvent] {
+        await TelemetryRecorders.settled()
         await telemetry.flush()
         let events = await telemetryTransport.drainBatches().flatMap { $0 }
         return events.map { SentEvent(event: $0.event, properties: $0.properties) }
