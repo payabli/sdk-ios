@@ -60,6 +60,21 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         }
     }
 
+    /// The sale may be taken once the reader is asked, so a cancelled read names its payment.
+    func testACancelledReadIsATapThatDidNotCompleteNamingItsPayment() async throws {
+        let (ttp, provider, _, _) = try await makeReadyTTP()
+        provider.readingResult = .failure(CancellationError())
+
+        do {
+            _ = try await ttp.charge(paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd))
+            XCTFail("expected the charge to fail")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .tapNotCompleted)
+            XCTAssertEqual(error.paymentTransId, "TXN-1")
+            XCTAssertEqual(error.capture, .unknown)
+        }
+    }
+
     func testTheTermsCallsConvertAForeignError() async throws {
         let (ttp, provider, _, _) = try makeTTP()
         provider.areTermsAcceptedResult = .failure(HostThrew())
