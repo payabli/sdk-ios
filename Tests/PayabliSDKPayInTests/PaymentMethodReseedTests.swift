@@ -4,11 +4,6 @@ import Combine
 import XCTest
 
 /// What an update from the caller does to what the payer has typed.
-///
-/// The sibling's form is handed its values and decides on every composition whether
-/// the caller supplied a different seed, so a comparison that answers "unchanged"
-/// too readily submits the card the caller replaced. These establish which of those
-/// questions this platform has.
 @MainActor
 final class PaymentMethodReseedTests: XCTestCase {
     override func setUp() {
@@ -23,15 +18,16 @@ final class PaymentMethodReseedTests: XCTestCase {
     /// The caller can change the form under a payer mid-entry — a fee recalculated,
     /// a method withdrawn — and what has been typed is not the caller's to replace.
     func testAnUpdateLeavesTypedValuesAlone() {
+        let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
-            component: makeComponent(),
+            component: component,
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount])
         )
         type(into: viewModel)
 
         viewModel.update(
-            component: makeComponent(entryPoint: "a-different-entry"),
+            component: component,
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card, .bankAccount],
@@ -114,8 +110,9 @@ final class PaymentMethodReseedTests: XCTestCase {
     /// never written into a field. So a caller replacing it replaces what is sent,
     /// with nothing on screen to compare against or to overwrite.
     func testConfiguredCustomerDataIsMergedRatherThanSeededIntoFields() {
+        let component = makeComponent()
         let viewModel = PayabliPayInViewModel(
-            component: makeComponent(),
+            component: component,
             operation: .storePaymentMethod(),
             configuration: PayabliPayInFormConfiguration(
                 allowedMethods: [.card],
@@ -127,7 +124,7 @@ final class PaymentMethodReseedTests: XCTestCase {
         // Through an update, not the initial build: a configuration carrying a
         // customer arriving mid-entry is the case that could overwrite a field.
         viewModel.update(
-            component: makeComponent(),
+            component: component,
             operation: .storePaymentMethod(PayabliPayInStoreOptions(
                 customerData: PayabliPayInCustomerData(
                     billingEmail: "configured@example.com",
@@ -419,10 +416,10 @@ final class PaymentMethodReseedTests: XCTestCase {
     }
     """
 
-    private func makeComponent(entryPoint: String = "entry") -> PayabliPayIn {
+    private func makeComponent() -> PayabliPayIn {
         flowOnSession(
             token: "access-token",
-            entryPoint: entryPoint,
+            entryPoint: "entry",
             environment: .sandbox
         )
     }

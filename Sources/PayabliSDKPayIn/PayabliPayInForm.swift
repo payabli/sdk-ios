@@ -157,9 +157,14 @@ public struct PayabliPayInForm: View {
             syncViewModel()
             viewModel.normalizeSelectedMethodForAvailableMethods()
         }
-        .onChange(of: PayInFormInputs(operation: operation, configuration: configuration, labels: labels)) { inputs in
+        .onChange(of: PayInFormInputs(
+            component: payIn,
+            operation: operation,
+            configuration: configuration,
+            labels: labels
+        )) { inputs in
             viewModel.update(
-                component: payIn,
+                component: inputs.component,
                 operation: inputs.operation,
                 configuration: inputs.configuration,
                 labels: inputs.labels

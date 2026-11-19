@@ -9,15 +9,17 @@ func payabliFramedSignature(_ components: [String]) -> String {
     components.map { "\($0.utf8.count):\($0)" }.joined()
 }
 
-/// Carries the operation, the configuration and the labels into one change handler, which may otherwise read the
-/// view's previous values: two handlers firing on one update would each apply one new value beside a stale one.
+/// Carries the component, the operation, the configuration and the labels into one change handler, so an update
+/// never applies one new value beside a stale one.
 struct PayInFormInputs: Equatable {
+    let component: PayabliPayIn
     let operation: PayabliPayInOperation
     let configuration: PayabliPayInFormConfiguration
     let labels: PayabliPayInFormLabels
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.operation.payabliViewModelSignature == rhs.operation.payabliViewModelSignature
+        lhs.component === rhs.component
+            && lhs.operation.payabliViewModelSignature == rhs.operation.payabliViewModelSignature
             && lhs.configuration.payabliViewModelSignature == rhs.configuration.payabliViewModelSignature
             && lhs.labels.payabliViewModelSignature == rhs.labels.payabliViewModelSignature
     }
