@@ -9,6 +9,16 @@ final class TokenFailureReportingTests: XCTestCase {
     private let clock = ManualTelemetryClock()
     private let lifecycle = ManualAppLifecycle()
 
+    override func setUp() {
+        super.setUp()
+        TelemetryRecorders.clear()
+    }
+
+    override func tearDown() {
+        TelemetryRecorders.clear()
+        super.tearDown()
+    }
+
     func testAProviderThatThrewReportsThrewAndTheTypeItRaised() async throws {
         let (auth, telemetry) = try makeAuth { throw HostBrokerDown() }
 
@@ -151,7 +161,7 @@ final class TokenFailureReportingTests: XCTestCase {
         let (auth, telemetry) = try makeAuth { throw HostBrokerDown() }
 
         await assertThrows { _ = try await auth.currentAccessToken() }
-        await telemetry.settled()
+        await TelemetryRecorders.settled()
 
         let sent = await transport.batches
         XCTAssertTrue(sent.isEmpty, "a send forced by a token failure would go out on the token that failed")
@@ -182,11 +192,12 @@ final class TokenFailureReportingTests: XCTestCase {
             deviceId: { nil },
             queued: []
         )
-        auth.reportFailures(to: telemetry)
+        TelemetryRecorders.install(telemetry)
         return (auth, telemetry)
     }
 
     private func reportsSent(by telemetry: TelemetryClient) async throws -> [[String: String]] {
+        await TelemetryRecorders.settled()
         await telemetry.flush()
         let events = await transport.drainBatches().flatMap { $0 }
         return events.filter { $0.event == TelemetryEventName.authTokenFailed }.map(\.properties)

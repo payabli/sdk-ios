@@ -28,9 +28,6 @@ actor PayabliAuth {
     /// can start between deciding and recording. Readable without awaiting.
     private nonisolated let finished = FinishedSlot()
 
-    /// Where a provider call that failed is reported. Filled once the session's telemetry exists, which is after this holder.
-    private nonisolated let failureReports = TelemetrySlot()
-
     /// Non-nil once this holder is finished: a token refreshed after a rejection was refused in turn.
     nonisolated var terminalFailure: PayabliGenericError? {
         finished.failure
@@ -57,13 +54,6 @@ actor PayabliAuth {
         self.logger = logger
         self.clock = clock
         self.onJoinedInFlightMint = onJoinedInFlightMint
-    }
-
-    /// Reports each provider call that fails to `telemetry` from now on.
-    ///
-    /// - Parameter telemetry: the session's telemetry client.
-    nonisolated func reportFailures(to telemetry: TelemetryClient) {
-        failureReports.client = telemetry
     }
 
     /// The token to send, minting one when none is held.
@@ -209,7 +199,7 @@ actor PayabliAuth {
                 // Named apart from every other provider throw below: a caller can tell a slow broker
                 // from a rejected credential or a thrown error, which is the whole point of the bound.
                 logger.error("The token provider did not return within the deadline")
-                await self.reportFailure(.timedOut, since: startedAt)
+                self.reportFailure(.timedOut, since: startedAt)
                 throw PayabliGenericError(
                     type: .tokenProviderFailed,
                     reason: "Token request failed",
@@ -221,9 +211,9 @@ actor PayabliAuth {
                 // through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
                 if Self.isReentryRefusal(error) {
-                    await self.reportFailure(.reentered, since: startedAt)
+                    self.reportFailure(.reentered, since: startedAt)
                 } else {
-                    await self.reportFailure(.threw, thrown: error, since: startedAt)
+                    self.reportFailure(.threw, thrown: error, since: startedAt)
                 }
                 throw PayabliGenericError(
                     type: .tokenProviderFailed,
@@ -234,7 +224,7 @@ actor PayabliAuth {
             }
             if let refusal = Self.refusal(of: minted, replacing: rejectedToken) {
                 logger.error("The minted token was refused before it was committed")
-                await self.reportFailure(refusal.reason, since: startedAt)
+                self.reportFailure(refusal.reason, since: startedAt)
                 throw refusal.error
             }
             self.commit(minted, mintID: mintID)
@@ -395,19 +385,36 @@ actor PayabliAuth {
     /// - Parameter reason: which of the six refusals it was.
     /// - Parameter thrown: what the provider threw, named as `failure_type`, only when `reason` is `threw`.
     /// - Parameter startedAt: when the provider was called.
-    private func reportFailure(_ reason: TokenFailureReason, thrown: Error? = nil, since startedAt: ContinuousClock.Instant) async {
-        guard let telemetry = failureReports.client else { return }
+    private nonisolated func reportFailure(_ reason: TokenFailureReason, thrown: Error? = nil, since startedAt: ContinuousClock.Instant) {
         let (seconds, attoseconds) = (ContinuousClock.now - startedAt).components
+        // A token failure waits for its batch instead of forcing a send.
+        TelemetryRecorders.record(
+            TelemetryEventName.authTokenFailed,
+            properties: Self.failureProperties(reason, thrown: thrown, milliseconds: seconds * 1000 + attoseconds / 1_000_000_000_000_000),
+            waitsForBatch: true
+        )
+    }
+
+    /// The properties `auth.tokenFailed` carries.
+    ///
+    /// - Parameter reason: which of the six refusals it was.
+    /// - Parameter thrown: what the provider threw, named as `failure_type`; `nil` for every reason but `threw`.
+    /// - Parameter milliseconds: how long the provider call took.
+    /// - Returns: the event's properties.
+    private static func failureProperties(
+        _ reason: TokenFailureReason,
+        thrown: Error?,
+        milliseconds: Int64
+    ) -> [String: String] {
         var properties = [
             TelemetryProperty.outcome.rawValue: "failed",
             TelemetryProperty.reason.rawValue: reason.rawValue,
-            TelemetryProperty.durationMs.rawValue: String(seconds * 1000 + attoseconds / 1_000_000_000_000_000)
+            TelemetryProperty.durationMs.rawValue: String(milliseconds)
         ]
         if let thrown {
             properties[TelemetryProperty.failureType.rawValue] = RedactedCause(thrown).simpleTypeName
         }
-        // A token failure waits for its batch instead of forcing a send.
-        await telemetry.emit(TelemetryEventName.authTokenFailed, properties: properties, occurredAt: Date(), waitsForBatch: true)
+        return properties
     }
 
     /// Drops the held token and any call in flight, and revives a finished holder, so the next read mints again.
@@ -439,15 +446,4 @@ enum TokenFailureReason: String {
     case unusableToken
     case unchangedToken
     case reentered
-}
-
-/// Holds the telemetry client a holder reports to, which is set after the holder exists.
-final class TelemetrySlot: @unchecked Sendable {
-    private let lock = NSLock()
-    private var held: TelemetryClient?
-
-    var client: TelemetryClient? {
-        get { lock.withLock { held } }
-        set { lock.withLock { held = newValue } }
-    }
 }

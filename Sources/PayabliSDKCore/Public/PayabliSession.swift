@@ -107,7 +107,6 @@ public final class PayabliSession: @unchecked Sendable {
             predecessor: predecessor,
             predecessorUnreachable: { await TelemetryRecorders.unreachable($0) }
         )
-        auth.reportFailures(to: telemetry)
     }
 
     /// The state a report gives for a session that is live and usable, the only one a report is made on.
