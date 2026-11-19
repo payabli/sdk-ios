@@ -59,7 +59,7 @@ final class PinnedCredentialTests: XCTestCase {
     }
 
     func testThePinAndTheCallerRefusalSurviveTheDecorationCopy() async throws {
-        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(
+        let decorated = try await BearerDecoration(readToken: { "chain" }, readHeldToken: { "chain" }).decorate(
             PayabliRequest(
                 method: .get,
                 path: "/api/v2/device/taptopay/config/entry",

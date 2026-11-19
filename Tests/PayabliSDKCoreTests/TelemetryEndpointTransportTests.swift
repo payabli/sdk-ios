@@ -13,6 +13,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -58,6 +59,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -76,6 +78,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -96,6 +99,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw NoToken() },
+            readHeldToken: { nil },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -130,6 +134,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             _ = await provider.increment()
             return "telemetry-token"
         })
+        _ = try await session.auth.currentAccessToken()
 
         session.telemetry.record(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
@@ -151,6 +156,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             _ = await provider.increment()
             return "telemetry-token"
         })
+        _ = try await session.auth.currentAccessToken()
 
         session.telemetry.record(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
@@ -197,6 +203,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw NoAnswer() },
+            readHeldToken: { nil },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -220,6 +227,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

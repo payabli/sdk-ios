@@ -67,7 +67,8 @@ extension PayabliRequest {
             headers: headers,
             body: body,
             isCallerRefusal: isCallerRefusal,
-            isCredentialPinned: isCredentialPinned
+            isCredentialPinned: isCredentialPinned,
+            requiresHeldCredential: requiresHeldCredential
         )
     }
 }

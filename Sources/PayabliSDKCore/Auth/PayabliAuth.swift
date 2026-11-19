@@ -112,11 +112,12 @@ actor PayabliAuth {
         finished.failure = failure
     }
 
-    /// The token held right now, without minting one.
+    /// The token held now, without calling the provider.
     ///
-    /// - Returns: the token held right now, or `nil` when none is held.
+    /// - Returns: the token held, or `nil` when none is held, a mint is in flight, or this holder is finished.
     func heldToken() -> String? {
-        currentToken
+        guard inFlightMint == nil, terminalFailure == nil else { return nil }
+        return currentToken
     }
 
     /// Reports `rejectedToken` as refused and returns the token to use instead.

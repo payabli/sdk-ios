@@ -44,7 +44,7 @@ final class FinishedSessionTransportTests: XCTestCase {
         })
         let gate = ParkSecondArrival()
         let transport = makeStackWithChain(
-            [BearerDecoration(readToken: { try await auth.currentAccessToken() }), gate],
+            [BearerDecoration(readToken: { try await auth.currentAccessToken() }, readHeldToken: { await auth.heldToken() }), gate],
             auth: auth
         )
 

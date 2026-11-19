@@ -352,6 +352,7 @@ final class TapToPayErrorTranslationTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

@@ -56,7 +56,8 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                     method: .post,
                     path: path,
                     jsonBody: body,
-                    isCallerRefusal: { $0.statusCode == 401 }
+                    isCallerRefusal: { $0.statusCode == 401 },
+                    requiresHeldCredential: true
                 )
             )
             guard (200 ..< 300).contains(response.statusCode) else {
@@ -66,6 +67,10 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                 return response.statusCode == 413 ? .discarded : .kept
             }
             return .delivered
+        } catch let refusal as PayabliGenericError where refusal.type == .missingToken {
+            // Every flush lands here until host work mints a token, so it is not a failure.
+            logger.debug("telemetry_batch_waiting: no token ready; the batch waits for the next flush")
+            return .kept
         } catch {
             logger.warning("Telemetry batch send failed (best-effort)")
             return .kept

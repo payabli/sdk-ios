@@ -181,6 +181,7 @@ func makeAuthenticatedStack(
     let service = PayabliService.makeWithChain(
         environment: .sandbox,
         readToken: { try await auth.currentAccessToken() },
+        readHeldToken: { await auth.heldToken() },
         session: StubURLProtocol.makeSession(),
         logger: logger
     )
