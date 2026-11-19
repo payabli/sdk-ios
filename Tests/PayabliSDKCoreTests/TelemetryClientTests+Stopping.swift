@@ -149,6 +149,22 @@ extension TelemetryClientTests {
         XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
     }
 
+    func testARecordReachingAClientTwoHandOversBackLeavesOnTheLatestWithNothingElseHoldingTheMiddleOne() async {
+        let first = makeClient(batchSize: 100)
+        var middle: TelemetryClient? = makeClient(batchSize: 100, predecessor: first)
+        await middle?.settled()
+        let latest = makeClient(batchSize: 100, predecessor: middle)
+        await latest.settled()
+        middle = nil
+
+        await record(first, "late")
+        await latest.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.map(\.label), ["late"])
+        XCTAssertEqual(Set(events.map(\.sessionId)), [first.sessionId])
+    }
+
     func testDiscardingDropsWhatIsQueuedAndLogsTheCount() async {
         let sink = RecordingLogSink()
         let client = makeClient(batchSize: 100, logger: PayabliLogger(category: .telemetry, sink: sink))

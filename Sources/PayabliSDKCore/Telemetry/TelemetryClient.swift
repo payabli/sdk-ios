@@ -82,8 +82,9 @@ package actor TelemetryClient {
     private var stopped = false
     /// Set while `handOff` waits for the drains already scheduled, so a batch kept then stays queued for the successor.
     private var handingOff = false
-    /// The client this one's queue was handed to, which an event reaching this one afterwards is passed on to.
-    private weak var successor: TelemetryClient?
+    /// The client this one's queue was handed to, which an event reaching this one afterwards is passed on to. Held
+    /// strongly, so a record reaching a client two hand-overs back still finds the latest one.
+    private var successor: TelemetryClient?
 
     /// - Parameter configuration: the batch and queue sizes and the identifiers every event carries.
     /// - Parameter transport: where batches are sent.
@@ -171,7 +172,7 @@ package actor TelemetryClient {
     /// refused, and the drains already scheduled finish first. A batch one of them cannot send stays queued.
     ///
     /// - Parameter successor: the client taking the queue, which an event recorded here afterwards is passed on to under
-    ///   this client's session; `nil` drops it.
+    ///   the session it was recorded for, or this client's when it names none; `nil` drops it.
     /// - Returns: the events left, oldest first, and how many the queue evicted that no batch has reported.
     package func handOff(to successor: TelemetryClient? = nil) async -> (events: [TelemetryEvent], dropped: Int) {
         self.successor = successor
