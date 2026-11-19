@@ -57,7 +57,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                     path: path,
                     jsonBody: body,
                     isCallerRefusal: { $0.statusCode == 401 },
-                    requiresHeldCredential: true
+                    sendsOnHeldCredentialOnly: true
                 )
             )
             guard (200 ..< 300).contains(response.statusCode) else {

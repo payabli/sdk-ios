@@ -42,7 +42,7 @@ struct AuthenticatedTransport: PayabliTransport {
         // Fails without a round trip once the holder is finished. The holder refuses a new mint on its own,
         // so this saves a send rather than guarding one.
         if let failure = auth.terminalFailure {
-            throw request.requiresHeldCredential ? BearerDecoration.noneHeld() : failure
+            throw request.sendsOnHeldCredentialOnly ? BearerDecoration.noneHeld() : failure
         }
 
         let stamped = SentToken()
@@ -145,7 +145,7 @@ struct AuthenticatedTransport: PayabliTransport {
         }
 
         // A refresh calls the host's provider, which this request never does.
-        if request.requiresHeldCredential {
+        if request.sendsOnHeldCredentialOnly {
             logger.warning(
                 "recovery declined: the route sends on the held credential only"
                     + " (\(request.method.rawValue) \(rejection.statusCode))"
