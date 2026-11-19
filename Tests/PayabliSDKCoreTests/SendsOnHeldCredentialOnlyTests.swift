@@ -4,7 +4,7 @@ import XCTest
 
 /// A request that requires a held credential is sent on the token already held, and never starts a call to the host's
 /// token provider. Telemetry's upload is that request.
-final class RequiresHeldCredentialTests: XCTestCase {
+final class SendsOnHeldCredentialOnlyTests: XCTestCase {
     override func setUp() {
         super.setUp()
         TelemetryRecorders.clear()
@@ -236,7 +236,7 @@ final class RequiresHeldCredentialTests: XCTestCase {
     // MARK: - Fixtures
 
     private func heldOnly() -> PayabliRequest {
-        PayabliRequest(method: .post, path: "/api/v2/telemetry/sdk", requiresHeldCredential: true)
+        PayabliRequest(method: .post, path: "/api/v2/telemetry/sdk", sendsOnHeldCredentialOnly: true)
     }
 
     private func makeAuth(provider: Counter) throws -> PayabliAuth {

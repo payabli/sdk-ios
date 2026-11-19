@@ -23,7 +23,7 @@ package struct PayabliRequest: Sendable {
     /// Whether this request is sent only on a credential already held. True means it never starts a call to the
     /// host's token provider: with none held, a mint in flight or the session finished, it is refused with
     /// `missingToken` and nothing is sent.
-    package let requiresHeldCredential: Bool
+    package let sendsOnHeldCredentialOnly: Bool
 
     package init(
         method: HTTPMethod,
@@ -33,7 +33,7 @@ package struct PayabliRequest: Sendable {
         body: Data? = nil,
         isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
         isCredentialPinned: Bool = false,
-        requiresHeldCredential: Bool = false
+        sendsOnHeldCredentialOnly: Bool = false
     ) {
         self.method = method
         self.path = path
@@ -42,7 +42,7 @@ package struct PayabliRequest: Sendable {
         self.body = body
         self.isCallerRefusal = isCallerRefusal
         self.isCredentialPinned = isCredentialPinned
-        self.requiresHeldCredential = requiresHeldCredential
+        self.sendsOnHeldCredentialOnly = sendsOnHeldCredentialOnly
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.
@@ -56,7 +56,7 @@ package struct PayabliRequest: Sendable {
     ///   credential, so it is returned as it arrived with no refresh and no replay.
     /// - Parameter isCredentialPinned: whether the request is bound to the exact credential it carries, so recovery
     ///   is skipped and a refusal reaches the caller as it arrived.
-    /// - Parameter requiresHeldCredential: whether the request is sent only on a credential already held, never
+    /// - Parameter sendsOnHeldCredentialOnly: whether the request is sent only on a credential already held, never
     ///   starting a call to the host's token provider.
     /// - Returns: the assembled request, ready for the decoration chain.
     package static func json(
@@ -67,7 +67,7 @@ package struct PayabliRequest: Sendable {
         jsonBody: some Encodable,
         isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
         isCredentialPinned: Bool = false,
-        requiresHeldCredential: Bool = false
+        sendsOnHeldCredentialOnly: Bool = false
     ) throws -> PayabliRequest {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -82,7 +82,7 @@ package struct PayabliRequest: Sendable {
             body: body,
             isCallerRefusal: isCallerRefusal,
             isCredentialPinned: isCredentialPinned,
-            requiresHeldCredential: requiresHeldCredential
+            sendsOnHeldCredentialOnly: sendsOnHeldCredentialOnly
         )
     }
 }

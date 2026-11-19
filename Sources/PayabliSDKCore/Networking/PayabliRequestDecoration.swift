@@ -68,7 +68,7 @@ extension PayabliRequest {
             body: body,
             isCallerRefusal: isCallerRefusal,
             isCredentialPinned: isCredentialPinned,
-            requiresHeldCredential: requiresHeldCredential
+            sendsOnHeldCredentialOnly: sendsOnHeldCredentialOnly
         )
     }
 }

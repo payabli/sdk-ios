@@ -25,7 +25,7 @@ struct BearerDecoration: PayabliRequestDecoration {
 
     func decorate(_ request: PayabliRequest) async throws -> PayabliRequest {
         let token: String
-        if request.requiresHeldCredential {
+        if request.sendsOnHeldCredentialOnly {
             guard let held = await readHeldToken() else { throw Self.noneHeld() }
             token = held
         } else {
