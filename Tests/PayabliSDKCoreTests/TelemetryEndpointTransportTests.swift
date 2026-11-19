@@ -195,7 +195,11 @@ final class TelemetryEndpointTransportTests: XCTestCase {
 
     /// A send that never reaches an answer is kept too: the next flush tries the batch again.
     func testATransportFailureIsKeptForTheNextFlush() async {
-        StubURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        let reached = expectation(description: "the request reached the transport")
+        StubURLProtocol.handler = { _ in
+            reached.fulfill()
+            throw URLError(.notConnectedToInternet)
+        }
         defer { StubURLProtocol.handler = nil }
         let service = PayabliService(
             environment: .sandbox,
@@ -207,6 +211,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
 
         let outcome = await TelemetryEndpointTransport(transport: service).send([event()])
 
+        await fulfillment(of: [reached], timeout: 1)
         XCTAssertEqual(outcome, .kept)
     }
 
