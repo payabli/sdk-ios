@@ -135,6 +135,20 @@ extension TelemetryClientTests {
         XCTAssertEqual(left, 0)
     }
 
+    func testARecordReachingAClientAfterItsHandOverLeavesOnTheSuccessorUnderItsOwnSession() async {
+        let old = makeClient(batchSize: 100)
+        let successor = makeClient(batchSize: 100, predecessor: old)
+        await successor.settled()
+
+        await record(old, "late")
+        await old.emit([(TelemetryEventName.formPresented, ["step": "late-pair"])])
+        await successor.flush()
+
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.map(\.label), ["late", "late-pair"])
+        XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
+    }
+
     func testDiscardingDropsWhatIsQueuedAndLogsTheCount() async {
         let sink = RecordingLogSink()
         let client = makeClient(batchSize: 100, logger: PayabliLogger(category: .telemetry, sink: sink))
