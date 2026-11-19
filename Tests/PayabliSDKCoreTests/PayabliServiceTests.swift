@@ -403,9 +403,8 @@ final class PayabliServiceTests: XCTestCase {
 
     // MARK: - Request building
 
-    /// A status above the valid range is a server fault, as RFC 9110 Section 15 asks, so it stays
-    /// retryable; narrowing the branch to the valid range would make it terminal. The status that
-    /// arrived is carried through.
+    /// A status above the valid range is still a server fault, as RFC 9110 Section 15 asks, and keeps
+    /// the status that arrived. Narrowing the branch to 500...599 would report 600 and 999 as unknown.
     func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
         for status in [599, 600, 999] {
             do {
