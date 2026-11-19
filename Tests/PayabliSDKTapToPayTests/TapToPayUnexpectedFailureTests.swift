@@ -35,8 +35,8 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         try await assertConverted { try await ttp.initialize() }
     }
 
-    /// Activation is a setup run, which converts a foreign error itself to the SDK's internal error, as card-present setup
-    /// does on both platforms. It still names the type and never the message.
+    /// Activation is a setup run, which converts a foreign error itself to the SDK's internal error. It still names the
+    /// type and never the message.
     func testActivateDeviceConvertsAForeignErrorInsideItsRun() async throws {
         let (ttp, _, attestation, _) = try await makePendingTTP()
         attestation.activationResult = .failure(HostThrew())
