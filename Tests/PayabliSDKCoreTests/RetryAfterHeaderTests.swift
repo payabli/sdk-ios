@@ -1,7 +1,6 @@
 @testable import PayabliSDKCore
 import XCTest
 
-/// The sibling SDK has this parser and no test for it, so these are written rather than ported.
 final class RetryAfterHeaderTests: XCTestCase {
     private func response(_ value: String?, status: Int = 429) -> PayabliResponse {
         PayabliResponse(

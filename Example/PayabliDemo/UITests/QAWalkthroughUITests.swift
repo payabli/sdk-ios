@@ -11,7 +11,7 @@ final class QAWalkthroughUITests: XCTestCase {
 
         // These submit real payments, so a run is opted into rather than assumed.
         // Without this an operator opening the scheme and pressing run charges a
-        // paypoint. The sibling platform excludes its walkthrough the same way.
+        // paypoint.
         try XCTSkipUnless(
             ProcessInfo.processInfo.environment["PAYABLI_QA_LIVE"] == "1",
             "set TEST_RUNNER_PAYABLI_QA_LIVE=1 to submit against a real paypoint"
@@ -257,11 +257,9 @@ final class QAWalkthroughUITests: XCTestCase {
         element.tap()
     }
 
-    /// The instrument the form is on, which the prefill then fills.
-    ///
-    /// Waited for by a bank-only field, because the prefill fills the boxes that are mounted and the swap takes
-    /// a frame. Prefilled too early it fills the card boxes it can still see, the bank ones stay empty, and the
-    /// form refuses itself. Measured on Android, where three of four devices lost that race.
+    /// Switches the form to the bank account and waits for a bank-only field, because the swap takes a
+    /// frame: prefilled earlier, the prefill fills the card boxes still mounted, the bank ones stay empty,
+    /// and the form refuses itself.
     private func chooseTheBankAccount() {
         tap(app.buttons["Bank account"], named: "the bank-account option")
         let routing = app.textFields["payabli.payIn.field.routingNumber"]

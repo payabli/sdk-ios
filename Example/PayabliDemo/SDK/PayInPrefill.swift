@@ -1,14 +1,8 @@
 import PayabliSDKPayIn
 
-/// The form fields this app can fill, and how to find one on screen.
-///
-/// The SDK owns the form's field state and offers no way to seed it, so the debug
-/// prefill reaches the rendered fields by the `accessibilityIdentifier` the SDK
-/// assigns. That identifier is built from an SDK type, so it is named here rather
-/// than rebuilt by the screen that types into it.
-///
-/// The sibling seeds through the form's own `initialValues` instead, so nothing
-/// there reaches around the form. This platform has no such parameter.
+/// The form fields the debug prefill fills, found by the `accessibilityIdentifier` the SDK assigns,
+/// because the SDK offers no way to seed its form. The identifier is built from an SDK type, so it
+/// is named here rather than rebuilt by the screen that types into it.
 enum PayInPrefillField: CaseIterable {
     case cardholderName
     case cardNumber

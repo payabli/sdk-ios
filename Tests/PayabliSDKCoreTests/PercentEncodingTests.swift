@@ -16,7 +16,7 @@ final class PercentEncodingTests: XCTestCase {
     }
 
     /// `urlPathAllowed` admits these, so the previous encoder passed them through. A route is free
-    /// to give any of them meaning, and the sibling platform encodes them.
+    /// to give any of them meaning, so each is encoded.
     func testTheSubDelimitersAreEncoded() {
         XCTAssertEqual(PercentEncoding.segment("a;b"), "a%3Bb")
         XCTAssertEqual(PercentEncoding.segment("a=b"), "a%3Db")
@@ -40,7 +40,7 @@ final class PercentEncodingTests: XCTestCase {
     }
 
     /// RFC 3986 Section 6.2.2.1: a producer writes the digits in upper case. Lower case would be
-    /// equivalent to a reader and would not match the sibling byte for byte.
+    /// equivalent to a reader, but the same value would no longer have one spelling on the wire.
     func testTheHexadecimalDigitsAreUpperCase() {
         XCTAssertEqual(PercentEncoding.segment("\u{7F}"), "%7F")
         XCTAssertEqual(PercentEncoding.segment("~\u{1F}"), "~%1F")

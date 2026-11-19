@@ -686,7 +686,7 @@ def test_poster() -> None:
         armed = at(posted(server, "chat.scheduleMessage"), 0)
         check("P1d the alarm carries the platform-scoped marker",
               "nightly-liveness:iOS" in armed.get("text", ""), armed.get("text"))
-        check("P1e the marker is not the Android one, and neither contains the other",
+        check("P1e the marker is not the other platform's, and neither contains the other",
               "nightly-liveness:Android" not in armed.get("text", "")
               and "nightly-liveness:iOS" not in "nightly-liveness:Android"
               and "nightly-liveness:Android" not in "nightly-liveness:iOS",

@@ -4,8 +4,7 @@ import UIKit
 /// The Payabli style guide palette, taken from the PAY_Style-Guide Figma file.
 ///
 /// The names below are the token names as the guide spells them, so a colour can be traced back to
-/// its source. The Android sample app carries the same values under the same names; the two demos
-/// are meant to screenshot as one product.
+/// its source.
 enum PayabliPalette {
     static let black: UInt32 = 0x000000
     static let white: UInt32 = 0xFFFFFF
@@ -37,20 +36,9 @@ enum PayabliPalette {
     static let darkContainerHigh: UInt32 = 0x1A264A
 }
 
-/// The roles the demo draws with.
-///
-/// Each one resolves through a `UIColor` that reads the trait collection, so light and dark are
-/// decided at draw time exactly as the system colours these replaced were. Swapping to an asset
-/// catalogue would work too; this keeps the whole palette and its role mapping in one readable file,
-/// next to the Android file it mirrors.
-///
-/// Which token plays which role, and why the bright ones are not the filled-button colours: Blue 1
-/// is a light cyan, so white text on it clears no contrast bar. It is `primary` in dark, where it
-/// sits on a near-black surface, and Blue 4 carries the light scheme's accents at 15.1:1 against
-/// white. The guide has no green, so a passing check reads teal; inventing a green would put a
-/// colour in the app that appears in no token list.
-///
-/// Every pair used here clears 4.5:1 in both appearances.
+/// The roles the demo draws with, resolved per appearance at draw time. White text fails contrast on
+/// Blue 1, a light cyan, so it is `primary` only in dark. The guide has no green, so a passing check
+/// reads teal. Every text, accent and status colour clears 4.5:1 on the background in both appearances.
 extension Color {
     // Surfaces.
     static let payabliBackground = dynamic(light: PayabliPalette.neutral8, dark: PayabliPalette.deepBlue)
