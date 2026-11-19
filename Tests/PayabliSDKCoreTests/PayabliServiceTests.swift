@@ -403,13 +403,9 @@ final class PayabliServiceTests: XCTestCase {
 
     // MARK: - Request building
 
-    /// A status the HTTP grammar has no room for is read as a server fault, which is what RFC 9110
-    /// Section 15 asks of a client: it "SHOULD process the response as if it had a 5xx (Server Error)
-    /// status code".
-    ///
-    /// The classification decides retrying now that the policy reads the code, so narrowing the branch
-    /// to the valid range would make one of these terminal instead of repeatable. The
-    /// status is carried through, so what arrived is still readable.
+    /// A status above the valid range is a server fault, as RFC 9110 Section 15 asks, so it stays
+    /// retryable; narrowing the branch to the valid range would make it terminal. The status that
+    /// arrived is carried through.
     func testAStatusAboveTheValidRangeIsStillAServerFault() throws {
         for status in [599, 600, 999] {
             do {

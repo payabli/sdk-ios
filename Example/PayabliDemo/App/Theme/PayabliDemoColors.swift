@@ -36,19 +36,9 @@ enum PayabliPalette {
     static let darkContainerHigh: UInt32 = 0x1A264A
 }
 
-/// The roles the demo draws with.
-///
-/// Each one resolves through a `UIColor` that reads the trait collection, so light and dark are
-/// decided at draw time exactly as the system colours these replaced were. Swapping to an asset
-/// catalogue would work too; this keeps the whole palette and its role mapping in one readable file.
-///
-/// Which token plays which role, and why the bright ones are not the filled-button colours: Blue 1
-/// is a light cyan, so white text on it clears no contrast bar. It is `primary` in dark, where it
-/// sits on a near-black surface, and Blue 4 carries the light scheme's accents at 15.1:1 against
-/// white. The guide has no green, so a passing check reads teal; inventing a green would put a
-/// colour in the app that appears in no token list.
-///
-/// Every pair used here clears 4.5:1 in both appearances.
+/// The roles the demo draws with, resolved per appearance at draw time. White text fails contrast on
+/// Blue 1, a light cyan, so it is `primary` only in dark. The guide has no green, so a passing check
+/// reads teal. Every pair used here clears 4.5:1 in both appearances.
 extension Color {
     // Surfaces.
     static let payabliBackground = dynamic(light: PayabliPalette.neutral8, dark: PayabliPalette.deepBlue)
