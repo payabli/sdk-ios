@@ -9,7 +9,7 @@ package struct TelemetrySessionContext: Sendable, Equatable {
 
 /// The process's one installed telemetry channel, and the call every reporting site makes.
 ///
-/// No reporter holds a channel, which would keep a replaced session's channel alive across a re-initialize. Records
+/// A reporter holds its session, never a channel, so a re-initialize releases the replaced session's channel. Records
 /// reach the channel in the order made, off the caller's path; with nothing installed, their properties are never built.
 package enum TelemetryRecorders {
     private static let lock = NSLock()
@@ -102,7 +102,6 @@ package enum TelemetryRecorders {
 }
 
 package extension TelemetryClient {
-    /// The session this channel reports for.
     nonisolated var context: TelemetrySessionContext {
         TelemetrySessionContext(sessionId: sessionId, entry: configuration.entry, environment: configuration.environment)
     }

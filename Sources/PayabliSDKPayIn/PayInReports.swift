@@ -32,8 +32,8 @@ final class PayInReports {
 
     private let session: TelemetrySessionContext?
 
-    /// - Parameter session: the session the flow runs on, which every report carries; `nil` for a flow given a
-    ///   transport whole, whose reports belong to whichever session is installed.
+    /// - Parameter session: the session the flow runs on, which every report carries; `nil` for a flow built on a
+    ///   bare transport, whose reports belong to whichever session is installed.
     init(session: TelemetrySessionContext?) {
         self.session = session
     }
