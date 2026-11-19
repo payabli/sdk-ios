@@ -95,7 +95,7 @@ final class FinishedSessionTransportTests: XCTestCase {
         defer { stub.uninstall() }
         let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
         let transport = makeAuthenticatedStack(auth: auth)
-        let pinned = PayabliRequest(method: .get, path: "/api/v2/device/taptopay/config/entry", pinsCredential: true)
+        let pinned = PayabliRequest(method: .get, path: "/api/v2/device/taptopay/config/entry", isCredentialPinned: true)
 
         _ = try await transport.perform(pinned)
         _ = try await transport.perform(pinned)

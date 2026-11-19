@@ -121,7 +121,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
         let transport = makeAuthenticatedStack(auth: auth)
         let mark = PayabliSendMark()
-        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", pinsCredential: true)
+        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", isCredentialPinned: true)
 
         _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(pinned) }
 

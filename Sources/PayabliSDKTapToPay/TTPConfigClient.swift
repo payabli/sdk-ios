@@ -37,7 +37,7 @@ final class TTPConfigClient: Sendable {
             method: .get,
             path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
             headers: headers.asDictionary,
-            pinsCredential: true
+            isCredentialPinned: true
         )
 
         // The headers carry the App Attest assertion, key id and device id.

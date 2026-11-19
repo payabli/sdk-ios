@@ -2,7 +2,7 @@ import Foundation
 
 /// What counts as the credential being refused, asked of every request by `AuthenticatedTransport`, which decides the
 /// replay itself so widening one never widens the other. Only this module's tests substitute a policy; a route that
-/// refuses recovery says so per request (`PayabliRequest.pinsCredential`).
+/// refuses recovery says so per request (`PayabliRequest.isCredentialPinned`).
 protocol AuthRecoveryPolicy: Sendable {
     /// Whether `response` says the credential was refused.
     ///

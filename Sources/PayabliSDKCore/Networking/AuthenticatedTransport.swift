@@ -133,7 +133,7 @@ struct AuthenticatedTransport: PayabliTransport {
     ) async -> Bool {
         // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
         // once the sequence it belongs to has ended.
-        if request.pinsCredential {
+        if request.isCredentialPinned {
             logger.warning(
                 "recovery declined: the route pins the credential it was sent"
                     + " (\(request.method.rawValue) \(rejection.statusCode))"
