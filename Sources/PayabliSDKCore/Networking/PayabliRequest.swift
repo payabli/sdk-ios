@@ -56,8 +56,7 @@ package struct PayabliRequest: Sendable {
     ///   credential, so it is returned as it arrived with no refresh and no replay.
     /// - Parameter isCredentialPinned: whether the request is bound to the exact credential it carries, so recovery
     ///   is skipped and a refusal reaches the caller as it arrived.
-    /// - Parameter sendsOnHeldCredentialOnly: whether the request is sent only on a credential already held, never
-    ///   starting a call to the host's token provider.
+    /// - Parameter sendsOnHeldCredentialOnly: whether the request goes out only on a token already held.
     /// - Returns: the assembled request, ready for the decoration chain.
     package static func json(
         method: HTTPMethod,

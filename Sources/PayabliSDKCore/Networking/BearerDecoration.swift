@@ -1,11 +1,9 @@
 import Foundation
 
-/// Attaches `Authorization: Bearer` to every outbound request, overriding a caller's own.
+/// Attaches `Authorization: Bearer` to every outbound request, overriding a caller's own. The token is read per
+/// request and not checked here: the holder checks every token it installs, so a blank one cannot arrive.
 ///
-/// The token is read per request and is not checked here. The only thing that reaches this is a
-/// holder that checks every token it installs, so a blank or unsendable one cannot arrive.
-///
-/// A request that requires a held credential is refused when none is held, and never starts a provider call.
+/// A held-only request is refused when no token is held, and never starts a provider call.
 struct BearerDecoration: PayabliRequestDecoration {
     private static let headerName = "Authorization"
     private static let scheme = "Bearer "
