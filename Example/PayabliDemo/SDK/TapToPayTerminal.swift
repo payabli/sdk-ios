@@ -6,7 +6,7 @@ import PayabliSDKTapToPay
 /// A screen's grip on the card reader.
 ///
 /// The terminal itself stays in here, and so does every state and error type it
-/// publishes. A screen drives it through these four calls and reads
+/// publishes. A screen drives it through these calls and reads
 /// ``TapToPaySessionStatus``, so nothing outside this group names an SDK type for
 /// the card-present surface.
 @MainActor
@@ -63,6 +63,13 @@ final class TapToPayTerminal: ObservableObject {
             )
             return result.paymentTransId
         }
+    }
+
+    /// Sends the close for a payment, in any session state.
+    ///
+    /// - Parameter paymentTransId: the payment to close.
+    func close(paymentTransId: String) async throws {
+        try await run { try await terminal.closeCapturedCharge(paymentTransId: paymentTransId) }
     }
 
     /// Presents an activation code for a device the service is holding.
