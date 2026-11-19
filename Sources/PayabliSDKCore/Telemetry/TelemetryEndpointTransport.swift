@@ -11,9 +11,9 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     private let deviceFacts: TelemetryDeviceFacts
     private let logger: PayabliLogger
 
-    /// Every batch declares a 401 a refusal of its caller, so the answer returns as it arrived, with no
-    /// refresh, no replay and nothing for the device setup to renew. A finished session refuses the
-    /// batch before it is sent.
+    /// A batch goes out only on a token already held, so a flush never calls the token provider. A 401 is
+    /// a refusal of the caller and returns as it arrived: no refresh, no replay, nothing for the device
+    /// setup to renew. A finished session refuses the batch before it is sent.
     ///
     /// - Parameter transport: the session's transport, so a batch takes the same path as every other route.
     /// - Parameter path: the route the batch is posted to.
