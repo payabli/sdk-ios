@@ -206,7 +206,7 @@ actor PayabliAuth {
                 // fixed because a host's error can carry request data; its type name still reaches a caller
                 // through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
-                if await self.raisedReentryRefusal(error, into: mintID) {
+                if self.raisedReentryRefusal(error, into: mintID) {
                     self.reportFailure(.reentered, since: startedAt)
                 } else {
                     self.reportFailure(.threw, thrown: error, since: startedAt)
