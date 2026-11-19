@@ -525,8 +525,8 @@ def main() -> int:
 
     facts = {
         # Bumped whenever a consumer would misread an older file. The poster refuses an unknown version
-        # rather than rendering half a message from fields it does not recognise. The number is the shared
-        # facts schema's, because one poster reads every report in the channel.
+        # rather than rendering half a message from fields it does not recognise. The number is the
+        # channel's shared facts schema, which every collector writes and every poster reads.
         "schema": 4,
         "verdict": "red" if red else "green",
         "platform": platform,
