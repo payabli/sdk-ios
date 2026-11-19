@@ -43,10 +43,9 @@ extension PayabliTTP {
     ///   - sale: The sale the charge describes.
     ///   - body: The charge, run in the caller's task while the gate is held.
     /// - Returns: The charge's result.
-    /// - Throws: `sessionNotInitialized` when this terminal's session was replaced or ended; `notReady` when a charge
-    ///   on any entry point holds the gate or a close holds this one, or for a declared retry `paymentReferenceOpen`
-    ///   when its key is being sent, else `terminalNotReady`. A refused retry carries the capture ``refusedRetry(of:)``
-    ///   reads.
+    /// - Throws: `sessionNotInitialized` when this terminal's session was replaced or ended. `notReady` while a charge on
+    ///   any entry point holds the gate or a close holds this one: `paymentReferenceOpen` for a declared retry whose key
+    ///   is being sent, carrying the capture ``refusedRetry(of:)`` reads, else `terminalNotReady`.
     func holdingSessionSetup<T>(
         attempt: PayabliAttempt,
         sale: ChargeDescription,

@@ -484,7 +484,7 @@ extension PayabliTTP {
         return deviceId
     }
 
-    /// Runs ``sendUpdate(paymentTransId:payload:)`` and returns a typed outcome rather than a `Bool`.
+    /// Runs ``sendUpdate(paymentTransId:payload:)`` and reports how the update ended.
     ///
     /// - Parameter paymentTransId: the transaction the update is sent for, minted at initiate.
     /// - Parameter payload: what the reader did, as the success or failure the update carries.
@@ -497,8 +497,7 @@ extension PayabliTTP {
             try await sendUpdate(paymentTransId: paymentTransId, payload: payload)
             return .succeeded
         } catch is CancellationError {
-            // Nothing below retries a cancelled request any more. What the caller is told depends on what
-            // the tap did.
+            // A cancelled request is not retried. What the caller is told depends on what the tap did.
             return .cancelled
         } catch {
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
@@ -542,8 +541,7 @@ extension PayabliTTP {
             return response
         }
 
-        // Raise a non-2xx as its mapped error and let the policy classify it. Deciding here would
-        // make retryability this call site's opinion, which the next call site is free to differ on.
+        // A non-2xx is raised as its mapped error, and whether it is retried is the retry policy's call alone.
         try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
             let response = try await performOnce(attempt: String(attempt))
             if let refusal = TTPTransactionClient.notPermitted(response) {

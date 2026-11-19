@@ -142,8 +142,8 @@ final class CloseCapturedChargeTests: XCTestCase {
 
     // MARK: - Cancellation
 
-    /// The first attempt answers 500 only after the caller has cancelled, so a second attempt is sent only by a close
-    /// its caller cannot stop.
+    /// The update answers 500 once the caller has cancelled, then 200, so the second update is sent by a close its
+    /// caller cannot stop.
     func testACancelledCallerGetsItsCancellationAndTheCloseFinishes() async throws {
         Self.wire.script(updates: [500, 200])
         Self.wire.holdUpdates()
@@ -399,7 +399,7 @@ final class CloseCapturedChargeTests: XCTestCase {
         return (terminal, provider)
     }
 
-    /// Three attempts with no wait: the schedule is the retry suite's subject.
+    /// Three attempts with no wait between them.
     private static let noWait = RetryPolicy(
         maxAttempts: 3,
         baseDelay: 0,

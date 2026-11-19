@@ -171,10 +171,7 @@ package final class TTPTransactionClient: Sendable {
         )
     }
 
-    /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`.
-    ///
-    /// Atomic providers forward their full response; payload-only providers are wrapped into the same
-    /// shape.
+    /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`, in one shape whatever the provider.
     ///
     /// - Parameter payload: what the reader did, as the success or failure to encode.
     /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error`
