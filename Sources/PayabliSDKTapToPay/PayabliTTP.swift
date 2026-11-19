@@ -24,13 +24,14 @@ import PayabliSDKCore
 ///   - `PayabliTTP+Initialize.swift` — startup & session refresh
 ///   - `PayabliTTP+Activation.swift` — pending-device activation
 ///   - `PayabliTTP+Charge.swift`     — 3-step sale pipeline
+///   - `PayabliTTP+Close.swift`      — closing a charged payment by its identifier
 ///
 /// ## ObjC interop
 ///
 /// `PayabliTTP` inherits `NSObject` so it can be consumed from Objective-C,
 /// and from any technology that binds the Objective-C surface.
 /// Each Swift `async throws` method has a callback-based `@objc` companion
-/// in the same file — see the `+Initialize`, `+Charge`, and `+Activation`
+/// in the same file — see the `+Initialize`, `+Charge`, `+Close` and `+Activation`
 /// extensions. Swift consumers use the `async throws` API, the published
 /// ``sessionState`` and value-type `struct`s. See `README.md` for the
 /// bilingual contract.

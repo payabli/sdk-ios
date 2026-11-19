@@ -28,6 +28,11 @@ public enum PayabliTapToPayModule {
 }
 @available(iOS 16.7, *)
 @_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
+  @_Concurrency::MainActor final public func closeCapturedCharge(paymentTransId: Swift::String) async throws
+  @objc @_Concurrency::MainActor final public func closeCapturedCharge(_ paymentTransId: Swift::String, completion: @escaping (Foundation::NSError?) -> Swift::Void)
+}
+@available(iOS 16.7, *)
+@_Concurrency::MainActor extension PayabliSDKTapToPay::PayabliTTP {
   @_Concurrency::MainActor final public func initialize() async throws
   @objc @_Concurrency::MainActor final public func initialize(completion: @escaping (Foundation::NSError?) -> Swift::Void)
 }
