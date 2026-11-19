@@ -38,7 +38,7 @@ enum PayabliPalette {
 
 /// The roles the demo draws with, resolved per appearance at draw time. White text fails contrast on
 /// Blue 1, a light cyan, so it is `primary` only in dark. The guide has no green, so a passing check
-/// reads teal. Every pair used here clears 4.5:1 in both appearances.
+/// reads teal. Every text, accent and status colour clears 4.5:1 on the background in both appearances.
 extension Color {
     // Surfaces.
     static let payabliBackground = dynamic(light: PayabliPalette.neutral8, dark: PayabliPalette.deepBlue)
