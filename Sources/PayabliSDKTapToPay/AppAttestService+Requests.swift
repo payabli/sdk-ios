@@ -15,7 +15,7 @@ extension AppAttestService {
             path: "/api/v2/device/taptopay/challenge",
             body: ChallengeRequest(entry: entry),
             readsRefusalBeforeStatus: true,
-            pinsCredential: true,
+            isCredentialPinned: true,
             makeDeclineError: ColdRouteRefusals.decline
         )
     }
@@ -26,7 +26,7 @@ extension AppAttestService {
             path: "/api/v2/device/taptopay/register",
             body: body,
             readsRefusalBeforeStatus: true,
-            pinsCredential: true,
+            isCredentialPinned: true,
             makeDeclineError: ColdRouteRefusals.decline
         )
     }
@@ -37,7 +37,7 @@ extension AppAttestService {
             path: "/api/v2/device/taptopay/attest",
             body: body,
             readsRefusalBeforeStatus: true,
-            pinsCredential: true,
+            isCredentialPinned: true,
             makeDeclineError: ColdRouteRefusals.attestDecline
         )
     }
@@ -50,7 +50,7 @@ extension AppAttestService {
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding
     ///   is gone, before the status mapping.
-    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
+    /// - Parameter isCredentialPinned: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
     ///   service sent, or `nil` where the words name nothing the route classifies.
     /// - Returns: the envelope's `responseData`, decoded as `Payload`.
@@ -60,7 +60,7 @@ extension AppAttestService {
         body: some Encodable,
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
-        pinsCredential: Bool = false,
+        isCredentialPinned: Bool = false,
         makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, _ in nil }
     ) async throws -> Payload {
         try await routes.measured(route) {
@@ -70,7 +70,7 @@ extension AppAttestService {
                 body: body,
                 assertion: assertion,
                 readsRefusalBeforeStatus: readsRefusalBeforeStatus,
-                pinsCredential: pinsCredential,
+                isCredentialPinned: isCredentialPinned,
                 makeDeclineError: makeDeclineError
             )
             return try read(response, on: route)
@@ -108,7 +108,7 @@ extension AppAttestService {
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: hands a refusal envelope on a 400, 403 or 404, or a 401 saying the binding is
     ///   gone, to `makeDeclineError`, for a route whose refusals are told apart by their text rather than by their status.
-    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
+    /// - Parameter isCredentialPinned: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
     ///   service sent, or `nil` where the words name nothing the route classifies.
     func postAttestationRequestExpectingNoBody(
@@ -117,7 +117,7 @@ extension AppAttestService {
         body: some Encodable,
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
-        pinsCredential: Bool = false,
+        isCredentialPinned: Bool = false,
         makeDeclineError: @escaping (_ code: Int?, _ reason: String) -> (any Error)? = { _, _ in nil }
     ) async throws {
         try await routes.measured(route) {
@@ -127,7 +127,7 @@ extension AppAttestService {
                 body: body,
                 assertion: assertion,
                 readsRefusalBeforeStatus: readsRefusalBeforeStatus,
-                pinsCredential: pinsCredential,
+                isCredentialPinned: isCredentialPinned,
                 makeDeclineError: makeDeclineError
             )
             try read(response, on: route)

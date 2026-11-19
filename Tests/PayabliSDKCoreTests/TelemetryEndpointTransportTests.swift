@@ -45,7 +45,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         await TelemetryEndpointTransport(transport: transport).send([event()])
 
         let request = try XCTUnwrap(recording.observed.first)
-        XCTAssertFalse(request.pinsCredential, "a refusal is not recorded for the device setup to renew")
+        XCTAssertFalse(request.isCredentialPinned, "a refusal is not recorded for the device setup to renew")
         XCTAssertTrue(request.isCallerRefusal(answered(401)), "a 401 refuses the caller")
         XCTAssertFalse(request.isCallerRefusal(answered(200)), "an accepted batch does not")
     }

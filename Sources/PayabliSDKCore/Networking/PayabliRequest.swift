@@ -17,7 +17,9 @@ package struct PayabliRequest: Sendable {
     /// Whether a refused answer refuses this caller rather than its credential. True means the answer is
     /// returned as it arrived, with no refresh and no replay.
     package let isCallerRefusal: @Sendable (PayabliResponse) -> Bool
-    package let pinsCredential: Bool
+    /// Whether this request is bound to the exact credential it carries. True means recovery is skipped and a refusal
+    /// reaches the caller as it arrived.
+    package let isCredentialPinned: Bool
 
     package init(
         method: HTTPMethod,
@@ -26,7 +28,7 @@ package struct PayabliRequest: Sendable {
         headers: [String: String] = [:],
         body: Data? = nil,
         isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
-        pinsCredential: Bool = false
+        isCredentialPinned: Bool = false
     ) {
         self.method = method
         self.path = path
@@ -34,7 +36,7 @@ package struct PayabliRequest: Sendable {
         self.headers = headers
         self.body = body
         self.isCallerRefusal = isCallerRefusal
-        self.pinsCredential = pinsCredential
+        self.isCredentialPinned = isCredentialPinned
     }
 
     /// Convenience for JSON POSTs with a `Content-Type: application/json` header.
@@ -46,8 +48,8 @@ package struct PayabliRequest: Sendable {
     /// - Parameter jsonBody: the body value, encoded as JSON with ISO-8601 dates.
     /// - Parameter isCallerRefusal: whether a refused answer refuses this caller rather than its
     ///   credential, so it is returned as it arrived with no refresh and no replay.
-    /// - Parameter pinsCredential: whether a refused answer records the token it carried for the device
-    ///   setup to renew, with no refresh and no replay.
+    /// - Parameter isCredentialPinned: whether the request is bound to the exact credential it carries, so recovery
+    ///   is skipped and a refusal reaches the caller as it arrived.
     /// - Returns: the assembled request, ready for the decoration chain.
     package static func json(
         method: HTTPMethod,
@@ -56,7 +58,7 @@ package struct PayabliRequest: Sendable {
         headers: [String: String] = [:],
         jsonBody: some Encodable,
         isCallerRefusal: @escaping @Sendable (PayabliResponse) -> Bool = { _ in false },
-        pinsCredential: Bool = false
+        isCredentialPinned: Bool = false
     ) throws -> PayabliRequest {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -70,7 +72,7 @@ package struct PayabliRequest: Sendable {
             headers: mergedHeaders,
             body: body,
             isCallerRefusal: isCallerRefusal,
-            pinsCredential: pinsCredential
+            isCredentialPinned: isCredentialPinned
         )
     }
 }
