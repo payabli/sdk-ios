@@ -3,9 +3,8 @@ import Foundation
 import os
 import PayabliSDKTapToPay
 
-/// A screen's grip on the card reader. The terminal and every state and error type it publishes stay
-/// in here: a screen drives these calls and reads ``TapToPaySessionStatus``, so nothing outside this
-/// group names an SDK type for the card-present surface.
+/// A screen's grip on the card reader. A screen drives the terminal through these calls and reads its
+/// state as ``TapToPaySessionStatus``.
 @MainActor
 final class TapToPayTerminal: ObservableObject {
     /// Where the reader has got to. Republished from the SDK's own state, mapped
