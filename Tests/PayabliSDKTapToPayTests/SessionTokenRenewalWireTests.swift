@@ -146,6 +146,11 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
         TelemetryRecorders.install(session.telemetry)
+        addTeardownBlock {
+            await TelemetryRecorders.settled()
+            TelemetryRecorders.clear()
+            await session.telemetry.discard()
+        }
         let attestation = AppAttestService(
             transport: session.transport,
             attestor: MockAppAttestor(),
