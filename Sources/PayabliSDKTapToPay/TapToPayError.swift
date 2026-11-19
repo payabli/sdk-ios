@@ -9,6 +9,8 @@ import PayabliSDKCore
 ///
 /// `refusal` is the charge's own refusal when this failure refused the charge, and nil when it did not.
 /// It does not change ``type``: a host branches on `refusal` for what this failure asks them to do.
+///
+/// `underlying` names the type of an error the SDK did not expect, and never carries its message.
 public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let type: PayabliErrorType
     public let reason: String
@@ -19,6 +21,7 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
     public let refusal: TapToPayChargeRefusal?
     public let httpStatus: Int?
     public let rawCode: String?
+    public let underlying: Error?
 
     package init(
         type: PayabliErrorType,
@@ -29,7 +32,8 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         retryAfter: TimeInterval? = nil,
         refusal: TapToPayChargeRefusal? = nil,
         httpStatus: Int? = nil,
-        rawCode: String? = nil
+        rawCode: String? = nil,
+        underlying: RedactedCause? = nil
     ) {
         self.type = type
         self.reason = reason
@@ -40,6 +44,7 @@ public struct TapToPayError: PayabliError, PayabliRetryAfter {
         self.refusal = refusal
         self.httpStatus = httpStatus
         self.rawCode = rawCode
+        self.underlying = underlying
     }
 }
 
@@ -58,7 +63,8 @@ extension TapToPayError {
             retryAfter: retryAfter,
             refusal: refusal,
             httpStatus: httpStatus,
-            rawCode: rawCode
+            rawCode: rawCode,
+            underlying: underlying as? RedactedCause
         )
     }
 }

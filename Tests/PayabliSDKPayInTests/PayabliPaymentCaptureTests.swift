@@ -316,22 +316,16 @@ final class PayabliPayInTests: XCTestCase {
         XCTAssertNil(viewModel.submittingOperation)
     }
 
-    func testAFailureInFlightDrawsTheMessageOfTheOperationItSent() async throws {
+    func testAFailureInFlightIsHiddenOnAnotherOperationAndShowsInTheWordingOfTheOperationItSent() async {
         let transport = BlockingFacadeTransport(statusCode: 402, responseBody: """
         {"code": "D0200", "reason": "Insufficient Funds", "explanation": "Declined.", "data": null, "token": null}
         """)
-        let component = PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport
-        )
-        let viewModel = PayabliPayInViewModel(
-            component: component,
-            operation: .capture(PayabliPayInRequestConfiguration(
-                paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: .usd)
-            )),
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
-        )
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
+        let capture = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
+            paymentDetails: PayabliPayInPaymentDetails(totalAmount: 30, currency: .usd)
+        ))
+        let configuration = PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card)
+        let viewModel = PayabliPayInViewModel(component: component, operation: capture, configuration: configuration)
         viewModel.cardholderName = "Jane Doe"
         viewModel.cardNumber = "4111111111111111"
         viewModel.cardExpiration = "02/37"
@@ -345,17 +339,16 @@ final class PayabliPayInTests: XCTestCase {
         viewModel.update(
             component: component,
             operation: .storePaymentMethod(),
-            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            configuration: configuration,
             labels: PayabliPayInFormLabels()
         )
         await transport.resume()
+        _ = try? await submission.value
+        XCTAssertNil(viewModel.failureMessage)
 
-        do {
-            _ = try await submission.value
-            XCTFail("Expected the capture to be declined")
-        } catch {
-            XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
-        }
+        viewModel.update(component: component, operation: capture, configuration: configuration, labels: PayabliPayInFormLabels())
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
     }
 
     func testFormViewModelSubmitsConfiguredCaptureRequest() async throws {

@@ -179,6 +179,10 @@ extension PayabliPayInViewModel {
         dropValues(for: Set(PayabliPayInField.allCases).subtracting(fieldsWithABox))
     }
 
+    func dropEveryValue() {
+        dropValues(for: Set(PayabliPayInField.allCases))
+    }
+
     /// What the payer typed into a field only the method they left shows goes, because it is never
     /// submitted with the method they moved to and is no longer on screen. A field both methods show
     /// is kept.

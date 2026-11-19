@@ -1,8 +1,7 @@
 @testable import PayabliSDKCore
 import XCTest
 
-/// Ported from the sibling SDK's retry suite. Every timing assertion runs on `FakeRetryClock`, so an
-/// elapsed total is exact and costs nothing.
+/// Every timing assertion runs on `FakeRetryClock`, so an elapsed total is exact and costs nothing.
 final class RetryTests: XCTestCase {
     private func logger(_ sink: RecordingLogSink) -> PayabliLogger {
         PayabliLogger(category: .network, sink: sink)

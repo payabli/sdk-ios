@@ -261,8 +261,7 @@ while IFS=$'\t' read -r old_path path; do
     code=$(( $(side '<' drop | grep -c . || true) + $(side '>' drop | grep -c . || true) ))
     comments=$(( $(side '<' keep | grep -c . || true) + $(side '>' keep | grep -c . || true) ))
 
-    # The contract consumers compile against, which the repository holds in
-    # common with the SDK for Android. Both sides are the whole visible surface
+    # The contract consumers compile against. Both sides are the whole visible surface
     # of the file, so a declaration that moved within it is not reported as a
     # change, and one that changed shape is reported from both ends.
     public_surface "$WORK/$old_path" | sort > "$WORK/api-base"
@@ -361,7 +360,7 @@ if [ -z "$api_added" ] && [ -z "$api_removed" ]; then
     echo "found to look at, not as a source-compatibility guarantee."
 else
     echo "Declarations a consumer can see were added or removed. The public surface is a"
-    echo "contract shared with the SDK for Android, so a change here is a change to both."
+    echo "published contract, so a change here is a contract change."
     # A path is a heading in these listings, not a declaration, so it is not
     # counted as one. Every heading is a path from a diff limited to Sources/,
     # and no declaration begins with a directory, so the prefix is what tells the

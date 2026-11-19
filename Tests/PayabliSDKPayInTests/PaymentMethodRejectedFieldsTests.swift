@@ -210,6 +210,41 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
     }
 
     @MainActor
+    func testANewComponentEmptiesEveryField() {
+        let viewModel = everyFieldFilled()
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            operation: viewModel.operation,
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        assertEveryFieldEmpty(viewModel)
+    }
+
+    @MainActor
+    func testTheFirstComponentHandedBackOpensEmpty() {
+        let viewModel = everyFieldFilled()
+        let first = viewModel.component
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            operation: viewModel.operation,
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+        viewModel.update(
+            component: first,
+            operation: viewModel.operation,
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        assertEveryFieldEmpty(viewModel)
+    }
+
+    @MainActor
     func testARefusalOfAFlowReplacedInFlightMarksNothing() async {
         let transport = HeldRefusalTransport(responseBody: Self.refusal(naming: ["paymentMethod.cardHolder"]))
         let viewModel = filledCardForm(transport: transport)
@@ -226,6 +261,25 @@ final class PaymentMethodRejectedFieldsTests: XCTestCase {
         _ = try? await submission.value
 
         XCTAssertEqual(viewModel.rejectedFields, [])
+    }
+
+    @MainActor
+    func testARefusalOfAFlowReplacedInFlightDrawsNoMessage() async {
+        let transport = HeldRefusalTransport(responseBody: Self.refusal(naming: ["entryPoint"]))
+        let viewModel = filledCardForm(transport: transport)
+        let submission = Task { try await viewModel.submit() }
+        await transport.waitForRequest()
+
+        viewModel.update(
+            component: captureFlow(transport: UnreachableTransport()),
+            operation: .capture(Self.requestConfiguration),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+        await transport.release()
+        _ = try? await submission.value
+
+        XCTAssertNil(viewModel.failureMessage)
     }
 
     /// A box a reconfiguration brings on screen holds a value the request already carried, because every
@@ -588,5 +642,49 @@ private struct UnreachableTransport: PayabliTransport {
         decoding _: T.Type
     ) async throws -> PayabliV2Envelope<T> {
         throw URLError(.notConnectedToInternet)
+    }
+}
+
+private extension PaymentMethodRejectedFieldsTests {
+    @MainActor
+    func everyFieldFilled() -> PayabliPayInViewModel {
+        let viewModel = PayabliPayInViewModel(
+            component: captureFlow(transport: UnreachableTransport()),
+            operation: .capture(Self.requestConfiguration),
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card, .bankAccount],
+                cardFieldOrder: PayabliPayInFormConfiguration.defaultCardFieldOrder
+                    + [.firstName, .lastName, .customerNumber, .billingEmail, .billingPostalCode]
+            )
+        )
+        fillCard(viewModel)
+        viewModel.cardExpirationMonth = 2
+        viewModel.cardExpirationYear = 2030
+        viewModel.firstName = "Jane"
+        viewModel.lastName = "Doe"
+        viewModel.customerNumber = "C-1"
+        viewModel.billingEmail = "jane@example.com"
+        viewModel.billingZip = "33139"
+        viewModel.accountHolder = "Jane Doe"
+        viewModel.routingNumber = "021000021"
+        viewModel.accountNumber = "123456789"
+        viewModel.accountType = .savings
+        viewModel.accountHolderType = .business
+        return viewModel
+    }
+
+    @MainActor
+    func assertEveryFieldEmpty(_ viewModel: PayabliPayInViewModel, line: UInt = #line) {
+        let typed = [
+            viewModel.cardholderName, viewModel.cardNumber, viewModel.cardExpiration, viewModel.cardCvv,
+            viewModel.cardZip, viewModel.firstName, viewModel.lastName, viewModel.customerNumber,
+            viewModel.billingEmail, viewModel.billingZip, viewModel.accountHolder, viewModel.routingNumber,
+            viewModel.accountNumber
+        ]
+        XCTAssertEqual(typed.filter { !$0.isEmpty }, [], line: line)
+        XCTAssertNil(viewModel.cardExpirationMonth, line: line)
+        XCTAssertNil(viewModel.cardExpirationYear, line: line)
+        XCTAssertEqual(viewModel.accountType, .checking, line: line)
+        XCTAssertEqual(viewModel.accountHolderType, .personal, line: line)
     }
 }

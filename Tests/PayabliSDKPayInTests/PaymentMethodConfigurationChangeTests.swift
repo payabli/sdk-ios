@@ -84,11 +84,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     func testChangingTheOperationAloneIsAChange() {
         let first = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.captureAttempt(.newPayment),
             configuration: configuration(),
             labels: PayabliPayInFormLabels()
         )
         let retry = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.captureAttempt(.retry),
             configuration: configuration(),
             labels: PayabliPayInFormLabels()
@@ -97,13 +99,32 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         XCTAssertNotEqual(first, retry)
     }
 
+    func testANewComponentAloneIsAChange() {
+        let first = PayInFormInputs(
+            component: inputsComponent,
+            operation: Self.capture,
+            configuration: configuration(),
+            labels: PayabliPayInFormLabels()
+        )
+        let next = PayInFormInputs(
+            component: captureComponent(),
+            operation: Self.capture,
+            configuration: configuration(),
+            labels: PayabliPayInFormLabels()
+        )
+
+        XCTAssertNotEqual(first, next)
+    }
+
     func testChangingTheBaseAmountSwitchAloneIsAConfigurationChange() {
         let withBaseAmount = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: configuration(showsBaseAmount: true),
             labels: PayabliPayInFormLabels()
         )
         let withoutBaseAmount = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: configuration(showsBaseAmount: false),
             labels: PayabliPayInFormLabels()
@@ -139,11 +160,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     func testChangingTheTotalLabelAloneIsAConfigurationChange() {
         let before = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels()
         )
         let after = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(total: "Amount due")
@@ -200,11 +223,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     func testChangingTheShowsFailureMessageSwitchAloneIsAConfigurationChange() {
         let drawingIt = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], showsFailureMessage: true),
             labels: PayabliPayInFormLabels()
         )
         let hidingIt = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], showsFailureMessage: false),
             labels: PayabliPayInFormLabels()
@@ -225,11 +250,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
         for labels in withEachFailureMessage {
             XCTAssertNotEqual(
                 PayInFormInputs(
+                    component: inputsComponent,
                     operation: Self.capture,
                     configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
                     labels: plain
                 ),
                 PayInFormInputs(
+                    component: inputsComponent,
                     operation: Self.capture,
                     configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
                     labels: labels
@@ -240,11 +267,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     func testFailureWordingThatForgesAnotherComponentIsStillAConfigurationChange() {
         let first = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(declinedMessage: "No|retryLater:Wait", retryLaterMessage: "Soon")
         )
         let second = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(declinedMessage: "No", retryLaterMessage: "Wait|retryLater:Soon")
@@ -255,11 +284,13 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
 
     func testFieldWordingThatForgesAnotherFieldIsStillAConfigurationChange() {
         let first = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(fieldLabels: [.amount: "Total,cardNumber=Due"])
         )
         let second = PayInFormInputs(
+            component: inputsComponent,
             operation: Self.capture,
             configuration: PayabliPayInFormConfiguration(allowedMethods: [.card]),
             labels: PayabliPayInFormLabels(fieldLabels: [.amount: "Total", .cardNumber: "Due"])
@@ -307,6 +338,8 @@ final class PaymentMethodConfigurationChangeTests: XCTestCase {
             fieldLabels: amountLabel.map { [.amount: $0] } ?? PayabliPayInFormLabels.defaultFieldLabels
         )
     }
+
+    private lazy var inputsComponent = captureComponent()
 
     private func captureComponent() -> PayabliPayIn {
         flowOnSession()

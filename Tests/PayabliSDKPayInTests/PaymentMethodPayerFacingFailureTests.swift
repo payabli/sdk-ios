@@ -188,6 +188,33 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
         XCTAssertNil(viewModel.failureMessage)
     }
 
+    func testAnUpdateThatRestoresTheMessageAfterTheOptOutShowsItAgain() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+        _ = try? await viewModel.submit()
+
+        viewModel.update(
+            component: flow,
+            operation: .capture(Self.requestConfiguration),
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                showsFailureMessage: false
+            ),
+            labels: PayabliPayInFormLabels()
+        )
+        XCTAssertNil(viewModel.failureMessage)
+
+        viewModel.update(
+            component: flow,
+            operation: .capture(Self.requestConfiguration),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: PayabliPayInFormLabels()
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
     /// The wording a drawn message follows is the wording the form holds now, so a changed failure
     /// label redraws the message the failure already drew.
     func testAChangedFailureLabelRedrawsTheDrawnMessage() async {
@@ -493,5 +520,114 @@ final class PaymentMethodPayerFacingFailureTests: XCTestCase {
           "token": null
         }
         """
+    }
+}
+
+// MARK: - The operation and the flow that failed
+
+extension PaymentMethodPayerFacingFailureTests {
+    func testAPaymentsMessageIsHiddenOnceTheFormSavesAMethod() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+
+        viewModel.update(
+            component: flow,
+            operation: .storePaymentMethod(),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        XCTAssertNil(viewModel.failureMessage)
+    }
+
+    func testAPaymentsMessageShowsAgainWhenTheFormPaysAgain() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+        _ = try? await viewModel.submit()
+        viewModel.update(
+            component: flow,
+            operation: .storePaymentMethod(),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        viewModel.update(
+            component: flow,
+            operation: .capture(Self.requestConfiguration),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
+    func testANewComponentOpensWithNoMessage() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        )
+        _ = try? await viewModel.submit()
+        XCTAssertNotNil(viewModel.failureMessage)
+
+        viewModel.update(
+            component: flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody)),
+            operation: .capture(Self.requestConfiguration),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        XCTAssertNil(viewModel.failureMessage)
+    }
+
+    func testAPaymentsMessageStaysWhenTheFormAuthorizesInstead() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(on: flow)
+        _ = try? await viewModel.submit()
+
+        viewModel.update(
+            component: flow,
+            operation: .authorize(Self.requestConfiguration),
+            configuration: viewModel.configuration,
+            labels: viewModel.labels
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
+    func testAFailureWhileTheOptOutIsOnShowsOnceItIsOff() async {
+        let flow = flowOnTransport(MockPaymentCaptureTransport(statusCode: 402, responseBody: Self.declineBody))
+        let viewModel = filledForm(
+            on: flow,
+            configuration: PayabliPayInFormConfiguration(
+                allowedMethods: [.card],
+                defaultMethod: .card,
+                showsFailureMessage: false
+            )
+        )
+        _ = try? await viewModel.submit()
+        XCTAssertNil(viewModel.failureMessage)
+
+        viewModel.update(
+            component: flow,
+            operation: .capture(Self.requestConfiguration),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card], defaultMethod: .card),
+            labels: viewModel.labels
+        )
+
+        XCTAssertEqual(viewModel.failureMessage, "The payment was declined. Try another payment method.")
+    }
+
+    func testASwitchOfInstrumentKeepsAnUnknownOutcomeMessage() async {
+        let viewModel = filledForm(
+            on: flowOnTransport(RecordingIdempotencyTransport(failure: URLError(.notConnectedToInternet))),
+            configuration: PayabliPayInFormConfiguration(allowedMethods: [.card, .bankAccount], defaultMethod: .card)
+        )
+        _ = try? await viewModel.submit()
+        XCTAssertEqual(viewModel.failureMessage, "This payment may have gone through. Check before paying again.")
+
+        viewModel.selectedMethod = .bankAccount
+
+        XCTAssertEqual(viewModel.failureMessage, "This payment may have gone through. Check before paying again.")
     }
 }

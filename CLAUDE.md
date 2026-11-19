@@ -6,7 +6,9 @@ The public surface (types, the state model, the error taxonomy, storage and wire
 contract. A change to it is decided and recorded before it is written, outside this repository, and lands in
 a pull request of its own. A pull request here does not restate how that decision was coordinated.
 
-## Simulator Setup
+## Commands
+
+### Simulator setup
 
 There is no test-runner script; invoke `xcodebuild` directly against a simulator destination.
 
@@ -21,7 +23,7 @@ xcrun simctl list runtimes             # check which iOS runtimes are installed
 Omit `OS=` from the destination so the installed runtime is used. Pinning a version (`OS=26.4.1`)
 breaks the moment Xcode updates.
 
-## Build Commands
+### Build commands
 
 ```bash
 # Build every target
@@ -45,7 +47,7 @@ Schemes: `PayabliSDK-Package` (everything, the one CI uses), `PayabliSDK`, `Paya
 `PayabliSDKPayIn`. A scheme exists per product, so Core, Telemetry and `PayabliSDKTestUtils`
 have none; they build as dependencies of the products and the test targets.
 
-## Code Quality
+## Code quality
 
 - **Lint**: `swiftlint --strict --baseline .swiftlint-baseline.json` (config `.swiftlint.yml`). This is
   what the CI lint job runs. The baseline holds the violations that predate the gate, so a new violation
@@ -84,7 +86,7 @@ have none; they build as dependencies of the products and the test targets.
   puts that excerpt wherever the error chain is walked. Keep the code and drop the underlying error.
 - **Branch requirement**: if you are on `main`, check out a new branch before making commits.
 
-## Project Architecture
+## Architecture
 
 ### Module Structure
 
@@ -221,7 +223,7 @@ them, and the script refuses a build where that stops being true.
   reader carries it too. App Attest needs only iOS 14 and Secure Enclave P-256 is older still.
 - The package is **iOS-only**. There is no macOS, tvOS or watchOS support to preserve.
 
-## Development Workflow
+## Testing
 
 ### Requirements
 
@@ -319,7 +321,7 @@ passed as a build setting on the command line or exported into the shell. Both w
 2026-09-14 against sandbox, and both skipped every live case while exiting 0 — which is what a
 successful run of an opted-out tier looks like, so read the skip count rather than the status.
 
-### CI
+## CI
 
 - **`ci.yml`** gates every pull request into `main`, `release/**` and `hotfix/**`, and every push to them:
   lint, the SDK suite, `PayabliDemoFlowTests`, and a change report. `pr-reports.yml` holds anything needing

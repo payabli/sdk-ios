@@ -106,6 +106,11 @@ Each operation needs its own permission on those credentials:
 | Activate a phone with its code | `pos_create` |
 | Take a Tap to Pay payment | `inboundpayments_create` |
 | Register an authorized app through the API | `pos_create` |
+| List authorized apps through the API | `pos_read` |
+
+Your backend's credentials need every permission your app uses, because the token they mint can only carry
+permissions the credentials have. Mint the token your app receives with only the permissions it needs, and never
+`pos_read` or a `device_` permission.
 
 ### Build your token endpoint
 
