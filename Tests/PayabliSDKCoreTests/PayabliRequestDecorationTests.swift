@@ -27,7 +27,7 @@ final class PayabliRequestDecorationTests: XCTestCase {
     }
 
     func testTheFactoryPutsContributorsInTheOrderTheChainDependsOn() {
-        let chain = RequestDecorationFactory.chain(readToken: { "tok" }, client: .none)
+        let chain = RequestDecorationFactory.chain(readToken: { "tok" }, readHeldToken: { "tok" }, client: .none)
 
         // A step that signs over what the others emit has to come after them, so the position of what
         // exists today is part of the contract.
@@ -46,7 +46,7 @@ final class PayabliRequestDecorationTests: XCTestCase {
             headers: ["Authorization": "Bearer caller"]
         )
 
-        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(carrying)
+        let decorated = try await BearerDecoration(readToken: { "chain" }, readHeldToken: { "chain" }).decorate(carrying)
 
         XCTAssertEqual(decorated.headers["Authorization"], "Bearer chain")
     }
@@ -61,7 +61,7 @@ final class PayabliRequestDecorationTests: XCTestCase {
             headers: ["authorization": "Bearer caller", "AUTHORIZATION": "Bearer also-caller"]
         )
 
-        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(carrying)
+        let decorated = try await BearerDecoration(readToken: { "chain" }, readHeldToken: { "chain" }).decorate(carrying)
 
         XCTAssertEqual(decorated.headers, ["Authorization": "Bearer chain"])
     }
@@ -123,7 +123,7 @@ final class PayabliRequestDecorationTests: XCTestCase {
         let box = SentToken()
 
         try await SentToken.$current.withValue(box) {
-            _ = try await BearerDecoration(readToken: { "stamped-token" }).decorate(request)
+            _ = try await BearerDecoration(readToken: { "stamped-token" }, readHeldToken: { "stamped-token" }).decorate(request)
         }
 
         XCTAssertEqual(box.value, "stamped-token")
@@ -132,7 +132,7 @@ final class PayabliRequestDecorationTests: XCTestCase {
     /// No box bound is legal and records nothing, which is what lets a transport with no recovery
     /// layer above it use the same chain.
     func testNoBoxBoundIsLegalAndRecordsNothing() async throws {
-        let decorated = try await BearerDecoration(readToken: { "stamped-token" }).decorate(request)
+        let decorated = try await BearerDecoration(readToken: { "stamped-token" }, readHeldToken: { "stamped-token" }).decorate(request)
 
         XCTAssertEqual(decorated.headers["Authorization"], "Bearer stamped-token")
         XCTAssertNil(SentToken.current)

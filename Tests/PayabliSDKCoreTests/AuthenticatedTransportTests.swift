@@ -289,7 +289,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         _ = try await auth.currentAccessToken()
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() })],
+            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() }, readHeldToken: { await auth.heldToken() })],
             auth: auth
         )
 
@@ -331,7 +331,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         // refused. Without it the count below depends on which caller the scheduler runs first.
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [BearerDecoration(readToken: { try await auth.currentAccessToken() }), gate],
+            [BearerDecoration(readToken: { try await auth.currentAccessToken() }, readHeldToken: { await auth.heldToken() }), gate],
             auth: auth
         )
 

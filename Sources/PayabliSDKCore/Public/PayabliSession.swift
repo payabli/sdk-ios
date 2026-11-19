@@ -78,6 +78,7 @@ public final class PayabliSession: @unchecked Sendable {
         let service = PayabliService(
             environment: config.environment,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: ClientFacts(
                 sdkVersion: PayabliCore.version,
                 osVersion: DeviceModel.osVersion(),
