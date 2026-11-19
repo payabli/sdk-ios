@@ -80,15 +80,16 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         try await assertRefusedAgainLeavesTheSessionUsable(at: "register")
     }
 
-    /// The held refusal can be the event that fills a batch, which sends it at once. It is held until the renewal has
-    /// run, so that send carries the renewed token and not the one being replaced.
+    /// The refused route's report can be the event that fills a batch, which sends it at once. It is held until the
+    /// renewal has run, so that send carries the renewed token and not the one being replaced.
     func testARenewableRefusalThatFillsTheBatchLeavesUnderTheRenewedToken() async throws {
         let wire = Wire(refusing: "attest")
         StubURLProtocol.handler = wire.handle
         let renewal = RenewalGate()
         let (ttp, _) = try makeTTP(renewal: renewal)
-        // Three short of a batch with the session's own start: the setup's start, the attempt and its refusal make twenty.
-        for _ in 0 ..< 16 {
+        // Five short of a batch with the session's own start: the setup's start, the attempt, the two routes it answered
+        // and the refused route make twenty.
+        for _ in 0 ..< 14 {
             ttp.session.telemetry.record(TelemetryEventName.ttpInitializeStarted)
         }
 

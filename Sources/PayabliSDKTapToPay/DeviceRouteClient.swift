@@ -33,18 +33,42 @@ final class RouteAnswer: @unchecked Sendable {
     }
 }
 
+/// The route reports a refused token's run makes before its renewal has run, which are recorded once it has: any send
+/// before then carries the refused token.
+final class RenewalHeldReports: @unchecked Sendable {
+    @TaskLocal static var current: RenewalHeldReports?
+
+    private let lock = NSLock()
+    private var held: [@Sendable () -> Void] = []
+
+    func hold(_ report: @escaping @Sendable () -> Void) {
+        lock.withLock { held.append(report) }
+    }
+
+    /// Records what was held, in the order it was made.
+    func release() {
+        let reports = lock.withLock {
+            defer { held = [] }
+            return held
+        }
+        for report in reports {
+            report()
+        }
+    }
+}
+
 /// The one client every card-present device route is sent through: the four attestation-family POSTs and the
 /// configuration GET. The bearer and its refresh are the transport's.
 final class DeviceRouteClient: Sendable {
     private let transport: any PayabliTransport
-    private let telemetry: TelemetryClient?
+    private let telemetrySession: TelemetrySessionContext?
     private let logger = PayabliLogger(category: .taptopay)
 
     /// - Parameter transport: what every device route is sent over, the session's.
-    /// - Parameter telemetry: where each route call's outcome is reported, or `nil` to report nothing.
-    init(transport: any PayabliTransport, telemetry: TelemetryClient? = nil) {
+    /// - Parameter telemetrySession: the session each route call's report belongs to; `nil` for the installed one.
+    init(transport: any PayabliTransport, telemetrySession: TelemetrySessionContext? = nil) {
         self.transport = transport
-        self.telemetry = telemetry
+        self.telemetrySession = telemetrySession
     }
 
     /// Runs one route call and reports how it ended: `succeeded` when it returned, `refused` with the service's code
@@ -58,13 +82,13 @@ final class DeviceRouteClient: Sendable {
         let started = ContinuousClock.now
         do {
             let result = try await RouteAnswer.$current.withValue(answer, operation: call)
-            await report(route, outcome: "succeeded", code: nil, since: started)
+            report(route, outcome: "succeeded", code: nil, since: started)
             return result
         } catch is CancellationError {
             throw CancellationError()
         } catch {
             let (outcome, code) = Self.outcome(of: error, on: route, answer: answer.response)
-            await report(route, outcome: outcome, code: code, since: started)
+            report(route, outcome: outcome, code: code, since: started, refusedToken: error is PinnedTokenRefusal)
             throw error
         }
     }
@@ -94,8 +118,20 @@ final class DeviceRouteClient: Sendable {
         return ("failed", nil)
     }
 
-    private func report(_ route: DeviceRoute, outcome: String, code: Int?, since started: ContinuousClock.Instant) async {
-        guard let telemetry else { return }
+    /// Records a route call's outcome, or holds it in ``RenewalHeldReports/current`` when the call refused the token.
+    ///
+    /// - Parameter route: the route the call sent.
+    /// - Parameter outcome: how the call ended.
+    /// - Parameter code: the service's code for a refusal.
+    /// - Parameter started: when the call began.
+    /// - Parameter refusedToken: whether the call refused the token a renewal is about to replace.
+    private func report(
+        _ route: DeviceRoute,
+        outcome: String,
+        code: Int?,
+        since started: ContinuousClock.Instant,
+        refusedToken: Bool = false
+    ) {
         let (seconds, attoseconds) = (ContinuousClock.now - started).components
         var properties = [
             TelemetryProperty.outcome.rawValue: outcome,
@@ -104,7 +140,23 @@ final class DeviceRouteClient: Sendable {
         if let code {
             properties[TelemetryProperty.code.rawValue] = String(code)
         }
-        await telemetry.emit(route.completedEvent, properties: properties, occurredAt: Date())
+        let event = route.completedEvent
+        let now = Date()
+        let session = telemetrySession
+        let record: @Sendable () -> Void = {
+            if let session {
+                TelemetryRecorders.recordFor(
+                    session, event, properties: properties, occurredAt: now, waitsForBatch: refusedToken
+                )
+            } else {
+                TelemetryRecorders.record(event, properties: properties, occurredAt: now, waitsForBatch: refusedToken)
+            }
+        }
+        if refusedToken, let held = RenewalHeldReports.current {
+            held.hold(record)
+        } else {
+            record()
+        }
     }
 
     /// Sends a device-route GET and answers its raw response, for the caller to classify.

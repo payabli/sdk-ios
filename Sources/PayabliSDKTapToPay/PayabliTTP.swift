@@ -147,7 +147,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.configClient = TTPConfigClient(
             transport: session.transport,
             attestation: attestation,
-            telemetry: session.telemetry
+            telemetrySession: session.telemetry.context
         )
         super.init()
     }
@@ -168,7 +168,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
                 attestor: RealAppAttestor(),
                 storage: KeychainStorage(migrating: PayabliKeychainKey.all),
                 deviceIdentity: payabliSession.deviceIdentity,
-                telemetry: payabliSession.telemetry
+                telemetrySession: payabliSession.telemetry.context
             )
             return PayabliTTP(
                 session: payabliSession,
