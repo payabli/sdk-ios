@@ -465,7 +465,6 @@ extension PayabliTTP {
         case .none where error is any PayabliError:
             return PayabliTTPError.nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
         case .none:
-            // An error the SDK did not expect reaches the caller's boundary as it was, which names its type there.
             return error
         }
     }

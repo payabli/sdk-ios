@@ -49,7 +49,6 @@ enum TapToPayErrorTranslation {
                 underlying: (error as? PayabliGenericError)?.underlying as? RedactedCause
             )
         default:
-            // An error the SDK did not expect: its type's name rides the cause, and its message never crosses.
             return TapToPayError(
                 type: .unknown,
                 reason: PayabliErrorType.unknown.message,
