@@ -99,6 +99,24 @@ final class TokenFailureReportingTests: XCTestCase {
         XCTAssertEqual(properties["failure_type"], "HostBrokerDown")
     }
 
+    func testAProviderThatRebuiltTheRefusalWithItsOwnReasonReportsThrew() async throws {
+        let holder = Slot<PayabliAuth>()
+        let (auth, telemetry) = try makeAuth {
+            do {
+                return try await XCTUnwrap(holder.value).currentAccessToken()
+            } catch let refusal as PayabliGenericError {
+                throw PayabliGenericError(type: refusal.type, reason: "Host broker unavailable", detail: refusal.detail)
+            }
+        }
+        holder.set(auth)
+
+        await assertThrows { _ = try await auth.currentAccessToken() }
+
+        let properties = try await onlyReport(from: telemetry)
+        XCTAssertEqual(properties["reason"], "threw")
+        XCTAssertEqual(properties["failure_type"], "PayabliGenericError")
+    }
+
     func testASessionReleasesItsCredentialHolderOnceNothingHoldsIt() throws {
         weak var released: PayabliAuth?
         do {
