@@ -204,7 +204,7 @@ final class TelemetryClientTests: XCTestCase {
     func testTheSendAtOnceRule() {
         XCTAssertTrue(TelemetryClient.sendsAtOnce("x", ["outcome": "refused_locally"]))
         XCTAssertTrue(TelemetryClient.sendsAtOnce("x", ["outcome": "something_new"]))
-        XCTAssertFalse(TelemetryClient.sendsAtOnce(TelemetryEventName.authTokenFailed, [:]))
+        XCTAssertFalse(TelemetryClient.sendsAtOnce(TelemetryEventName.authTokenFailed, ["outcome": "failed", "reason": "threw"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce("x", ["outcome": "succeeded"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce("x", ["outcome": "approved"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce(TelemetryEventName.ttpInitializePending, ["state": "pending_terms"]))
