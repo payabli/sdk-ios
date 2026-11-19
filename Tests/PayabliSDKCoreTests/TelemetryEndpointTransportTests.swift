@@ -195,15 +195,12 @@ final class TelemetryEndpointTransportTests: XCTestCase {
 
     /// A send that never reaches an answer is kept too: the next flush tries the batch again.
     func testATransportFailureIsKeptForTheNextFlush() async {
-        struct NoAnswer: Error {}
-
-        let stub = RecordingStub()
-        stub.install()
-        defer { stub.uninstall() }
+        StubURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        defer { StubURLProtocol.handler = nil }
         let service = PayabliService(
             environment: .sandbox,
-            readToken: { throw NoAnswer() },
-            readHeldToken: { nil },
+            readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
