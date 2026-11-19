@@ -203,28 +203,19 @@ extension PayabliTTP {
         landsSecondRefusal: Bool,
         _ sequence: @MainActor () async throws -> Void
     ) async throws {
-        let routeReports = RenewalHeldReports()
-        let releaseHeld = { [reports] in
-            routeReports.release()
-            reports.releaseHeld()
-        }
-        // Once after the renewal, so its refusal is reported ahead of the second run, and once at the end, for that
-        // run's own refusal. A route's report is made before the facade's, so it goes first.
-        defer { releaseHeld() }
         do {
-            return try await RenewalHeldReports.$current.withValue(routeReports) { try await sequence() }
+            return try await sequence()
         } catch is PinnedTokenRefusal {
             logger.info("a device route refused the token: renewing it and running again")
         }
         do {
-            defer { releaseHeld() }
             _ = try await session.renewRefusedToken()
         } catch {
             landIfAsked(error, landsSecondRefusal)
             throw error
         }
         do {
-            try await RenewalHeldReports.$current.withValue(routeReports) { try await sequence() }
+            try await sequence()
         } catch let refused as PinnedTokenRefusal {
             let expired = PayabliGenericError(
                 type: refused.type,

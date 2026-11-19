@@ -42,21 +42,15 @@ final class TapToPayReportsTests: XCTestCase {
         XCTAssertNotNil(Int(succeeded.properties["duration_ms"] ?? ""))
     }
 
-    func testAnAttestationRefusalTheSessionRenewsWaitsForItsBatch() async throws {
+    func testAnAttestationRefusalTheSessionRenewsIsSentAtOnce() async throws {
         let (ttp, _, _, transport) = try makeTTP()
-        let before = await ttp.session.telemetry.bufferedCount
 
         ttp.reports.attestationFailed(PinnedTokenRefusal(), after: .zero)
         await TelemetryRecorders.settled()
-        let whileHeld = await ttp.session.telemetry.bufferedCount
-        ttp.reports.releaseHeld()
-        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.settled()
 
-        XCTAssertEqual(whileHeld, before, "held until the renewal, so no batch it fills can carry the token being renewed")
-        let buffered = await ttp.session.telemetry.bufferedCount
-        XCTAssertEqual(buffered, before + 1, "released into the batch")
-        let sent = await transport.batches
-        XCTAssertTrue(sent.isEmpty, "and not sent at once")
+        let sent = await sent(transport).map(\.event).filter { $0.hasPrefix("ttp.") }
+        XCTAssertEqual(sent, ["ttp.attestation.failed"], "a refused batch goes back to the queue, so the failure does not wait")
     }
 
     func testAnyOtherAttestationFailureIsSentAtOnce() async throws {

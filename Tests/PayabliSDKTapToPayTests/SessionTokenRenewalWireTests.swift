@@ -82,26 +82,21 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
     /// The refused route's report can be the event that fills a batch, which sends it at once. It is held until the
     /// renewal has run, so that send carries the renewed token and not the one being replaced.
-    func testARenewableRefusalThatFillsTheBatchLeavesUnderTheRenewedToken() async throws {
+    func testARefusedTokensFailuresAreSentWithEveryBatchOnTheRenewedToken() async throws {
         let wire = Wire(refusing: "attest")
         StubURLProtocol.handler = wire.handle
-        let renewal = RenewalGate()
-        let (ttp, _) = try makeTTP(renewal: renewal)
-        // Five short of a batch with the session's own start: the setup's start, the attempt, the two routes it answered
-        // and the refused route make twenty.
-        for _ in 0 ..< 14 {
-            await ttp.session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
-        }
+        let (ttp, tokens) = try makeTTP()
 
-        let setup = Task { try await ttp.initialize() }
-        await renewal.waitUntilAsked()
+        try await ttp.initialize()
         await TelemetryRecorders.settled()
-        XCTAssertEqual(wire.bearers(for: "telemetry"), [], "a batch was sent while the token was being replaced")
-        renewal.release()
-        try await setup.value
-        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.flush()
 
-        XCTAssertEqual(wire.bearers(for: "telemetry").first, "renewed-2")
+        let bearers = wire.bearers(for: "telemetry")
+        XCTAssertFalse(bearers.isEmpty)
+        XCTAssertEqual(Set(bearers), ["renewed-2"], "no batch was sent on the refused token")
+        let left = await ttp.session.telemetry.bufferedCount
+        XCTAssertEqual(left, 0)
+        XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
     // MARK: - Fixtures
@@ -135,13 +130,10 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP(renewal: RenewalGate? = nil) throws -> (PayabliTTP, Tokens) {
+    private func makeTTP() throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
-            if call > 1 {
-                await renewal?.ask()
-            }
             return call == 1 ? "seed" : "renewed-\(call)"
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
@@ -186,51 +178,6 @@ private final class Tokens: @unchecked Sendable {
             calls += 1
             return calls
         }
-    }
-}
-
-/// Holds the provider's renewal open until the test releases it, and says when it has been asked.
-private final class RenewalGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var asked = false
-    private var released = false
-    private var waiting: CheckedContinuation<Void, Never>?
-
-    func ask() async {
-        await withCheckedContinuation { continuation in
-            let resumeNow: Bool = lock.withLock {
-                asked = true
-                if released {
-                    return true
-                }
-                waiting = continuation
-                return false
-            }
-            if resumeNow {
-                continuation.resume()
-            }
-        }
-    }
-
-    func release() {
-        let continuation: CheckedContinuation<Void, Never>? = lock.withLock {
-            released = true
-            defer { waiting = nil }
-            return waiting
-        }
-        continuation?.resume()
-    }
-
-    /// Polled under a ceiling, so a renewal that never starts fails the test rather than hanging the suite.
-    func waitUntilAsked(file: StaticString = #filePath, line: UInt = #line) async {
-        for _ in 0 ..< 300 {
-            if lock.withLock({ asked }) {
-                return
-            }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        release()
-        XCTFail("the renewal was never asked for", file: file, line: line)
     }
 }
 

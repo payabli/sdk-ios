@@ -7,7 +7,6 @@ import PayabliSDKCore
 @MainActor
 final class TapToPayReports {
     private let session: TelemetrySessionContext
-    private var held: [() -> Void] = []
 
     /// - Parameter session: the session the facade runs on, which every report carries.
     init(session: TelemetrySessionContext) {
@@ -68,8 +67,7 @@ final class TapToPayReports {
         record(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now)
     }
 
-    /// Reports an attestation that was refused, by the number the host is told, and sends it at once. A token the session
-    /// is about to renew is held for ``releaseHeld()`` instead, since any send before the renewal would carry it.
+    /// Reports an attestation that was refused, by the number the host is told, and sends it at once.
     ///
     /// - Parameter error: what the attestation threw, before it was translated for the host.
     /// - Parameter duration: how long the attestation took.
@@ -79,28 +77,7 @@ final class TapToPayReports {
         if let told = TapToPayErrorTranslation.hostError(for: error) as? any PayabliError {
             properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
         }
-        guard !(error is PinnedTokenRefusal) else {
-            held.append { [session] in
-                TelemetryRecorders.recordFor(
-                    session,
-                    TelemetryEventName.ttpAttestationFailed,
-                    properties: properties,
-                    occurredAt: now,
-                    waitsForBatch: true
-                )
-            }
-            return
-        }
         record(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
-    }
-
-    /// Queues the reports held while a token was renewed, in the order they were made, to go with the next batch.
-    func releaseHeld() {
-        let reports = held
-        held = []
-        for report in reports {
-            report()
-        }
     }
 
     private func record(_ name: String, properties: [String: String] = [:], occurredAt: Date) {

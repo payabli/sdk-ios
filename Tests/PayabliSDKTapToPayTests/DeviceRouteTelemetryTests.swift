@@ -109,24 +109,20 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["outcome"], "failed")
     }
 
-    func testARefusedTokensReportIsHeldUntilTheRenewalReleasesIt() async throws {
+    func testARefusedTokensReportIsSentAtOnce() async {
         let (client, telemetry) = makeClient(answering: .status(401, body: Data()))
-        let held = RenewalHeldReports()
 
-        await RenewalHeldReports.$current.withValue(held) {
-            await assertThrows {
-                _ = try await client.measured(.challenge) {
-                    _ = try await client.get(.challenge, Self.request)
-                    throw PinnedTokenRefusal()
-                }
+        await assertThrows {
+            _ = try await client.measured(.challenge) {
+                _ = try await client.get(.challenge, Self.request)
+                throw PinnedTokenRefusal()
             }
         }
-        let whileRenewing = try await sent(by: telemetry)
-        held.release()
+        await TelemetryRecorders.settled()
+        await telemetry.settled()
 
-        XCTAssertEqual(whileRenewing, [], "a send before the renewal carries the refused token")
-        let properties = try await onlyEvent(of: telemetry)
-        XCTAssertEqual(properties["outcome"], "failed")
+        let events = await telemetryTransport.drainBatches().flatMap { $0 }
+        XCTAssertEqual(events.map(\.event), ["ttp.device.challenge.completed"], "a failure does not wait for its batch")
     }
 
     func testACancelledCallReportsNothing() async throws {
