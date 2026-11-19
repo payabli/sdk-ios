@@ -357,8 +357,7 @@ extension PayabliTTP {
         } catch {
             markError(error)
             syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error
         }
     }
 
@@ -394,8 +393,7 @@ extension PayabliTTP {
         } catch {
             markError(error)
             syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error
         }
     }
 
