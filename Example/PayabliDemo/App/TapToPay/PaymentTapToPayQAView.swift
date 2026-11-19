@@ -223,11 +223,16 @@ struct PaymentTapToPayQAView: View {
                     Button("Where do I get a code?") { isActivationHelpPresented = true }
                         .font(.caption)
                 }
-                Button("Activate") {
-                    isActivationPresented = false
-                    runActivate()
+                if activationCode.isEmpty, let activationId = terminal.activationId {
+                    Button("Get Activation Code") { runGetActivationCode(activationId) }
+                        .disabled(isWorking)
+                } else {
+                    Button("Activate") {
+                        isActivationPresented = false
+                        runActivate()
+                    }
+                    .disabled(activationCode.isEmpty)
                 }
-                .disabled(activationCode.isEmpty)
             }
             .navigationTitle("Activate device")
             .sheet(isPresented: $isActivationHelpPresented) { activationHelpSheet }
@@ -688,5 +693,42 @@ private struct TapToPayCloseSection: View {
                 log(ActionLine.failureEvent(step: "close", error: error))
             }
         }
+    }
+}
+
+private extension PaymentTapToPayQAView {
+    /// Fills the code field with this device's code from the local token server, a development helper.
+    private func runGetActivationCode(_ activationId: String) {
+        activationMessage = ""
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                activationCode = try await TokenServerActivationCode.issue(for: activationId)
+            } catch {
+                activationMessage = "✗ The token server issued no code: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+/// The local token server's activation code for a pending device.
+private enum TokenServerActivationCode {
+    /// - Parameter deviceId: the device's `activationId`.
+    /// - Returns: the code the token server issued.
+    /// - Throws: a transport error, or `URLError(.badServerResponse)` when the answer carries no code.
+    static func issue(for deviceId: String) async throws -> String {
+        var request = URLRequest(url: DemoConfiguration.TokenServer.activationCodeURL, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["entry": DemoConfiguration.entryPoint, "deviceId": deviceId]
+        )
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let body = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let code = body?["code"] as? String, !code.isEmpty else {
+            throw URLError(.badServerResponse)
+        }
+        return code
     }
 }
