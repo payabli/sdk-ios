@@ -108,7 +108,7 @@ MAX_SWITCH_PAGES = 10
 # alarms from anything else scheduled in the channel.
 #
 # Scoped by platform, because both platform SDKs report into this one channel. An unscoped marker would make
-# an iOS alarm and an Android alarm indistinguishable, so each would cancel the other's and each would mask
+# the two platforms' alarms indistinguishable, so each would cancel the other's and each would mask
 # the other's death. That is worse than having no switch, because it looks like one is present. Neither
 # marker may be a substring of the other, for the same reason.
 def switch_marker() -> str:
