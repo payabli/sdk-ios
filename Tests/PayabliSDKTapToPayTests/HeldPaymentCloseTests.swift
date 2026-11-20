@@ -193,6 +193,8 @@ final class HeldPaymentCloseTests: XCTestCase {
     func testACancelledHeldCloseStillSettlesWhatItsLandingAllows() async throws {
         let (terminal, _) = try await makeReadyTerminal()
         try await leaveHeld(on: terminal, read: .approved)
+        // The charge's failed closes are recorded, so the wait below would return before this close is sent.
+        Self.wire.reset()
         Self.wire.script(updates: [500, 200])
         Self.wire.holdUpdates()
 
