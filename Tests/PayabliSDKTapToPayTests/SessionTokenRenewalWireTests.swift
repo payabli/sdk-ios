@@ -102,6 +102,32 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(wire.bearers(for: "telemetry").first, "renewed-2")
     }
 
+    // MARK: - What a cold start publishes
+
+    func testAColdStartRefusedOnceAtAttestOrChallengePublishesNoFailedState() async throws {
+        for route in ["attest", "challenge"] {
+            let wire = Wire(refusing: route)
+            StubURLProtocol.handler = wire.handle
+            let (ttp, tokens) = try makeTTP()
+            var seen: [PayabliTTPSessionState] = []
+            let watching = ttp.$sessionState.sink { seen.append($0) }
+
+            try await ttp.initialize()
+            watching.cancel()
+            await ttp.reports.sent()
+
+            XCTAssertFalse(seen.contains {
+                if case .failed = $0 {
+                    true
+                } else {
+                    false
+                }
+            }, "\(route): \(seen)")
+            XCTAssertEqual(seen.last, .ready, route)
+            XCTAssertEqual(tokens.count, 2, "\(route): one renewal")
+        }
+    }
+
     // MARK: - Fixtures
 
     /// A cold `initialize` whose `route` refuses the seed and the renewed token throws 1002, lands `serviceUnavailable`,
