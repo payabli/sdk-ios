@@ -275,9 +275,9 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         return response
     }
 
-    private func makeClient(answering answer: FixedTransport.Answer) -> (DeviceRouteClient, TelemetryClient) {
+    private func makeClient(answering answer: FixedTransport.Answer) -> (DeviceServiceClient, TelemetryClient) {
         let telemetry = makeTelemetry()
-        return (DeviceRouteClient(transport: FixedTransport(answer: answer)), telemetry)
+        return (DeviceServiceClient(transport: FixedTransport(answer: answer)), telemetry)
     }
 
     /// A channel installed as the process recorder's, removed when the test ends.

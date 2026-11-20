@@ -35,7 +35,7 @@ final class RouteAnswer: @unchecked Sendable {
 
 /// The one client every card-present device route is sent through: the four attestation-family POSTs and the
 /// configuration GET. The bearer and its refresh are the transport's.
-final class DeviceRouteClient: Sendable {
+final class DeviceServiceClient: Sendable {
     private let transport: any PayabliTransport
     private let telemetrySession: TelemetrySessionContext?
     private let logger = PayabliLogger(category: .taptopay)

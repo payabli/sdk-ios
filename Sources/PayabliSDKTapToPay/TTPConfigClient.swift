@@ -11,7 +11,7 @@ struct TTPConfig: Sendable {
 /// `X-Assertion-Timestamp` headers inline. Bearer auth and HTTP 401 refresh-and-retry come from the
 /// `PayabliTransport` passed at init, which should be `session.transport`.
 final class TTPConfigClient: Sendable {
-    private let routes: DeviceRouteClient
+    private let routes: DeviceServiceClient
     private let attestation: DeviceAttestationService
     private let logger = PayabliLogger(category: .taptopay)
 
@@ -23,7 +23,7 @@ final class TTPConfigClient: Sendable {
         attestation: DeviceAttestationService,
         telemetrySession: TelemetrySessionContext? = nil
     ) {
-        routes = DeviceRouteClient(transport: transport, telemetrySession: telemetrySession)
+        routes = DeviceServiceClient(transport: transport, telemetrySession: telemetrySession)
         self.attestation = attestation
     }
 
