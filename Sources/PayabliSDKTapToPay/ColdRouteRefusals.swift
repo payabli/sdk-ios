@@ -31,7 +31,7 @@ enum ColdRouteRefusals {
             return PayabliTTPError.deviceSetupRequired(reason: reason)
         case 400 where reason == attestationRootUnavailable:
             // The service cannot verify anything, so it is the service failing, not the device.
-            return DeviceRouteRefusal(type: .serverError, detail: reason, httpStatus: 400, rawCode: nil)
+            return DeviceRouteRefusal(type: .serverError, detail: reason, httpStatus: 400, resultCode: nil)
         case 400 where reason.hasPrefix(verificationFailedPrefix):
             return PayabliTTPError.deviceSetupRefused(reason: reason)
         default:

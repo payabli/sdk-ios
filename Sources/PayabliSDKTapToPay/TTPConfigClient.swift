@@ -55,7 +55,12 @@ final class TTPConfigClient: Sendable {
             if [400, 404].contains(response.statusCode),
                let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body)
             {
-                throw DeviceRouteRefusal.of(code: code ?? response.statusCode, reason: reason, httpStatus: response.statusCode)
+                // A refusal naming no code, and words this route does not know, is left to the status mapping below.
+                let refused = ColdRouteRefusals.decline(code: code, reason: reason)
+                    ?? code.map { DeviceRouteRefusal.of(code: $0, reason: reason, httpStatus: response.statusCode) }
+                if let refused {
+                    throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
+                }
             }
             try mapPayabliHTTPError(response: response) { code in
                 if code == 403 {

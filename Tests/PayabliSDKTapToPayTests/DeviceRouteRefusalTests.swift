@@ -63,7 +63,8 @@ final class DeviceRouteRefusalTests: XCTestCase {
             } catch {
                 let host = try XCTUnwrap(TapToPayErrorTranslation.hostError(for: error) as? TapToPayError)
                 XCTAssertEqual(host.type, row.type, "code \(row.code!)")
-                XCTAssertEqual(host.rawCode, String(row.code!))
+                XCTAssertNil(host.rawCode, "a device route's code is its status, so it names no finer condition")
+                XCTAssertEqual(host.httpStatus, 200)
             }
         }
     }
@@ -85,6 +86,70 @@ final class DeviceRouteRefusalTests: XCTestCase {
                 XCTAssertEqual(error.type, row.type, "code \(row.code!)")
             }
             XCTAssertEqual(ttp.sessionState, row.landing, "code \(row.code!)")
+        }
+    }
+
+    func testADeclineNamingNoCodeIsNotGivenTheStatusAsItsCode() async throws {
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Self.decline(code: nil, reason: "REASON-SENTINEL")
+            )
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("expected the attestation to fail")
+        } catch {
+            let host = try XCTUnwrap(TapToPayErrorTranslation.hostError(for: error) as? TapToPayError)
+            XCTAssertNil(host.rawCode)
+            XCTAssertEqual(host.httpStatus, 400)
+            XCTAssertNotEqual(host.type, .sdkInternalError, "the status is not read as the refusal's code")
+        }
+    }
+
+    func testAnAttestDeclineTheServiceCannotVerifyKeepsTheStatusItCameWith() async throws {
+        let reason = "Attestation verification failed: Apple attestation root is unavailable."
+        StubURLProtocol.handler = { request in
+            switch request.url?.lastPathComponent {
+            case "challenge":
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "register":
+                return AttestFixture.ok(request, ["deviceId": "dev_1"])
+            default:
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.decline(code: 400, reason: reason)
+                )
+            }
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("expected the attestation to fail")
+        } catch {
+            let host = try XCTUnwrap(TapToPayErrorTranslation.hostError(for: error) as? TapToPayError)
+            XCTAssertEqual(host.type, .serverError)
+            XCTAssertEqual(host.httpStatus, 200)
+        }
+    }
+
+    func testAConfigRefusalOfTheEntryPointUnderA400IsTheEntryPointRefused() async throws {
+        StubURLProtocol.handler = { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Self.decline(code: 403, reason: ColdRouteRefusals.entryPointUnusable)
+            )
+        }
+        let ttp = try makeTTP()
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected initialize to fail")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.type, .entryPointRefused, "an activation code cannot resolve this refusal")
         }
     }
 
@@ -126,7 +191,12 @@ final class DeviceRouteRefusalTests: XCTestCase {
     // MARK: - Fixtures
 
     private static func decline(code: Int) -> Data {
-        Data(#"{"isSuccess":false,"responseData":{"resultCode":\#(code),"resultText":"REASON-SENTINEL"}}"#.utf8)
+        decline(code: code, reason: "REASON-SENTINEL")
+    }
+
+    private static func decline(code: Int?, reason: String) -> Data {
+        let resultCode = code.map { #""resultCode":\#($0),"# } ?? ""
+        return Data(#"{"isSuccess":false,"responseData":{\#(resultCode)"resultText":"\#(reason)"}}"#.utf8)
     }
 
     private func makeTTP() throws -> PayabliTTP {

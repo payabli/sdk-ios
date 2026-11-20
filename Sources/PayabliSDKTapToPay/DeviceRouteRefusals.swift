@@ -52,6 +52,8 @@ enum DeviceRefusalStatus {
             ActivationRefusal(hostError: activation.hostError.carrying(httpStatus: status), movesSession: activation.movesSession)
         case let host as TapToPayError:
             host.carrying(httpStatus: status)
+        case let route as DeviceRouteRefusal:
+            DeviceRouteRefusal(type: route.type, detail: route.detail, httpStatus: status, resultCode: route.resultCode)
         default:
             refusal
         }
@@ -66,7 +68,13 @@ struct DeviceRouteRefusal: PayabliError {
     let type: PayabliErrorType
     let detail: String?
     let httpStatus: Int?
-    let rawCode: String?
+    /// The envelope's `resultCode`, reported in telemetry. A device route's code is its status, so it is not the
+    /// error's `rawCode`.
+    let resultCode: Int?
+
+    var rawCode: String? {
+        nil
+    }
 
     var reason: String {
         type.message
@@ -93,7 +101,7 @@ struct DeviceRouteRefusal: PayabliError {
         case let .some(code) where code >= 500: .serverError
         default: .unknown
         }
-        return DeviceRouteRefusal(type: type, detail: reason, httpStatus: httpStatus, rawCode: code.map(String.init))
+        return DeviceRouteRefusal(type: type, detail: reason, httpStatus: httpStatus, resultCode: code)
     }
 
     /// A success the route could not read, or one carrying nothing the route needs.
@@ -101,6 +109,6 @@ struct DeviceRouteRefusal: PayabliError {
     /// - Parameter httpStatus: the status the answer came with.
     /// - Returns: a decoding failure, which carries no excerpt of what was rejected.
     static func undecodable(httpStatus: Int) -> DeviceRouteRefusal {
-        DeviceRouteRefusal(type: .decodingError, detail: nil, httpStatus: httpStatus, rawCode: nil)
+        DeviceRouteRefusal(type: .decodingError, detail: nil, httpStatus: httpStatus, resultCode: nil)
     }
 }
