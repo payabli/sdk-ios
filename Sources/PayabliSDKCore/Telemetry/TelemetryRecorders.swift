@@ -9,9 +9,8 @@ package struct TelemetrySessionContext: Sendable, Equatable {
 
 /// The process's one installed telemetry channel, and the call every reporter outside the session makes.
 ///
-/// A record keeps the session installed when it is made, and reaches the channel installed when it is delivered, so a
-/// re-initialize between the two moves it to the new channel. Records reach a channel in the order made, off the
-/// caller's path; with nothing installed, a properties argument is never evaluated.
+/// A record keeps the session installed when it is made and reaches the channel installed when it is delivered, in the
+/// order made, off the caller's path. With nothing installed, a properties argument is never evaluated.
 package enum TelemetryRecorders {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var installed: TelemetryClient?
