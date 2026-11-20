@@ -151,6 +151,20 @@ final class SessionTokenRenewalTests: XCTestCase {
         XCTAssertEqual(stub.configBearers.count, 3)
     }
 
+    /// The repair is entered once, before the run a refused token repeats, so the rerun starts where the refusal
+    /// arrived and a host sees each state once.
+    func testARepairRefusedOnceEntersEachStateOnce() async throws {
+        let ttp = try await makeExpiredTTP()
+        stub.configStatuses = [401]
+        var seen: [PayabliTTPSessionStateCode] = []
+        let observation = ttp.addSessionStateObserver { seen.append(ttp.sessionStateCode) }
+
+        try await ttp.reinitialize()
+        observation.cancel()
+
+        XCTAssertEqual(seen, [.reinitializing, .fetchingConfig, .initializingReader, .ready])
+    }
+
     func testASecondRefusalOnARepairReportsAnExpiredToken() async throws {
         let ttp = try await makeExpiredTTP()
         stub.configStatuses = [401, 401]

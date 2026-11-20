@@ -173,17 +173,22 @@ extension PayabliTTP {
         }
         let startedAt = ContinuousClock.now
         reports.reinitializeStarted()
+        enterRepair()
         try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
         reports.reinitializeSucceeded(after: ContinuousClock.now - startedAt)
     }
 
-    /// Steps 2–4 of `initialize()`, from a state the repair has already accepted.
-    private func runRepair() async throws {
+    /// Moves the session into the repair once, before the run a refused token may repeat, so the rerun starts from
+    /// the state the refusal arrived in.
+    private func enterRepair() {
         _ = sessionManager.transition(to: .reinitializing)
         syncPublished()
         _ = sessionManager.transition(to: .fetchingConfig)
         syncPublished()
+    }
 
+    /// Steps 2–4 of `initialize()`, from the state ``enterRepair()`` left.
+    private func runRepair() async throws {
         // 2. Fresh /config (credentials never survive between sessions).
         let config = try await runFetchConfigPhase()
 
