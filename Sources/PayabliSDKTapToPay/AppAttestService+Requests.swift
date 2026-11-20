@@ -75,7 +75,7 @@ extension AppAttestService {
                 pinsCredential: pinsCredential,
                 makeDeclineError: makeDeclineError
             )
-            return try decodedPayload(of: response, on: route)
+            return try read(response, on: route)
         }
     }
 
@@ -84,31 +84,21 @@ extension AppAttestService {
     /// - Parameter response: the route's answer, already read for a refusal.
     /// - Parameter route: the route answered, which names the answer in its logs and errors.
     /// - Returns: the decoded payload, or throws `decodingError` where it is missing or unreadable.
-    private func decodedPayload<Payload: Decodable>(of response: PayabliResponse, on route: DeviceRoute) throws -> Payload {
+    private func read<Payload: Decodable>(_ response: PayabliResponse, on route: DeviceRoute) throws -> Payload {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
 
         do {
             let success = try decoder.decode(PayabliEnvelope.Success<Payload>.self, from: response.body)
             guard let payload = success.responseData else {
-                throw TapToPayError(
-                    type: .decodingError,
-                    reason: "\(route.rawValue) missing responseData",
-                    detail: nil,
-                    httpStatus: response.statusCode
-                )
+                throw undecodable(reason: "\(route.rawValue) missing responseData", statusCode: response.statusCode)
             }
             return payload
         } catch let error as TapToPayError {
             throw error
         } catch {
             logger.error("[\(route.rawValue)] payload decode failed: \(error.localizedDescription)")
-            throw TapToPayError(
-                type: .decodingError,
-                reason: "Failed to decode \(route.rawValue) response",
-                detail: nil,
-                httpStatus: response.statusCode
-            )
+            throw undecodable(reason: "Failed to decode \(route.rawValue) response", statusCode: response.statusCode)
         }
     }
 
@@ -144,7 +134,7 @@ extension AppAttestService {
                 pinsCredential: pinsCredential,
                 makeDeclineError: makeDeclineError
             )
-            try requireAcknowledgement(in: response, on: route)
+            try read(response, on: route)
         }
     }
 
@@ -152,15 +142,24 @@ extension AppAttestService {
     ///
     /// - Parameter response: the route's answer, already read for a refusal.
     /// - Parameter route: the route answered, which names the answer in its logs and errors.
-    private func requireAcknowledgement(in response: PayabliResponse, on route: DeviceRoute) throws {
+    private func read(_ response: PayabliResponse, on route: DeviceRoute) throws {
         let status = try? JSONDecoder().decode(PayabliEnvelope.Status.self, from: response.body)
         guard status?.isSuccess != true else { return }
         logger.error("[\(route.rawValue)] acknowledgement unreadable")
-        throw TapToPayError(
+        throw undecodable(reason: "Failed to decode \(route.rawValue) response", statusCode: response.statusCode)
+    }
+
+    /// The failure for an answer that could not be used.
+    ///
+    /// - Parameter reason: what the error says.
+    /// - Parameter statusCode: the answer's status.
+    /// - Returns: the `decodingError` the caller throws.
+    private func undecodable(reason: String, statusCode: Int) -> TapToPayError {
+        TapToPayError(
             type: .decodingError,
-            reason: "Failed to decode \(route.rawValue) response",
+            reason: reason,
             detail: nil,
-            httpStatus: response.statusCode
+            httpStatus: statusCode
         )
     }
 }
