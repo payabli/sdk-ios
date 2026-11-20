@@ -83,8 +83,8 @@ package actor TelemetryClient {
     /// Set while `handOff` waits for the drains already scheduled, so a batch kept then stays queued for the successor.
     private var handingOff = false
     /// The client this one's queue was handed to, which an event reaching this one afterwards is passed on to. Held
-    /// weakly: a record reaches the channel installed when it is delivered, so only one already on its way when the
-    /// successor was installed lands here, and the installed session holds the successor until then.
+    /// weakly: a record reaches the channel installed when it is delivered, so only one delivered between this hand-over
+    /// and the successor's install lands here, while the session being installed holds the successor.
     private weak var successor: TelemetryClient?
 
     /// - Parameter configuration: the batch and queue sizes and the identifiers every event carries.

@@ -149,11 +149,14 @@ extension TelemetryClientTests {
         XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
     }
 
-    func testRecordsForASessionOnAnotherEntryPointAreDroppedTogether() async {
+    func testRecordsForASessionOnAnotherEntryPointAreDropped() async {
         let client = makeClient(batchSize: 100)
         let foreign = TelemetrySessionContext(sessionId: "other", entry: "elsewhere", environment: client.context.environment)
 
-        await client.emit([(TelemetryEventName.formPresented, ["step": "pair"])], session: foreign)
+        await client.emit(
+            [(TelemetryEventName.formPresented, ["step": "one"]), (TelemetryEventName.formPresented, ["step": "two"])],
+            session: foreign
+        )
 
         let queued = await client.bufferedCount
         XCTAssertEqual(queued, 0, "a channel cannot deliver another entry point's records")

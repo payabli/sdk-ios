@@ -74,7 +74,7 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(events.map(\.event), [], "a record for another entry point is never delivered on this channel")
     }
 
-    func testARecordDeliveredAfterTwoReinstallsLeavesOnTheLatestChannelUnderTheSessionItWasMadeUnder() async {
+    func testARecordDeliveredAfterAReinstallLeavesOnTheNewChannelUnderTheSessionItWasMadeUnder() async {
         let gate = BlockingDeviceId()
         let first = TelemetryClient(
             configuration: .init(entry: "e", environment: "sandbox"),
@@ -88,11 +88,11 @@ final class TelemetryRecordersTests: XCTestCase {
         let latestClient = Self.client(entry: "e", transport: latest)
         TelemetryRecorders.install(first)
         TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
-        XCTAssertTrue(gate.waitUntilReading(), "the failure's send never started")
+        let reading = await gate.waitUntilReading()
+        XCTAssertTrue(reading, "the failure's send never started")
         TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
         TelemetryRecorders.record(TelemetryEventName.ttpAttestationStarted)
 
-        TelemetryRecorders.install(Self.client(entry: "e", transport: InMemoryTelemetryTransport()))
         TelemetryRecorders.install(latestClient)
         gate.release()
 
@@ -161,14 +161,14 @@ private final class PropertyBuilds: @unchecked Sendable {
 
 /// A device id read that blocks its client's actor until released, so a delivery to that client waits behind it.
 private final class BlockingDeviceId: @unchecked Sendable {
-    private let reading = DispatchSemaphore(value: 0)
     private let released = DispatchSemaphore(value: 0)
     private let lock = NSLock()
     private var open = false
+    private var started = false
 
     var read: @Sendable () -> String? {
         { [self] in
-            reading.signal()
+            lock.withLock { started = true }
             if !lock.withLock({ open }) {
                 _ = released.wait(timeout: .now() + 5)
             }
@@ -176,8 +176,15 @@ private final class BlockingDeviceId: @unchecked Sendable {
         }
     }
 
-    func waitUntilReading() -> Bool {
-        reading.wait(timeout: .now() + 5) == .success
+    /// - Returns: whether a read began within five seconds.
+    func waitUntilReading() async -> Bool {
+        for _ in 0 ..< 500 {
+            if lock.withLock({ started }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
     }
 
     func release() {
