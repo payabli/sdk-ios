@@ -127,6 +127,20 @@ final class HeldPaymentCloseTests: XCTestCase {
         XCTAssertTrue(terminal.heldPayments === HeldPayments.process)
     }
 
+    func testAClosedPaymentThatIsNotTheHeldOneLeavesTheHeldOneAndItsKey() async throws {
+        let (terminal, _) = try await makeReadyTerminal()
+        try await leaveHeld(on: terminal, read: .approved)
+
+        Self.wire.script(updates: [200])
+        try await terminal.closeCapturedCharge(paymentTransId: "TXN-EARLIER")
+        let keyOutlivedTheClose = keyIsHeld()
+        Self.wire.script(updates: [500])
+        let failure = await Self.failure { try await terminal.closeCapturedCharge(paymentTransId: Self.opened) }
+
+        XCTAssertTrue(keyOutlivedTheClose, "closing another payment settled the held payment's key")
+        XCTAssertEqual(failure?.capture, .charged, "closing another payment dropped the held one")
+    }
+
     func testAPaymentHeldForOneEntryPointIsNotHeldForAnother() async throws {
         let (terminal, _) = try await makeReadyTerminal()
         try await leaveHeld(on: terminal, read: .approved)

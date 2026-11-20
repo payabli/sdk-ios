@@ -66,8 +66,8 @@ package final class HeldPayments: @unchecked Sendable {
     }
 }
 
-/// A payment whose card was read and whose close was not confirmed: what its close sends, what a failed close
-/// reports, and the key a confirmed close settles. Its description names neither the payment nor the key.
+/// A payment whose card was read and whose close was not confirmed: what a failed close reports, and the key a
+/// confirmed close settles. Its description names neither the payment nor the key.
 struct HeldPayment: CustomStringConvertible {
     let paymentTransId: String
     let outcome: CardReadOutcome
