@@ -159,6 +159,57 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(events.map { $0.properties["outcome"] }, ["succeeded", "succeeded", "succeeded"])
     }
 
+    func testAnAttestAcknowledgementThatCannotBeReadIsFailed() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "/api/v2/device/taptopay/register":
+                AttestFixture.ok(request, ["deviceId": "dev_1"])
+            default:
+                (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data("not json".utf8)
+                )
+            }
+        }
+        defer { StubURLProtocol.handler = nil }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        await assertThrows { _ = try await sut.attest(entry: "myEntry") }
+
+        let events = try await sent(by: telemetry)
+        XCTAssertEqual(events.last?.event, "ttp.device.attest.completed")
+        XCTAssertEqual(events.last?.properties["outcome"], "failed")
+        XCTAssertNil(events.last?.properties["code"])
+    }
+
+    func testAnActivationAcknowledgementThatCannotBeReadIsFailed() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data("not json".utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        defer { StubURLProtocol.handler = nil }
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        await assertThrows {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev")
+        }
+
+        let events = try await sent(by: telemetry)
+        XCTAssertEqual(events.last?.event, "ttp.device.activate.completed")
+        XCTAssertEqual(events.last?.properties["outcome"], "failed")
+    }
+
     func testARouteRefusalReadByTheRealClientIsRefusedWithItsCode() async throws {
         let telemetry = makeTelemetry()
         StubURLProtocol.handler = { request in

@@ -135,7 +135,7 @@ extension AppAttestService {
         }
     ) async throws {
         try await routes.measured(route) {
-            _ = try await routes.post(
+            let response = try await routes.post(
                 route,
                 path: path,
                 body: body,
@@ -144,6 +144,23 @@ extension AppAttestService {
                 pinsCredential: pinsCredential,
                 makeDeclineError: makeDeclineError
             )
+            try requireAcknowledgement(in: response, on: route)
         }
+    }
+
+    /// Throws `decodingError` unless the answer is an `isSuccess: true` envelope. One with no `responseData` is a success.
+    ///
+    /// - Parameter response: the route's answer, already read for a refusal.
+    /// - Parameter route: the route answered, which names the answer in its logs and errors.
+    private func requireAcknowledgement(in response: PayabliResponse, on route: DeviceRoute) throws {
+        let status = try? JSONDecoder().decode(PayabliEnvelope.Status.self, from: response.body)
+        guard status?.isSuccess != true else { return }
+        logger.error("[\(route.rawValue)] acknowledgement unreadable")
+        throw TapToPayError(
+            type: .decodingError,
+            reason: "Failed to decode \(route.rawValue) response",
+            detail: nil,
+            httpStatus: response.statusCode
+        )
     }
 }
