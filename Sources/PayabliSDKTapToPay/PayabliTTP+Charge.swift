@@ -197,6 +197,8 @@ extension PayabliTTP {
             )
         }
         progress.paymentTransId = paymentTransId
+        // Only the newest payment on an entry point can be closed from what is held.
+        heldPayments.dropAny(entry: entryPoint, environment: environment)
 
         // Again here, because a replacement can land while the payment opens, and by then the reader may be armed
         // for another merchant.
@@ -221,6 +223,16 @@ extension PayabliTTP {
         recordChargeActivity(.waitingForCard, for: charge)
         do {
             readResult = try await provider.startReading(readRequest)
+            heldPayments.hold(
+                HeldPayment(
+                    paymentTransId: paymentTransId,
+                    outcome: readResult.outcome,
+                    key: reservation.key,
+                    resentKey: reservation.reused
+                ),
+                entry: entryPoint,
+                environment: environment
+            )
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
             let touchedNoCard = Self.touchedNoCard(failure)
@@ -307,6 +319,9 @@ extension PayabliTTP {
     ) async throws -> TransactionResult {
         let update = await tryUpdate { [transactionClient] in
             try await transactionClient.update(paymentTransId: paymentTransId, result: readResult)
+        }
+        if case .succeeded = update {
+            heldPayments.drop(paymentTransId, entry: entryPoint, environment: environment)
         }
 
         let capture: PayabliTTPCapture
