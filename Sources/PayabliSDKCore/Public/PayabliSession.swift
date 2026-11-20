@@ -104,7 +104,8 @@ public final class PayabliSession: @unchecked Sendable {
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
             queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])],
-            predecessor: predecessor
+            predecessor: predecessor,
+            predecessorUnreachable: { await TelemetryRecorders.unreachable($0) }
         )
     }
 

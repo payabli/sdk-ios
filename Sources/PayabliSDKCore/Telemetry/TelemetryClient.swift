@@ -82,10 +82,6 @@ package actor TelemetryClient {
     private var stopped = false
     /// Set while `handOff` waits for the drains already scheduled, so a batch kept then stays queued for the successor.
     private var handingOff = false
-    /// The client this one's queue was handed to, which an event reaching this one afterwards is passed on to. Held
-    /// weakly: a record reaches the channel installed when it is delivered, so only one delivered between this hand-over
-    /// and the successor's install lands here, while the session being installed holds the successor.
-    private weak var successor: TelemetryClient?
 
     /// - Parameter configuration: the batch and queue sizes and the identifiers every event carries.
     /// - Parameter transport: where batches are sent.
@@ -98,6 +94,8 @@ package actor TelemetryClient {
     /// - Parameter logger: where the client's own log lines go.
     /// - Parameter predecessor: the replaced session's client, whose queue this one takes before its first send, ahead
     ///   of what this one queues; `nil` when nothing is taken over.
+    /// - Parameter predecessorUnreachable: returns once no record can still reach `predecessor`, which hands over
+    ///   only then.
     package init(
         configuration: Configuration,
         transport: TelemetryTransport,
@@ -107,7 +105,8 @@ package actor TelemetryClient {
         queued: [(name: String, properties: [String: String])],
         sessionId: String = UUID().uuidString,
         logger: PayabliLogger = PayabliLogger(category: .telemetry),
-        predecessor: TelemetryClient? = nil
+        predecessor: TelemetryClient? = nil,
+        predecessorUnreachable: @escaping @Sendable (TelemetryClient) async -> Void = { _ in }
     ) {
         self.configuration = configuration
         self.logger = logger
@@ -135,7 +134,8 @@ package actor TelemetryClient {
         // The first drain, so every later one and `settled()` wait for what the predecessor hands over.
         if let predecessor {
             tail = Task { [weak self] in
-                let handed = await predecessor.handOff(to: self)
+                await predecessorUnreachable(predecessor)
+                let handed = await predecessor.handOff()
                 await self?.adopt(handed.events, dropped: handed.dropped)
             }
         }
@@ -169,14 +169,11 @@ package actor TelemetryClient {
         }
     }
 
-    /// Stops this client and gives up what it has queued: its timer and its background watcher end, a later flush is
-    /// refused, and the drains already scheduled finish first. A batch one of them cannot send stays queued.
+    /// Stops this client and gives up what it has queued: its timer and its background watcher end, a later record or
+    /// flush is refused, and the drains already scheduled finish first. A batch one of them cannot send stays queued.
     ///
-    /// - Parameter successor: the client taking the queue, which an event recorded here afterwards is passed on to under
-    ///   the session it was recorded for, or this client's when it names none; `nil` drops it.
     /// - Returns: the events left, oldest first, and how many the queue evicted that no batch has reported.
-    package func handOff(to successor: TelemetryClient? = nil) async -> (events: [TelemetryEvent], dropped: Int) {
-        self.successor = successor
+    package func handOff() async -> (events: [TelemetryEvent], dropped: Int) {
         stopped = true
         handingOff = true
         timer?.cancel()
@@ -230,17 +227,10 @@ package actor TelemetryClient {
         waitsForBatch: Bool = false,
         session: TelemetrySessionContext? = nil
     ) async {
-        if stopped, let successor {
-            await successor.emit(
-                name,
-                properties: properties,
-                occurredAt: occurredAt,
-                waitsForBatch: waitsForBatch,
-                session: session ?? context
-            )
+        if let session, session.entry != configuration.entry || session.environment != configuration.environment {
+            logger.debug("telemetry_event_foreign_session: the session this event belongs to is not this channel's; dropped")
             return
         }
-        guard accepts(session) else { return }
         enqueue(
             name,
             properties: properties,
@@ -253,39 +243,11 @@ package actor TelemetryClient {
     /// Enqueue events in order, with nothing another caller records between them.
     ///
     /// - Parameter records: each event's catalog name and properties, in the order they happened.
-    /// - Parameter session: the session the records belong to; `nil` for this client's own. One for another entry point
-    ///   or environment is dropped, since this channel cannot deliver it.
-    package func emit(
-        _ records: [(name: String, properties: [String: String])],
-        session: TelemetrySessionContext? = nil
-    ) async {
-        if stopped, let successor {
-            await successor.emit(records, session: session ?? context)
-            return
-        }
-        guard accepts(session) else { return }
+    package func emit(_ records: [(name: String, properties: [String: String])]) async {
         let now = Date()
         for record in records {
-            enqueue(
-                record.name,
-                properties: record.properties,
-                occurredAt: now,
-                waitsForBatch: false,
-                sessionId: session?.sessionId ?? sessionId
-            )
+            enqueue(record.name, properties: record.properties, occurredAt: now, waitsForBatch: false, sessionId: sessionId)
         }
-    }
-
-    /// Whether this channel can deliver an event for `session`, logging the drop when it cannot.
-    ///
-    /// - Parameter session: the session the event belongs to; `nil` for this client's own.
-    /// - Returns: `false` for a session with another entry point or environment.
-    private func accepts(_ session: TelemetrySessionContext?) -> Bool {
-        guard let session, session.entry != configuration.entry || session.environment != configuration.environment else {
-            return true
-        }
-        logger.debug("telemetry_event_foreign_session: the session this event belongs to is not this channel's; dropped")
-        return false
     }
 
     private func enqueue(

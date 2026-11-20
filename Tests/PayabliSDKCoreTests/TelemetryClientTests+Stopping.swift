@@ -135,42 +135,21 @@ extension TelemetryClientTests {
         XCTAssertEqual(left, 0)
     }
 
-    func testARecordReachingAClientAfterItsHandOverLeavesOnTheSuccessorUnderItsOwnSession() async {
+    func testAPredecessorTakesRecordsUntilItIsUnreachableAndThenHandsThemOver() async {
         let old = makeClient(batchSize: 100)
-        let successor = makeClient(batchSize: 100, predecessor: old)
-        await successor.settled()
+        let gate = Gate()
+        let successor = makeClient(batchSize: 100, predecessor: old, predecessorUnreachable: { _ in await gate.wait() })
 
+        try? await Task.sleep(for: .milliseconds(100))
         await record(old, "late")
-        await old.emit([(TelemetryEventName.formPresented, ["step": "late-pair"])])
+        let queuedBeforeTheGate = await old.bufferedCount
+        await gate.open()
         await successor.flush()
 
+        XCTAssertEqual(queuedBeforeTheGate, 1, "the predecessor is not retired while a record can still reach it")
         let events = await transport.batches.flatMap { $0 }
-        XCTAssertEqual(events.map(\.label), ["late", "late-pair"])
+        XCTAssertEqual(events.map(\.label), ["late"])
         XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
-    }
-
-    func testRecordsForASessionOnAnotherEntryPointAreDropped() async {
-        let client = makeClient(batchSize: 100)
-        let foreign = TelemetrySessionContext(sessionId: "other", entry: "elsewhere", environment: client.context.environment)
-
-        await client.emit(
-            [(TelemetryEventName.formPresented, ["step": "one"]), (TelemetryEventName.formPresented, ["step": "two"])],
-            session: foreign
-        )
-
-        let queued = await client.bufferedCount
-        XCTAssertEqual(queued, 0, "a channel cannot deliver another entry point's records")
-    }
-
-    func testAHandedOverClientDoesNotKeepItsSuccessorAlive() async {
-        let first = makeClient(batchSize: 100)
-        var successor: TelemetryClient? = makeClient(batchSize: 100, predecessor: first)
-        await successor?.settled()
-        weak let released = successor
-
-        successor = nil
-
-        XCTAssertNil(released, "only the installed session holds a successor")
     }
 
     func testDiscardingDropsWhatIsQueuedAndLogsTheCount() async {
@@ -221,5 +200,22 @@ extension TelemetryClientTests {
         let dropped = sink.records.filter { $0.message.hasPrefix("telemetry_event_after_stop") }
         XCTAssertEqual(dropped.map(\.level), [.debug])
         XCTAssertEqual(dropped.map(\.category), [.telemetry])
+    }
+}
+
+/// Holds a waiter until opened.
+private actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiting.forEach { $0.resume() }
+        waiting = []
     }
 }

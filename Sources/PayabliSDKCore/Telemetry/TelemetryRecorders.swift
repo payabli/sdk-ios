@@ -15,17 +15,48 @@ package enum TelemetryRecorders {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var installed: TelemetryClient?
     private nonisolated(unsafe) static var tail: Task<Void, Never>?
+    private nonisolated(unsafe) static var waitingForReplacement: [CheckedContinuation<Void, Never>] = []
 
     /// Installs `client`, replacing whatever was installed: a re-initialized session reports through its own channel.
     ///
     /// - Parameter client: the channel every later record reaches.
     package static func install(_ client: TelemetryClient) {
-        lock.withLock { installed = client }
+        replace(with: client)
     }
 
     /// Removes the installed channel, so a record goes back to costing nothing.
     package static func clear() {
-        lock.withLock { installed = nil }
+        replace(with: nil)
+    }
+
+    /// Returns once no record can still reach `client`: another channel, or none, is installed, and every record made
+    /// before that has reached its channel.
+    ///
+    /// - Parameter client: the channel being retired.
+    package static func unreachable(_ client: TelemetryClient) async {
+        while lock.withLock({ installed === client }) {
+            await withCheckedContinuation { (replaced: CheckedContinuation<Void, Never>) in
+                let waits = lock.withLock {
+                    guard installed === client else { return false }
+                    waitingForReplacement.append(replaced)
+                    return true
+                }
+                if !waits {
+                    replaced.resume()
+                }
+            }
+        }
+        let pending = lock.withLock { tail }
+        await pending?.value
+    }
+
+    private static func replace(with client: TelemetryClient?) {
+        let waiting = lock.withLock {
+            installed = client
+            defer { waitingForReplacement = [] }
+            return waitingForReplacement
+        }
+        waiting.forEach { $0.resume() }
     }
 
     /// Hands an event to the installed channel, or does nothing.

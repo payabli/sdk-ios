@@ -129,6 +129,42 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(events.last?.event, TelemetryEventName.ttpAttestationStarted, "\(events.map(\.event))")
     }
 
+    func testAChannelIsUnreachableOnlyOnceReplacedAndEveryRecordMadeBeforeHasArrived() async throws {
+        let gate = BlockingDeviceId()
+        let first = TelemetryClient(
+            configuration: .init(entry: "e", environment: "sandbox"),
+            transport: InMemoryTelemetryTransport(),
+            sleep: ManualTelemetryClock().sleep,
+            lifecycle: ManualAppLifecycle(),
+            deviceId: gate.read,
+            queued: []
+        )
+        TelemetryRecorders.install(first)
+        let retired = Retired()
+        let waiting = Task {
+            await TelemetryRecorders.unreachable(first)
+            await retired.mark()
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let whileInstalled = await retired.value
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        let reading = await gate.waitUntilReading()
+        XCTAssertTrue(reading, "the failure's send never started")
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
+        try await Task.sleep(for: .milliseconds(100))
+
+        TelemetryRecorders.install(Self.client(entry: "e", transport: InMemoryTelemetryTransport()))
+        try await Task.sleep(for: .milliseconds(100))
+        let whileARecordWasOnItsWay = await retired.value
+        gate.release()
+        await waiting.value
+
+        XCTAssertFalse(whileInstalled, "installed, so a record can still reach it")
+        XCTAssertFalse(whileARecordWasOnItsWay, "a record made while it was installed had not arrived")
+        let arrived = await retired.value
+        XCTAssertTrue(arrived)
+    }
+
     func testRecordsFromTwoCallersArriveInTheOrderTheyWereMade() async {
         let transport = InMemoryTelemetryTransport()
         let client = Self.client(entry: "e", transport: transport)
@@ -218,5 +254,14 @@ private final class BlockingDeviceId: @unchecked Sendable {
     func release() {
         lock.withLock { open = true }
         released.signal()
+    }
+}
+
+/// Whether a wait has returned.
+private actor Retired {
+    private(set) var value = false
+
+    func mark() {
+        value = true
     }
 }
