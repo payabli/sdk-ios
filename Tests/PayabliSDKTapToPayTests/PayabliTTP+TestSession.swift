@@ -16,7 +16,8 @@ extension PayabliTTP {
         session: URLSession? = nil,
         telemetry: any TelemetryTransport = InMemoryTelemetryTransport(),
         isLive: @escaping @Sendable () -> Bool = { true },
-        chargeKeys: ChargeKeyStore = ChargeKeyStore()
+        chargeKeys: ChargeKeyStore = ChargeKeyStore(),
+        heldPayments: HeldPayments = HeldPayments()
     ) {
         self.init(
             session: PayabliSession(config: config, urlSession: session, telemetryTransport: telemetry),
@@ -24,7 +25,8 @@ extension PayabliTTP {
             attestation: attestation,
             retryPolicy: retryPolicy,
             isLive: isLive,
-            chargeKeys: chargeKeys
+            chargeKeys: chargeKeys,
+            heldPayments: heldPayments
         )
     }
 }

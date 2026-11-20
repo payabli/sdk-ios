@@ -41,13 +41,22 @@ public extension PayabliTTP {
         try closed.get()
     }
 
-    /// Sends the close for a payment this process holds no reader answer for.
+    /// Sends the close for `paymentTransId`. A confirmed close of the held payment drops it and settles its key where
+    /// the reader's answer allows.
     ///
     /// - Parameter paymentTransId: the payment to close.
-    /// - Returns: success once the service confirmed the close; otherwise the host's error, with the capture unknown.
+    /// - Returns: success once the service confirmed the close; otherwise the host's error, with the held payment's
+    ///   capture, or unknown for a payment not held.
     private func sendClose(_ paymentTransId: String) async -> Result<Void, TapToPayError> {
+        let held = heldPayments.payment(named: paymentTransId, entry: entryPoint, environment: environment)
         do {
             try await transactionClient.close(paymentTransId: paymentTransId)
+            if let held {
+                if held.closeSettlesKey {
+                    chargeKeys.settle(entry: entryPoint, environment: environment, key: held.key)
+                }
+                heldPayments.drop(paymentTransId, entry: entryPoint, environment: environment)
+            }
             return .success(())
         } catch {
             // Waiting and sending again cannot change a refusal of the caller.
@@ -60,7 +69,7 @@ public extension PayabliTTP {
                 reason: type.message,
                 detail: nil,
                 paymentTransId: paymentTransId,
-                capture: .unknown,
+                capture: held?.capture ?? .unknown,
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
                 httpStatus: answer.httpStatus,
                 rawCode: answer.rawCode
