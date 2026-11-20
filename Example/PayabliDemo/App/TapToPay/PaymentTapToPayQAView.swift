@@ -235,7 +235,7 @@ struct PaymentTapToPayQAView: View {
                         isActivationPresented = false
                         runActivate()
                     }
-                    .disabled(activationCode.isEmpty)
+                    .disabled(activationCode.isEmpty || isWorking)
                 }
             }
             .navigationTitle("Activate device")
