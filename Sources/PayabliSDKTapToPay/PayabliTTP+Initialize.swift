@@ -171,7 +171,10 @@ extension PayabliTTP {
         default:
             throw PayabliTTPError.notReady(current: sessionState)
         }
+        let startedAt = ContinuousClock.now
+        reports.reinitializeStarted()
         try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
+        reports.reinitializeSucceeded(after: ContinuousClock.now - startedAt)
     }
 
     /// Steps 2–4 of `initialize()`, from a state the repair has already accepted.
@@ -318,21 +321,7 @@ extension PayabliTTP {
             }
             throw PayabliTTPError.devicePendingActivation(httpStatus: pending.httpStatus)
         } catch {
-            // A core error keeps its own code and the wait the service asked for, and a cancellation stays one.
-            // Anything else is wrapped with its parsed description, so the fields
-            // the service named still reach the merchant. `String(describing:)`
-            // renders every stored property instead, the page token among them.
-            let failure: Error = if error is PayabliTTPError || error is any PayabliError || error is CancellationError {
-                error
-            } else {
-                PayabliTTPError.configFailed(reason: error.localizedDescription)
-            }
-            // Marked as it arrived, so a permission this paypoint has not
-            // granted still reaches `.pendingActivation` and a service that was
-            // briefly away still reads as one to try again.
-            markError(error)
-            syncPublished()
-            throw failure
+            throw settled(error)
         }
     }
 
@@ -348,10 +337,7 @@ extension PayabliTTP {
         do {
             try provider.configure(credentials: credentials)
         } catch {
-            markError(error)
-            syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw settled(error)
         }
     }
 
@@ -385,11 +371,30 @@ extension PayabliTTP {
             markPendingTerms()
             throw PayabliTTPError.termsNotAccepted
         } catch {
-            markError(error)
-            syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw settled(error)
         }
+    }
+
+    /// Settles a setup failure in one place: lands it, and answers what the caller is told. The SDK's own failures, a
+    /// core one and a cancellation keep their kind; an error the SDK did not expect is its internal error, naming the
+    /// type and never the message.
+    ///
+    /// - Parameter error: what the setup step threw.
+    /// - Returns: the failure the caller is told, already landed.
+    private func settled(_ error: Error) -> Error {
+        let failure: Error = if error is PayabliTTPError || error is any PayabliError || error is CancellationError {
+            error
+        } else {
+            TapToPayError(
+                type: .sdkInternalError,
+                reason: PayabliErrorType.sdkInternalError.message,
+                detail: nil,
+                underlying: RedactedCause(error)
+            )
+        }
+        markError(failure)
+        syncPublished()
+        return failure
     }
 
     // MARK: - Shared transitions
@@ -397,17 +402,18 @@ extension PayabliTTP {
     private func landPendingActivation(answeredFor presented: String? = nil) -> Error? {
         let failure: Error
         switch storedRegistration() {
-        case let .held(activationId) where presented == nil || presented == activationId:
+        case let .held(activationId):
+            // The registration held when the answer is settled is the truth, even one replaced while it was in flight.
             _ = sessionManager.transition(to: .pendingActivation(activationId: activationId))
             syncPublished()
             return nil
-        case .held, .none where presented != nil:
-            let stale = PayabliTTPError.configFailed(
+        case .none where presented != nil:
+            let removed = PayabliTTPError.configFailed(
                 reason: "The registration changed while the configuration was fetched; initialize again"
             )
             _ = sessionManager.transition(to: .failed(reason: .serviceUnavailable))
             syncPublished()
-            return stale
+            return removed
         case .none:
             failure = PayabliTTPError.configFailed(reason: "The device is pending activation, and no registration is stored for it")
         case .unreadable:

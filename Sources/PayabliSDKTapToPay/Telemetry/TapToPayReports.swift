@@ -51,8 +51,26 @@ final class TapToPayReports {
             if let told {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
+            if let cause = told?.underlying as? RedactedCause {
+                properties[TelemetryProperty.failureType.rawValue] = cause.simpleTypeName
+            }
+            if let code = told?.rawCode {
+                properties[TelemetryProperty.code.rawValue] = code
+            }
         }
         record(name, properties: properties, occurredAt: now)
+    }
+
+    func reinitializeStarted() {
+        let now = Date()
+        record(TelemetryEventName.ttpReinitializeStarted, occurredAt: now)
+    }
+
+    /// - Parameter duration: how long the re-arm took.
+    func reinitializeSucceeded(after duration: Duration) {
+        let now = Date()
+        let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
+        record(TelemetryEventName.ttpReinitializeSucceeded, properties: properties, occurredAt: now)
     }
 
     func attestationStarted() {
