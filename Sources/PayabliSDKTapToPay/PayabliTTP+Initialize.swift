@@ -309,8 +309,8 @@ extension PayabliTTP {
 
     /// Fetches `/config`, with the session in `.fetchingConfig`.
     ///
-    /// A pending backend lands `.pendingActivation`; a core error, a 401 included, passes through as it
-    /// arrived; anything else wraps as `.configFailed`, with the state classified from the arrival.
+    /// A pending backend lands `.pendingActivation`; any other failure passes through as it arrived, for the entry
+    /// point to translate, with the state classified from it.
     ///
     /// - Returns: the route's configuration, carrying the reader credentials.
     private func runFetchConfigPhase() async throws -> TTPConfig {
@@ -322,21 +322,12 @@ extension PayabliTTP {
             }
             throw PayabliTTPError.devicePendingActivation(httpStatus: pending.httpStatus)
         } catch {
-            // A core error keeps its own code and the wait the service asked for, and a cancellation stays one.
-            // Anything else is wrapped with its parsed description, so the fields
-            // the service named still reach the merchant. `String(describing:)`
-            // renders every stored property instead, the page token among them.
-            let failure: Error = if error is PayabliTTPError || error is any PayabliError || error is CancellationError {
-                error
-            } else {
-                PayabliTTPError.configFailed(reason: error.localizedDescription)
-            }
             // Marked as it arrived, so a permission this paypoint has not
             // granted still reaches `.pendingActivation` and a service that was
             // briefly away still reads as one to try again.
             markError(error)
             syncPublished()
-            throw failure
+            throw error
         }
     }
 
@@ -354,8 +345,7 @@ extension PayabliTTP {
         } catch {
             markError(error)
             syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error
         }
     }
 
@@ -391,8 +381,7 @@ extension PayabliTTP {
         } catch {
             markError(error)
             syncPublished()
-            throw error as? PayabliTTPError
-                ?? PayabliTTPError.readerSetupFailed(reason: String(describing: error))
+            throw error
         }
     }
 

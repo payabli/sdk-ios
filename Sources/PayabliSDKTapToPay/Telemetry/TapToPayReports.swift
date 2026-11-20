@@ -52,6 +52,9 @@ final class TapToPayReports {
             if let told {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
+            if let cause = told?.underlying as? RedactedCause {
+                properties[TelemetryProperty.failureType.rawValue] = cause.simpleTypeName
+            }
         }
         enqueue { [properties] in await $0.emit(name, properties: properties, occurredAt: now) }
     }

@@ -101,7 +101,8 @@ public extension PayabliTTP {
         return TapToPayError(
             type: .sdkInternalError,
             reason: "The activation could not be sent",
-            detail: "\(nsError.domain) \(nsError.code)"
+            detail: "\(nsError.domain) \(nsError.code)",
+            underlying: RedactedCause(error)
         )
     }
 
