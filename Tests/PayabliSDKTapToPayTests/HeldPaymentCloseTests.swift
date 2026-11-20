@@ -66,6 +66,23 @@ final class HeldPaymentCloseTests: XCTestCase {
         XCTAssertTrue(keyIsHeld(), "the only handle on a payment that may have taken money was dropped")
     }
 
+    /// The resent key names an earlier charge whose outcome was never known, so this approval does not settle it.
+    func testAHeldApprovalUnderAResentKeyKeepsTheKeyWhenTheCloseLands() async throws {
+        let (terminal, provider) = try await makeReadyTerminal()
+        try await leaveHeld(on: terminal, read: .indeterminate)
+        provider.readingResult = .success(Self.read(.approved))
+        _ = await Self.failure { _ = try await terminal.charge(paymentDetails: Self.sale, attempt: .retry) }
+
+        Self.wire.script(updates: [200])
+        try await terminal.closeCapturedCharge(paymentTransId: Self.opened)
+        let keyOutlivedTheClose = keyIsHeld()
+        Self.wire.script(updates: [500])
+        let failure = await Self.failure { try await terminal.closeCapturedCharge(paymentTransId: Self.opened) }
+
+        XCTAssertTrue(keyOutlivedTheClose, "a close under a resent key settled the earlier charge's key")
+        XCTAssertEqual(failure?.capture, .unknown, "the closed payment was still held")
+    }
+
     // MARK: - A close that fails
 
     func testAHeldCloseThatFailsReportsTheReadersCaptureAndStaysHeld() async throws {
