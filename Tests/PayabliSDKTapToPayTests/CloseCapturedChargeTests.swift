@@ -171,6 +171,55 @@ final class CloseCapturedChargeTests: XCTestCase {
         XCTAssertEqual(Self.wire.closes(of: Self.notHeld).count, 2, "the close stopped with its caller")
     }
 
+    /// A session is replaced only once its credential is finished, so the retired terminal's close stops at that
+    /// credential rather than at a liveness check, and the replacement's credentials are never borrowed.
+    func testARetiredTerminalsCloseIsRefusedUnsentAndAsksNeitherProvider() async throws {
+        PayabliSession.resetForTesting()
+        defer { PayabliSession.resetForTesting() }
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: "HTTP/1.1", headerFields: nil)!, Data())
+        }
+        let firstTokens = TokenRequests()
+        let replacementTokens = TokenRequests()
+        let first = try PayabliSession.install(
+            config: PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: {
+                await firstTokens.record()
+                return UUID().uuidString
+            }),
+            urlSession: StubURLProtocol.makeSession(),
+            telemetryTransport: InMemoryTelemetryTransport()
+        )
+        let retired = PayabliTTP(
+            session: first,
+            provider: MockTapToPayProvider(),
+            attestation: MockDeviceAttestationService(),
+            chargeKeys: keys
+        )
+        _ = try? await first.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
+        _ = try PayabliSession.install(
+            config: PayabliConfig(entryPoint: "e", environment: .production, tokenProvider: {
+                await replacementTokens.record()
+                return "replacement"
+            }),
+            urlSession: StubURLProtocol.makeSession(),
+            telemetryTransport: InMemoryTelemetryTransport()
+        )
+        XCTAssertFalse(retired.isLive())
+        let firstAsks = firstTokens.value
+        let stateBefore = retired.sessionState
+        StubURLProtocol.handler = Self.wire.handle
+
+        let error = await Self.failure { try await retired.closeCapturedCharge(paymentTransId: Self.notHeld) }
+
+        XCTAssertEqual(error?.type, .paymentNotClosed)
+        XCTAssertEqual(error?.capture, .unknown)
+        XCTAssertEqual(error?.paymentTransId, Self.notHeld)
+        XCTAssertTrue(Self.wire.updates.isEmpty, "a finished credential sent the close")
+        XCTAssertEqual(firstTokens.value, firstAsks, "the finished credential asked its provider again")
+        XCTAssertEqual(replacementTokens.value, 0, "the replacement's provider was asked")
+        XCTAssertEqual(retired.sessionState, stateBefore)
+    }
+
     // MARK: - Sharing the entry point with a charge
 
     /// The charge's own close goes first, and no close is sent while its card is read.
