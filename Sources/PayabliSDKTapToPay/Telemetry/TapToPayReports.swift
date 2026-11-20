@@ -63,14 +63,14 @@ final class TapToPayReports {
 
     func reinitializeStarted() {
         let now = Date()
-        enqueue { await $0.emit(TelemetryEventName.ttpReinitializeStarted, occurredAt: now) }
+        record(TelemetryEventName.ttpReinitializeStarted, occurredAt: now)
     }
 
     /// - Parameter duration: how long the re-arm took.
     func reinitializeSucceeded(after duration: Duration) {
         let now = Date()
         let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
-        enqueue { await $0.emit(TelemetryEventName.ttpReinitializeSucceeded, properties: properties, occurredAt: now) }
+        record(TelemetryEventName.ttpReinitializeSucceeded, properties: properties, occurredAt: now)
     }
 
     func attestationStarted() {

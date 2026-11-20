@@ -47,7 +47,7 @@ final class SetupSettleTests: XCTestCase {
         provider.prepareReaderResult = .success(())
 
         try await ttp.reinitialize()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let events = await transport.batches.flatMap { $0 }.filter { $0.event.hasPrefix("ttp.reinitialize.") }
@@ -56,7 +56,7 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertEqual(Set(events.last?.properties.keys ?? [:].keys), ["duration_ms"])
     }
 
-    func testAFailedInitializeCarriesTheServicesCodeOnlyWhenItHadOne() async throws {
+    func testAFailedInitializeCarriesTheServicesCodeOnlyWhenItNamesACondition() async throws {
         let refused = try makeTTP()
         StubURLProtocol.handler = { request in
             (
@@ -66,8 +66,17 @@ final class SetupSettleTests: XCTestCase {
         }
         _ = try? await refused.0.initialize()
         let refusedEvent = try await failedEvent(refused.0, refused.3)
-        XCTAssertEqual(refusedEvent["code"], "404")
+        XCTAssertNil(refusedEvent["code"], "a device route's result code is its status, not a condition")
         XCTAssertNil(refusedEvent["failure_type"])
+
+        let named = try makeTTP()
+        named.1.configureResult = .failure(
+            PayabliGenericError(type: .unknown, reason: "HTTP 418", httpStatus: 418, rawCode: "E1001")
+        )
+        StubURLProtocol.handler = TapToPayReportsTests.configHandler(status: 200)
+        _ = try? await named.0.initialize()
+        let namedEvent = try await failedEvent(named.0, named.3)
+        XCTAssertEqual(namedEvent["code"], "E1001")
 
         let foreign = try makeTTP()
         foreign.1.configureResult = .failure(HostThrew())
@@ -93,7 +102,7 @@ final class SetupSettleTests: XCTestCase {
     }
 
     private func failedEvent(_ ttp: PayabliTTP, _ transport: InMemoryTelemetryTransport) async throws -> [String: String] {
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
         let failed = await transport.batches.flatMap { $0 }.filter { $0.event == "ttp.initialize.failed" }
         XCTAssertEqual(failed.count, 1)
