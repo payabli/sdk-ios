@@ -228,10 +228,10 @@ extension PayabliTTP {
             // Best-effort backend notify so the transaction isn't left dangling.
             // Its outcome does not change what the caller is told.
             recordChargeActivity(.closing, for: charge)
-            let close = await tryUpdate(
-                paymentTransId: paymentTransId,
-                payload: .nfcFailure(description: String(describing: error))
-            )
+            let description = String(describing: error)
+            let close = await tryUpdate { [transactionClient] in
+                try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: description)
+            }
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
             // payment says nothing was captured, and so does a read that never reached a card, whatever the close
             // answers.
@@ -305,7 +305,9 @@ extension PayabliTTP {
         readResult: CardReadResult,
         reservation: ChargeKeyStore.Reservation
     ) async throws -> TransactionResult {
-        let update = await tryUpdate(paymentTransId: paymentTransId, payload: .success(readResult))
+        let update = await tryUpdate { [transactionClient] in
+            try await transactionClient.update(paymentTransId: paymentTransId, result: readResult)
+        }
 
         let capture: PayabliTTPCapture
         switch readResult.outcome {
@@ -400,7 +402,10 @@ extension PayabliTTP {
     /// - Throws: `sessionNotInitialized`, carrying the opened payment and `capture: .notCharged`.
     private func refuseRetiredCharge(paymentTransId: String, charge: Int) async throws -> Never {
         recordChargeActivity(.closing, for: charge)
-        _ = await tryUpdate(paymentTransId: paymentTransId, payload: .nfcFailure(description: Self.retiredReason))
+        let reason = Self.retiredReason
+        _ = await tryUpdate { [transactionClient] in
+            try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: reason)
+        }
         sessionManager.failCharge(.sessionEnded, for: charge)
         syncPublished()
         throw TapToPayError(
@@ -484,17 +489,13 @@ extension PayabliTTP {
         return deviceId
     }
 
-    /// Runs ``sendUpdate(paymentTransId:payload:)`` and reports how the update ended.
+    /// Runs one of the transaction client's closes and reports how it ended.
     ///
-    /// - Parameter paymentTransId: the transaction the update is sent for, minted at initiate.
-    /// - Parameter payload: what the reader did, as the success or failure the update carries.
+    /// - Parameter send: the close to run.
     /// - Returns: what the update ended as: succeeded, failed with its reason and wait, or cancelled.
-    private func tryUpdate(
-        paymentTransId: String,
-        payload: TTPUpdatePayload
-    ) async -> TTPUpdateOutcome {
+    private func tryUpdate(_ send: @Sendable () async throws -> Void) async -> TTPUpdateOutcome {
         do {
-            try await sendUpdate(paymentTransId: paymentTransId, payload: payload)
+            try await send()
             return .succeeded
         } catch is CancellationError {
             // A cancelled request is not retried. What the caller is told depends on what the tap did.
@@ -510,45 +511,6 @@ extension PayabliTTP {
                 httpStatus: answer.httpStatus,
                 rawCode: answer.rawCode
             )
-        }
-    }
-
-    /// Sends `PATCH /update/{paymentTransId}` with retry; bearer auth and 401 refresh-and-retry are
-    /// `session.transport`'s.
-    ///
-    /// - Parameter paymentTransId: the transaction the update is sent for.
-    /// - Parameter payload: what the update carries.
-    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller the route says may not act
-    ///   on the payment.
-    func sendUpdate(paymentTransId: String, payload: TTPUpdatePayload) async throws {
-        let body = TTPTransactionClient.updateBody(for: payload)
-        let logger = self.logger
-        let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
-        let transport = self.session.transport
-
-        @Sendable func performOnce(attempt: String) async throws -> PayabliResponse {
-            let request = PayabliRequest(
-                method: .patch,
-                path: path,
-                headers: ["Content-Type": "application/json"],
-                body: body
-            )
-            // The success body carries the provider's whole response, and with
-            // it `paymentTokens.tokenData` and the card's expiry. Size only.
-            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
-            let response = try await transport.perform(request)
-            logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
-            return response
-        }
-
-        // A non-2xx is raised as its mapped error for the retry policy to classify; a refusal of the caller is raised
-        // as `permissionDenied`, which the policy does not retry.
-        try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
-            let response = try await performOnce(attempt: String(attempt))
-            if let refusal = TTPTransactionClient.notPermitted(response) {
-                throw refusal
-            }
-            try mapPayabliHTTPError(response: response)
         }
     }
 

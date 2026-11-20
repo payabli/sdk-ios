@@ -47,7 +47,7 @@ public extension PayabliTTP {
     /// - Returns: success once the service confirmed the close; otherwise the host's error, with the capture unknown.
     private func sendClose(_ paymentTransId: String) async -> Result<Void, TapToPayError> {
         do {
-            try await sendUpdate(paymentTransId: paymentTransId, payload: .noOutcome)
+            try await transactionClient.close(paymentTransId: paymentTransId)
             return .success(())
         } catch {
             // Waiting and sending again cannot change a refusal of the caller.

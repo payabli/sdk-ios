@@ -9,10 +9,14 @@ import PayabliSDKCore
 ///
 package final class TTPTransactionClient: Sendable {
     private let transport: any PayabliTransport
+    private let retryPolicy: RetryPolicy
     private let logger = PayabliLogger(category: .taptopay)
 
-    package init(transport: any PayabliTransport) {
+    /// - Parameter transport: the session's authenticated transport.
+    /// - Parameter retryPolicy: the policy every close runs under.
+    package init(transport: any PayabliTransport, retryPolicy: RetryPolicy = .default) {
         self.transport = transport
+        self.retryPolicy = retryPolicy
     }
 
     /// `POST /api/v2/MoneyIn/initiate`, returning the authoritative `paymentTransId`.
@@ -176,28 +180,66 @@ package final class TTPTransactionClient: Sendable {
         )
     }
 
-    /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`, in one shape whatever the provider.
+    /// Closes the transaction with what the reader's processor answered, under the `fiservResponse` key.
     ///
-    /// - Parameter payload: what the reader did, as the success or failure to encode.
-    /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error`
-    ///   object on a failure, `{}` for no outcome.
-    static func updateBody(for payload: TTPUpdatePayload) -> Data {
-        let encoder = JSONEncoder()
-        switch payload {
-        case let .success(result):
-            let body = UpdateSuccessBody(providerResponse: providerResponse(from: result))
-            return (try? encoder.encode(body)) ?? Data()
+    /// - Parameter paymentTransId: the transaction to close, minted at initiate.
+    /// - Parameter result: what the reader read.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func update(paymentTransId: String, result: CardReadResult) async throws {
+        let body = UpdateSuccessBody(providerResponse: Self.providerResponse(from: result))
+        try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
+    }
 
-        case let .nfcFailure(description):
-            let body = UpdateErrorBody(error: .init(
-                title: "NFC Tap Failed",
-                description: description,
-                failureReason: "nfc_read"
-            ))
-            return (try? encoder.encode(body)) ?? Data()
+    /// Closes the transaction after a tap that never completed, so an opened transaction is not left standing.
+    ///
+    /// - Parameter paymentTransId: the transaction to close, minted at initiate.
+    /// - Parameter description: why the read failed, sent as a record only.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func updateAfterFailedRead(paymentTransId: String, description: String) async throws {
+        let body = UpdateErrorBody(error: .init(
+            title: "NFC Tap Failed",
+            description: description,
+            failureReason: "nfc_read"
+        ))
+        try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
+    }
 
-        case .noOutcome:
-            return Data("{}".utf8)
+    /// Closes a transaction this SDK holds no reader answer for, with a body that claims no outcome.
+    ///
+    /// - Parameter paymentTransId: the transaction to close.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func close(paymentTransId: String) async throws {
+        try await send(paymentTransId: paymentTransId, body: Data("{}".utf8))
+    }
+
+    /// The closes' shared `PATCH /api/v2/MoneyIn/update/{paymentTransId}`, retried. Any 2xx is success and the
+    /// response is not decoded.
+    ///
+    /// - Parameter paymentTransId: the transaction the close is sent for.
+    /// - Parameter body: the encoded close.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once, unretried, for a caller the route says
+    ///   may not act on the payment.
+    private func send(paymentTransId: String, body: Data) async throws {
+        let logger = self.logger
+        let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
+        let transport = self.transport
+
+        try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
+            let request = PayabliRequest(
+                method: .patch,
+                path: path,
+                headers: ["Content-Type": "application/json"],
+                body: body
+            )
+            // The success body carries the provider's whole response, and with
+            // it `paymentTokens.tokenData` and the card's expiry. Size only.
+            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
+            let response = try await transport.perform(request)
+            logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
+            if let refusal = Self.notPermitted(response) {
+                throw refusal
+            }
+            try mapPayabliHTTPError(response: response)
         }
     }
 

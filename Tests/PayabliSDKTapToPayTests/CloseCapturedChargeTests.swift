@@ -57,6 +57,23 @@ final class CloseCapturedChargeTests: XCTestCase {
         XCTAssertEqual(Self.wire.closes(of: Self.notHeld).count, 3, "a server error is retried as the charge's close is")
     }
 
+    func testACloseRunsUnderTheTerminalsRetryPolicy() async throws {
+        Self.wire.script(updates: [500])
+        let terminal = try makeTerminal(retryPolicy: RetryPolicy(
+            maxAttempts: 1,
+            baseDelay: 0,
+            maxDelay: 0,
+            multiplier: 1,
+            maxJitter: 0,
+            jitter: .none
+        ))
+
+        let failure = await Self.failure { try await terminal.closeCapturedCharge(paymentTransId: Self.notHeld) }
+
+        XCTAssertEqual(failure?.type, .paymentNotClosed)
+        XCTAssertEqual(Self.wire.closes(of: Self.notHeld).count, 1, "the close ran under another policy")
+    }
+
     func testACloseTheCallerMayNotSendIsPermissionDeniedSentOnceWithNoTokenRenewed() async throws {
         Self.wire.script(updates: [400], refusal: "E9001")
         let tokens = TokenRequests()
@@ -476,7 +493,11 @@ final class CloseCapturedChargeTests: XCTestCase {
         }
     }
 
-    private func makeTerminal(entryPoint: String = "e", tokens: TokenRequests = TokenRequests()) throws -> PayabliTTP {
+    private func makeTerminal(
+        entryPoint: String = "e",
+        tokens: TokenRequests = TokenRequests(),
+        retryPolicy: RetryPolicy = noWait
+    ) throws -> PayabliTTP {
         let config = try PayabliConfig(
             entryPoint: entryPoint,
             environment: .sandbox,
@@ -489,7 +510,7 @@ final class CloseCapturedChargeTests: XCTestCase {
             config: config,
             provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService(),
-            retryPolicy: Self.noWait,
+            retryPolicy: retryPolicy,
             session: StubURLProtocol.makeSession(),
             chargeKeys: keys
         )

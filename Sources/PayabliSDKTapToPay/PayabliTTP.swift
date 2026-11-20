@@ -122,7 +122,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
     ///   - session: the session whose entry point, environment and transport the facade runs on.
     ///   - provider: the card reader the charges read through.
     ///   - attestation: the service that holds the device's binding and signs requests.
-    ///   - retryPolicy: the retry policy the charge's update runs under.
+    ///   - retryPolicy: the policy every close of a transaction runs under, the charge's and `closeCapturedCharge`'s.
     ///   - isLive: whether `session` is still the installed one; this terminal stops arming the reader once it is not.
     ///   - chargeKeys: the idempotency keys of unsettled charges, shared by every terminal in the process.
     package init(
@@ -142,7 +142,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
 
         self.session = session
         self.reports = TapToPayReports(telemetry: session.telemetry)
-        self.transactionClient = TTPTransactionClient(transport: session.transport)
+        self.transactionClient = TTPTransactionClient(transport: session.transport, retryPolicy: retryPolicy)
         self.chargeKeys = chargeKeys
         self.configClient = TTPConfigClient(
             transport: session.transport,
