@@ -28,7 +28,7 @@ final class TTPConfigClient: Sendable {
     }
 
     /// Fetches the TTP config for `entry` on a pinned credential. Only a 401 saying the binding is gone drops it, throwing
-    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `.tokenExpired`. A 403
+    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `deviceSetupRequired`. A 403
     /// naming the entry point throws `entryPointRefused`; one naming nothing classified is the device owing its code.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
@@ -52,6 +52,16 @@ final class TTPConfigClient: Sendable {
                 throw PinnedTokenRefusal()
             }
 
+            if [400, 404].contains(response.statusCode),
+               let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body)
+            {
+                // A refusal naming no code, and words this route does not know, is left to the status mapping below.
+                let refused = ColdRouteRefusals.decline(code: code, reason: reason)
+                    ?? code.map { DeviceRouteRefusal.of(code: $0, reason: reason, httpStatus: response.statusCode) }
+                if let refused {
+                    throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
+                }
+            }
             try mapPayabliHTTPError(response: response) { code in
                 if code == 403 {
                     return ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: code)
@@ -64,9 +74,9 @@ final class TTPConfigClient: Sendable {
                 let code = rawCode ?? 0
                 // Same as the attestation path: the code, not the service's sentence.
                 logger.error("[config] declined (isSuccess=false code=\(code))")
-                // A binding the service no longer holds is dropped here, where which handle the request presented is
-                // known. Any other 401 in the body keeps it.
-                if BindingRefusal.isBindingGone(code: code, reason: reason) {
+                // A 401 in the body is the service holding no live attestation for the binding, whatever its text. It is
+                // dropped here, where which handle the request presented is known, so the next setup attests again.
+                if code == 401 {
                     guard dropRefusedBinding(entry: entry, presented: headers) else {
                         throw PayabliTTPError.attestationRevoked(
                             reason: "\(reason) — the stored binding could not be dropped",
@@ -75,16 +85,13 @@ final class TTPConfigClient: Sendable {
                     }
                     throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
                 }
-                if code == 401 {
-                    throw PayabliGenericError(type: .tokenExpired, reason: reason, httpStatus: response.statusCode, rawCode: nil)
-                }
                 if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
                     throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
                 }
                 if code == 403 {
                     throw ConfigPendingActivation(presentedDeviceId: headers.deviceId, httpStatus: response.statusCode)
                 }
-                throw PayabliTTPError.configFailed(reason: reason, httpStatus: response.statusCode)
+                throw DeviceRouteRefusal.of(code: rawCode, reason: reason, httpStatus: response.statusCode)
             }
 
             let decoder = JSONDecoder()
@@ -95,7 +102,7 @@ final class TTPConfigClient: Sendable {
                 let credentials = envelope.responseData?.credentials
             else {
                 logger.error("[config] payload decode failed")
-                throw PayabliTTPError.configFailed(reason: "Invalid config envelope", httpStatus: response.statusCode)
+                throw DeviceRouteRefusal.undecodable(httpStatus: response.statusCode)
             }
 
             return TTPConfig(providerCredentials: credentials)

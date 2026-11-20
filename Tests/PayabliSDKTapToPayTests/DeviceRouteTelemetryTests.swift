@@ -125,6 +125,21 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(events.map(\.event), ["ttp.device.challenge.completed"], "a failure does not wait for its batch")
     }
 
+    func testAConfigRefusalWith401InsideASuccessfulStatusIsRefusedWithItsCode() async throws {
+        let (client, telemetry) = makeClient(answering: .status(200, body: Self.decline(code: 401)))
+
+        await assertThrows {
+            _ = try await client.measured(.config) {
+                let response = try await client.get(.config, Self.request)
+                throw DeviceRouteRefusal.of(code: 401, reason: "Unauthorized", httpStatus: response.statusCode)
+            }
+        }
+
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "refused", "the device was refused, not the token")
+        XCTAssertEqual(properties["code"], "401")
+    }
+
     func testACancelledCallReportsNothing() async throws {
         let (client, telemetry) = makeClient(answering: .error(CancellationError()))
 
