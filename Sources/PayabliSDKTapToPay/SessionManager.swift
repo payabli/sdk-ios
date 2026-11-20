@@ -28,6 +28,10 @@ final class SessionManager: ObservableObject {
     @Published private(set) var isReady: Bool = false
     private(set) var lastError: Error?
 
+    /// Told of each move from one state to another; a move between two charge activities or two progress readings is
+    /// not one.
+    var onMove: ((_ from: PayabliTTPSessionState, _ to: PayabliTTPSessionState) -> Void)?
+
     init() {}
 
     /// Attempt to transition to a new state. Rejects invalid transitions.
@@ -39,8 +43,7 @@ final class SessionManager: ObservableObject {
         guard Self.isValidTransition(from: sessionState, to: target) else {
             return false
         }
-        sessionState = target
-        isReady = (target == .ready)
+        move(to: target)
         return true
     }
 
@@ -51,8 +54,7 @@ final class SessionManager: ObservableObject {
     /// still governs.
     private func forceSessionExpiry() {
         if sessionState != .sessionExpired {
-            sessionState = .sessionExpired
-            isReady = false
+            move(to: .sessionExpired)
         }
     }
 
@@ -64,8 +66,7 @@ final class SessionManager: ObservableObject {
     func markError(_ error: Error, registration: StoredRegistration) {
         lastError = error
         guard let landing = PayabliTTPSessionState.landing(for: error, registration: registration) else { return }
-        sessionState = landing
-        isReady = (landing == .ready)
+        move(to: landing)
     }
 
     /// Records how far the reader has got, without leaving the state it belongs
@@ -75,7 +76,7 @@ final class SessionManager: ObservableObject {
     /// - Parameter percent: how far the reader has got, within 0 through 100.
     func recordConfigurationProgress(_ percent: Int) {
         guard case .initializingReader = sessionState else { return }
-        sessionState = .initializingReader(percent: percent)
+        move(to: .initializingReader(percent: percent))
     }
 
     /// The charge holding the session, or `nil` when none does.
@@ -110,8 +111,7 @@ final class SessionManager: ObservableObject {
     func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
         runningCharge = nil
-        sessionState = .failed(reason: reason)
-        isReady = false
+        move(to: .failed(reason: reason))
     }
 
     /// Returns to ready only while `charge` still holds the session, so a move
@@ -130,6 +130,18 @@ final class SessionManager: ObservableObject {
     func reset() {
         transition(to: .idle)
         lastError = nil
+    }
+
+    /// The one writer of the session state: every move goes through here.
+    ///
+    /// - Parameter target: the state the session moves to.
+    private func move(to target: PayabliTTPSessionState) {
+        let from = sessionState
+        sessionState = target
+        isReady = (target == .ready)
+        if from.diagnosticName != target.diagnosticName {
+            onMove?(from, target)
+        }
     }
 
     // MARK: - Transition matrix
@@ -238,6 +250,34 @@ final class SessionManager: ObservableObject {
             return to != .opening
         case .closing:
             return false
+        }
+    }
+}
+
+extension PayabliTTPSessionState {
+    /// The state's name in telemetry, the same on both platforms.
+    var diagnosticName: String {
+        switch self {
+        case .idle: "idle"
+        case .attestingDevice: "attesting_device"
+        case .fetchingConfig: "fetching_config"
+        case .initializingReader: "initializing_reader"
+        case .ready: "ready"
+        case .charging: "charging"
+        case .sessionExpired: "session_expired"
+        case .reinitializing: "reinitializing"
+        case .pendingActivation: "pending_activation"
+        case .pendingTerms: "pending_terms"
+        case .failed: "failed"
+        }
+    }
+}
+
+extension PayabliTTPFailureReason {
+    /// The reason's name in telemetry, the same on both platforms.
+    var diagnosticName: String {
+        String(describing: self).reduce(into: "") { name, character in
+            name += character.isUppercase ? "_" + character.lowercased() : String(character)
         }
     }
 }

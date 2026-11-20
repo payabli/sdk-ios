@@ -150,6 +150,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
             telemetrySession: session.telemetry.context
         )
         super.init()
+        sessionManager.onMove = { [reports] from, to in reports.sessionStateChanged(from: from, to: to) }
     }
 
     #if canImport(DeviceCheck)
