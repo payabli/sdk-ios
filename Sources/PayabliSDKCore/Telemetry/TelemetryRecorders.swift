@@ -7,10 +7,11 @@ package struct TelemetrySessionContext: Sendable, Equatable {
     package let environment: String
 }
 
-/// The process's one installed telemetry channel, and the call every reporting site makes.
+/// The process's one installed telemetry channel, and the call every reporter outside the session makes.
 ///
-/// A reporter holds its session, never a channel, so a re-initialize releases the replaced session's channel. Records
-/// reach the channel in the order made, off the caller's path; with nothing installed, their properties are never built.
+/// A record keeps the session installed when it is made, and reaches the channel installed when it is delivered, so a
+/// re-initialize between the two moves it to the new channel. Records reach a channel in the order made, off the
+/// caller's path; with nothing installed, a properties argument is never evaluated.
 package enum TelemetryRecorders {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var installed: TelemetryClient?
@@ -83,12 +84,14 @@ package enum TelemetryRecorders {
         waitsForBatch: Bool,
         session: TelemetrySessionContext?
     ) {
-        guard let client = lock.withLock({ installed }) else { return }
+        guard let recordedOn = lock.withLock({ installed }) else { return }
         let properties = properties()
+        let session = session ?? recordedOn.context
         lock.withLock {
             let previous = tail
             tail = Task {
                 await previous?.value
+                let client = lock.withLock { installed } ?? recordedOn
                 await client.emit(
                     name,
                     properties: properties,

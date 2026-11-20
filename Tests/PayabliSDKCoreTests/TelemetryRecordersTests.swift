@@ -74,6 +74,33 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(events.map(\.event), [], "a record for another entry point is never delivered on this channel")
     }
 
+    func testARecordDeliveredAfterTwoReinstallsLeavesOnTheLatestChannelUnderTheSessionItWasMadeUnder() async {
+        let gate = BlockingDeviceId()
+        let first = TelemetryClient(
+            configuration: .init(entry: "e", environment: "sandbox"),
+            transport: InMemoryTelemetryTransport(),
+            sleep: ManualTelemetryClock().sleep,
+            lifecycle: ManualAppLifecycle(),
+            deviceId: gate.read,
+            queued: []
+        )
+        let latest = InMemoryTelemetryTransport()
+        let latestClient = Self.client(entry: "e", transport: latest)
+        TelemetryRecorders.install(first)
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        XCTAssertTrue(gate.waitUntilReading(), "the failure's send never started")
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
+        TelemetryRecorders.record(TelemetryEventName.ttpAttestationStarted)
+
+        TelemetryRecorders.install(Self.client(entry: "e", transport: InMemoryTelemetryTransport()))
+        TelemetryRecorders.install(latestClient)
+        gate.release()
+
+        let events = await sent(latest)
+        XCTAssertEqual(events.last?.event, TelemetryEventName.ttpAttestationStarted, "\(events.map(\.event))")
+        XCTAssertEqual(Set(events.map(\.sessionId)), [first.sessionId])
+    }
+
     func testRecordsFromTwoCallersArriveInTheOrderTheyWereMade() async {
         let transport = InMemoryTelemetryTransport()
         let client = Self.client(entry: "e", transport: transport)
@@ -129,5 +156,32 @@ private final class PropertyBuilds: @unchecked Sendable {
     func next() -> [String: String] {
         lock.withLock { count += 1 }
         return [:]
+    }
+}
+
+/// A device id read that blocks its client's actor until released, so a delivery to that client waits behind it.
+private final class BlockingDeviceId: @unchecked Sendable {
+    private let reading = DispatchSemaphore(value: 0)
+    private let released = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var open = false
+
+    var read: @Sendable () -> String? {
+        { [self] in
+            reading.signal()
+            if !lock.withLock({ open }) {
+                _ = released.wait(timeout: .now() + 5)
+            }
+            return nil
+        }
+    }
+
+    func waitUntilReading() -> Bool {
+        reading.wait(timeout: .now() + 5) == .success
+    }
+
+    func release() {
+        lock.withLock { open = true }
+        released.signal()
     }
 }

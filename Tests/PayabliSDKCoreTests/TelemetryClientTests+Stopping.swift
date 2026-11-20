@@ -149,20 +149,25 @@ extension TelemetryClientTests {
         XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
     }
 
-    func testARecordReachingAClientTwoHandOversBackLeavesOnTheLatestWithNothingElseHoldingTheMiddleOne() async {
+    func testRecordsForASessionOnAnotherEntryPointAreDroppedTogether() async {
+        let client = makeClient(batchSize: 100)
+        let foreign = TelemetrySessionContext(sessionId: "other", entry: "elsewhere", environment: client.context.environment)
+
+        await client.emit([(TelemetryEventName.formPresented, ["step": "pair"])], session: foreign)
+
+        let queued = await client.bufferedCount
+        XCTAssertEqual(queued, 0, "a channel cannot deliver another entry point's records")
+    }
+
+    func testAHandedOverClientDoesNotKeepItsSuccessorAlive() async {
         let first = makeClient(batchSize: 100)
-        var middle: TelemetryClient? = makeClient(batchSize: 100, predecessor: first)
-        await middle?.settled()
-        let latest = makeClient(batchSize: 100, predecessor: middle)
-        await latest.settled()
-        middle = nil
+        var successor: TelemetryClient? = makeClient(batchSize: 100, predecessor: first)
+        await successor?.settled()
+        weak let released = successor
 
-        await record(first, "late")
-        await latest.flush()
+        successor = nil
 
-        let events = await transport.batches.flatMap { $0 }
-        XCTAssertEqual(events.map(\.label), ["late"])
-        XCTAssertEqual(Set(events.map(\.sessionId)), [first.sessionId])
+        XCTAssertNil(released, "only the installed session holds a successor")
     }
 
     func testDiscardingDropsWhatIsQueuedAndLogsTheCount() async {

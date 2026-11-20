@@ -5,8 +5,9 @@ import PayabliSDKTestUtils
 
 @available(iOS 16.7, *)
 extension PayabliTTP {
-    /// A facade on a session of its own, outside the installed one, so a test needs no reset. It installs that
-    /// session's channel in the process recorder, in memory unless a test passes its own transport.
+    /// A facade on a session of its own, outside the installed one, so a test needs no session reset. It installs that
+    /// session's channel in the process recorder, in memory unless a test passes its own transport, and the channel
+    /// stays installed until the next install or clear; a test passing a transport that reaches a stub clears it.
     /// The session reads as live unless a test says otherwise, since it was never installed.
     convenience init(
         config: PayabliConfig,

@@ -10,6 +10,7 @@ import XCTest
 final class SessionTokenRenewalWireTests: XCTestCase {
     override func tearDown() {
         StubURLProtocol.handler = nil
+        TelemetryRecorders.clear()
         super.tearDown()
     }
 
