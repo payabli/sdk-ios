@@ -264,6 +264,33 @@ final class CloseCapturedChargeTests: XCTestCase {
         XCTAssertEqual(Self.wire.updates.map(\.path), [CloseWire.path(Self.opened), CloseWire.path(Self.notHeld)])
     }
 
+    /// Each close is held at its own token, so the first can end while the second still runs.
+    func testAChargeIsRefusedUntilTheLastOfTwoClosesOnItsEntryPointEnds() async throws {
+        let (charging, provider) = try await makeReadyTerminal()
+        let firstTokens = TokenRequests(held: true)
+        let secondTokens = TokenRequests(held: true)
+        let first = try makeTerminal(tokens: firstTokens)
+        let second = try makeTerminal(tokens: secondTokens)
+
+        let firstClosing = Task { try await first.closeCapturedCharge(paymentTransId: Self.notHeld) }
+        let secondClosing = Task { try await second.closeCapturedCharge(paymentTransId: Self.notHeld) }
+        await firstTokens.waitUntilAsked()
+        await secondTokens.waitUntilAsked()
+        firstTokens.release()
+        try await firstClosing.value
+
+        let refusal = await Self.failure { _ = try await charging.charge(paymentDetails: Self.sale) }
+        XCTAssertEqual(refusal?.type, .terminalNotReady, "a charge was admitted while a close still ran")
+        XCTAssertEqual(Self.wire.openings, 0, "the refused charge opened a payment")
+        XCTAssertEqual(provider.startReadingCalls, 0)
+
+        secondTokens.release()
+        try await secondClosing.value
+        _ = try await charging.charge(paymentDetails: Self.sale)
+
+        XCTAssertEqual(Self.wire.openings, 1, "the charge after the last close was not admitted")
+    }
+
     /// The retry's key is being sent by the running charge, whether or not a close waits behind it.
     func testARetryWhoseKeyIsBeingSentIsRefusedOpenWhileACloseWaitsBehindTheCharge() async throws {
         let (charging, provider) = try await makeReadyTerminal()
