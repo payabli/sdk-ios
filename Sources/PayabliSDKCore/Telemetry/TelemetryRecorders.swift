@@ -109,6 +109,8 @@ package enum TelemetryRecorders {
         await client?.flush()
     }
 
+    /// Takes the record's place in the delivery order as it reads the installed channel, before its properties are
+    /// built, so a channel retired meanwhile waits for it.
     private static func deliver(
         _ name: String,
         properties: () -> [String: String],
@@ -116,23 +118,29 @@ package enum TelemetryRecorders {
         waitsForBatch: Bool,
         session: TelemetrySessionContext?
     ) {
-        guard let recordedOn = lock.withLock({ installed }) else { return }
-        let properties = properties()
-        let session = session ?? recordedOn.context
-        lock.withLock {
+        var built: AsyncStream<[String: String]>.Continuation?
+        let stream = AsyncStream<[String: String]>(bufferingPolicy: .bufferingNewest(1)) { built = $0 }
+        let reserved: Bool = lock.withLock {
+            guard let recordedOn = installed else { return false }
             let previous = tail
             tail = Task {
                 await previous?.value
+                var reading = stream.makeAsyncIterator()
+                guard let properties = await reading.next() else { return }
                 let client = lock.withLock { installed } ?? recordedOn
                 await client.emit(
                     name,
                     properties: properties,
                     occurredAt: occurredAt,
                     waitsForBatch: waitsForBatch,
-                    session: session
+                    session: session ?? recordedOn.context
                 )
             }
+            return true
         }
+        guard reserved else { return }
+        built?.yield(properties())
+        built?.finish()
     }
 }
 

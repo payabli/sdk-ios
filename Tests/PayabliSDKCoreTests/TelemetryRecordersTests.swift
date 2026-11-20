@@ -225,6 +225,35 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(onLatest.map(\.sessionId), [second.sessionId, latest.sessionId])
     }
 
+    func testAChannelClearedWhileARecordBuildsItsPropertiesIsUnreachableOnlyOnceThatRecordArrives() async throws {
+        let transport = InMemoryTelemetryTransport()
+        let client = Self.client(entry: "e", transport: transport)
+        TelemetryRecorders.install(client)
+        let builder = BlockingBuilder()
+        let recording = Task.detached {
+            TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted, properties: builder.build())
+        }
+        let building = await builder.waitUntilBuilding()
+        XCTAssertTrue(building, "the properties were never built")
+        TelemetryRecorders.clear()
+        let retired = Retired()
+        let waiting = Task {
+            await TelemetryRecorders.unreachable(client)
+            await retired.mark()
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        let whileBuilding = await retired.value
+
+        builder.release()
+        await recording.value
+        await waiting.value
+
+        XCTAssertFalse(whileBuilding, "a record made while it was installed was still being built")
+        await client.flush()
+        let events = await transport.drainBatches().flatMap { $0 }
+        XCTAssertEqual(events.map(\.event), [TelemetryEventName.ttpInitializeStarted])
+    }
+
     func testRecordsFromTwoCallersArriveInTheOrderTheyWereMade() async {
         let transport = InMemoryTelemetryTransport()
         let client = Self.client(entry: "e", transport: transport)
@@ -323,5 +352,33 @@ private actor Retired {
 
     func mark() {
         value = true
+    }
+}
+
+/// A properties builder that blocks until released, so a record stays between reading the channel and being queued.
+private final class BlockingBuilder: @unchecked Sendable {
+    private let released = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var started = false
+
+    func build() -> [String: String] {
+        lock.withLock { started = true }
+        _ = released.wait(timeout: .now() + 5)
+        return ["outcome": "started"]
+    }
+
+    /// - Returns: whether the builder began within five seconds.
+    func waitUntilBuilding() async -> Bool {
+        for _ in 0 ..< 500 {
+            if lock.withLock({ started }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+
+    func release() {
+        released.signal()
     }
 }
