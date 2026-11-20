@@ -168,6 +168,23 @@ final class HeldPaymentCloseTests: XCTestCase {
         XCTAssertEqual(failure?.capture, .unknown)
     }
 
+    func testAPaymentHeldInOneEnvironmentIsNeitherReportedNorClosedByAnother() async throws {
+        let (terminal, _) = try await makeReadyTerminal()
+        try await leaveHeld(on: terminal, read: .approved)
+        let (production, _) = try await makeReadyTerminal(environment: .production)
+
+        let unheld = await Self.failure { try await production.closeCapturedCharge(paymentTransId: Self.opened) }
+        Self.wire.script(updates: [200])
+        try await production.closeCapturedCharge(paymentTransId: Self.opened)
+        let keyOutlivedTheClose = keyIsHeld()
+        Self.wire.script(updates: [500])
+        let held = await Self.failure { try await terminal.closeCapturedCharge(paymentTransId: Self.opened) }
+
+        XCTAssertEqual(unheld?.capture, .unknown, "another environment's terminal reported the held capture")
+        XCTAssertTrue(keyOutlivedTheClose, "a close in another environment settled the held payment's key")
+        XCTAssertEqual(held?.capture, .charged, "a close in another environment dropped the held payment")
+    }
+
     func testTheNextOpeningOnTheEntryPointDropsTheHeldPayment() async throws {
         let (terminal, provider) = try await makeReadyTerminal()
         try await leaveHeld(on: terminal, read: .approved)
@@ -231,10 +248,13 @@ final class HeldPaymentCloseTests: XCTestCase {
         CardReadResult(provider: "mock", encryptedPayload: Data(), outcome: outcome)
     }
 
-    private func makeReadyTerminal(entryPoint: String = "e") async throws -> (PayabliTTP, MockTapToPayProvider) {
+    private func makeReadyTerminal(
+        entryPoint: String = "e",
+        environment: PayabliEnvironment = .sandbox
+    ) async throws -> (PayabliTTP, MockTapToPayProvider) {
         let provider = MockTapToPayProvider()
         provider.readingResult = .success(Self.read(.approved))
-        let config = try PayabliConfig(entryPoint: entryPoint, environment: .sandbox, tokenProvider: { "token" })
+        let config = try PayabliConfig(entryPoint: entryPoint, environment: environment, tokenProvider: { "token" })
         let terminal = PayabliTTP(
             config: config,
             provider: provider,
