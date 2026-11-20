@@ -234,7 +234,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         attestation.attestFailuresFirst = [PinnedTokenRefusal()]
 
         try await ttp.initialize()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let events = await telemetry.batches.flatMap { $0 }
@@ -256,7 +256,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         attestation.attestFailuresFirst = [PinnedTokenRefusal(), PinnedTokenRefusal()]
 
         _ = await failure { try await ttp.initialize() }
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let names = await telemetry.batches.flatMap { $0 }.map(\.event)

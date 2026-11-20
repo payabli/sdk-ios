@@ -15,7 +15,8 @@ final class TelemetryClientTests: XCTestCase {
         deviceId: String? = nil,
         queued: [(name: String, properties: [String: String])] = [],
         logger: PayabliLogger = PayabliLogger(category: .telemetry, sink: RecordingLogSink()),
-        predecessor: TelemetryClient? = nil
+        predecessor: TelemetryClient? = nil,
+        predecessorUnreachable: @escaping @Sendable (TelemetryClient) async -> Void = { _ in }
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -32,7 +33,8 @@ final class TelemetryClientTests: XCTestCase {
             deviceId: { deviceId },
             queued: queued,
             logger: logger,
-            predecessor: predecessor
+            predecessor: predecessor,
+            predecessorUnreachable: predecessorUnreachable
         )
     }
 
