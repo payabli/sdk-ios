@@ -197,12 +197,11 @@ final class DeviceRouteClient: Sendable {
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
            [400, 403, 404].contains(response.statusCode)
-           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
+           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason),
+           let decline = makeDeclineError(code ?? response.statusCode, reason)
         {
-            if let decline = makeDeclineError(code ?? response.statusCode, reason) {
-                logger.error("[\(route.rawValue)] refused (code=\(code.map(String.init) ?? "nil"))")
-                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
-            }
+            logger.error("[\(route.rawValue)] refused (code=\(code.map(String.init) ?? "nil"))")
+            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
