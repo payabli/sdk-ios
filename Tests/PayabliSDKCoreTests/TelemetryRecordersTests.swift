@@ -101,6 +101,34 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(Set(events.map(\.sessionId)), [first.sessionId])
     }
 
+    func testAFlushWaitingOnADeliveryWhileAChannelIsInstalledSendsOnTheNewChannel() async throws {
+        let gate = BlockingDeviceId()
+        let first = TelemetryClient(
+            configuration: .init(entry: "e", environment: "sandbox"),
+            transport: InMemoryTelemetryTransport(),
+            sleep: ManualTelemetryClock().sleep,
+            lifecycle: ManualAppLifecycle(),
+            deviceId: gate.read,
+            queued: []
+        )
+        let next = InMemoryTelemetryTransport()
+        TelemetryRecorders.install(first)
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        let reading = await gate.waitUntilReading()
+        XCTAssertTrue(reading, "the failure's send never started")
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
+        TelemetryRecorders.record(TelemetryEventName.ttpAttestationStarted)
+        let flushing = Task { await TelemetryRecorders.flush() }
+        try await Task.sleep(for: .milliseconds(100))
+
+        TelemetryRecorders.install(Self.client(entry: "e", transport: next))
+        gate.release()
+        await flushing.value
+
+        let events = await next.drainBatches().flatMap { $0 }
+        XCTAssertEqual(events.last?.event, TelemetryEventName.ttpAttestationStarted, "\(events.map(\.event))")
+    }
+
     func testRecordsFromTwoCallersArriveInTheOrderTheyWereMade() async {
         let transport = InMemoryTelemetryTransport()
         let client = Self.client(entry: "e", transport: transport)

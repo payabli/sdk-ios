@@ -64,15 +64,17 @@ package enum TelemetryRecorders {
     /// Waits until every record made so far has reached its channel, and every send the installed channel started has
     /// ended.
     package static func settled() async {
-        let (pending, client) = lock.withLock { (tail, installed) }
+        let pending = lock.withLock { tail }
         await pending?.value
+        let client = lock.withLock { installed }
         await client?.settled()
     }
 
     /// Sends what the installed channel holds, once every record made so far has reached it.
     package static func flush() async {
-        let (pending, client) = lock.withLock { (tail, installed) }
+        let pending = lock.withLock { tail }
         await pending?.value
+        let client = lock.withLock { installed }
         await client?.flush()
     }
 

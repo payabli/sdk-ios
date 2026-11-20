@@ -256,6 +256,12 @@ final class TapToPayReportsTests: XCTestCase {
         let answerConfig = Self.configHandler(status: 200)
         StubURLProtocol.handler = { request in
             guard second.value == nil else { return try answerConfig(request) }
+            let delivered = DispatchSemaphore(value: 0)
+            Task {
+                await TelemetryRecorders.settled()
+                delivered.signal()
+            }
+            _ = delivered.wait(timeout: .now() + 5)
             PayabliSession.resetForTesting()
             second.value = try PayabliSession.install(
                 config: PayabliConfig(entryPoint: entryPoint, environment: .sandbox, tokenProvider: { "seed_token" }),
