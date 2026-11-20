@@ -197,7 +197,12 @@ final class RetiredTerminalTests: XCTestCase {
             urlSession: StubURLProtocol.makeSession(),
             telemetryTransport: InMemoryTelemetryTransport()
         )
-        let terminal = PayabliTTP(session: first, provider: MockTapToPayProvider(), attestation: MockDeviceAttestationService())
+        let terminal = PayabliTTP(
+            session: first,
+            provider: MockTapToPayProvider(),
+            attestation: MockDeviceAttestationService(),
+            heldPayments: HeldPayments()
+        )
         XCTAssertTrue(terminal.isLive())
 
         _ = try? await first.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
