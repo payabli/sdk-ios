@@ -10,6 +10,7 @@ import XCTest
 final class SessionTokenRenewalWireTests: XCTestCase {
     override func tearDown() {
         StubURLProtocol.handler = nil
+        TelemetryRecorders.clear()
         super.tearDown()
     }
 
@@ -79,27 +80,47 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         try await assertRefusedAgainLeavesTheSessionUsable(at: "register")
     }
 
-    /// The held refusal can be the event that fills a batch, which sends it at once. It is held until the renewal has
-    /// run, so that send carries the renewed token and not the one being replaced.
-    func testARenewableRefusalThatFillsTheBatchLeavesUnderTheRenewedToken() async throws {
+    /// The refused route's failures are sent at once, so a batch can leave before the renewal and be refused with it.
+    func testARefusedTokensFailuresLeaveUnderTheRenewedTokenWithNothingLeftQueued() async throws {
         let wire = Wire(refusing: "attest")
         StubURLProtocol.handler = wire.handle
-        let renewal = RenewalGate()
-        let (ttp, _) = try makeTTP(renewal: renewal)
-        // Three short of a batch with the session's own start: the setup's start, the attempt and its refusal make twenty.
-        for _ in 0 ..< 16 {
-            await ttp.session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
-        }
+        let (ttp, tokens) = try makeTTP()
 
-        let setup = Task { try await ttp.initialize() }
-        await renewal.waitUntilAsked()
-        await ttp.reports.sent()
-        XCTAssertEqual(wire.bearers(for: "telemetry"), [], "a batch was sent while the token was being replaced")
-        renewal.release()
-        try await setup.value
-        await ttp.reports.sent()
+        try await ttp.initialize()
+        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.flush()
 
-        XCTAssertEqual(wire.bearers(for: "telemetry").first, "renewed-2")
+        XCTAssertEqual(wire.bearers(for: "telemetry").last, "renewed-2")
+        let left = await ttp.session.telemetry.bufferedCount
+        XCTAssertEqual(left, 0)
+        XCTAssertEqual(tokens.count, 2, "one renewal")
+    }
+
+    /// The renewal waits until a batch on the refused token has been refused, so that batch goes back to the queue and
+    /// both failures leave on the renewed token.
+    func testABatchRefusedOnTheRefusedTokenLeavesWithBothFailuresUnderTheRenewedToken() async throws {
+        let wire = Wire(refusing: "attest", refusesTelemetryOn: "seed")
+        StubURLProtocol.handler = wire.handle
+        let (ttp, tokens) = try makeTTP(beforeRenewal: { await wire.waitForRefusedTelemetry() })
+
+        try await ttp.initialize()
+        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.flush()
+
+        XCTAssertTrue(wire.refusedTelemetry, "no batch was sent on the refused token before the renewal")
+        let delivered = wire.deliveredEvents(under: "renewed-2")
+        XCTAssertTrue(
+            delivered.contains { $0.event == TelemetryEventName.ttpDeviceAttestCompleted && $0.outcome == "failed" },
+            "the route's failure was lost: \(delivered)"
+        )
+        XCTAssertTrue(
+            delivered.contains { $0.event == TelemetryEventName.ttpAttestationFailed },
+            "the attestation's failure was lost: \(delivered)"
+        )
+        XCTAssertTrue(wire.deliveredEvents(under: "seed").isEmpty)
+        let left = await ttp.session.telemetry.bufferedCount
+        XCTAssertEqual(left, 0)
+        XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
     // MARK: - Fixtures
@@ -128,21 +149,28 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         _ = try await ttp.session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
         XCTAssertEqual(wire.bearers(for: "/api/v2/ping"), ["renewed-2"], "the session refused a later call", file: file, line: line)
         // The failure's report is sent after the throw, and would otherwise reach the next test's stub.
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
     }
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP(renewal: RenewalGate? = nil) throws -> (PayabliTTP, Tokens) {
+    ///
+    /// - Parameter beforeRenewal: awaited inside every provider call after the first, before it returns.
+    private func makeTTP(beforeRenewal: (@Sendable () async -> Void)? = nil) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
-            if call > 1 {
-                await renewal?.ask()
-            }
-            return call == 1 ? "seed" : "renewed-\(call)"
+            guard call > 1 else { return "seed" }
+            await beforeRenewal?()
+            return "renewed-\(call)"
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
+        TelemetryRecorders.install(session.telemetry)
+        addTeardownBlock {
+            await TelemetryRecorders.settled()
+            TelemetryRecorders.clear()
+            await session.telemetry.discard()
+        }
         let attestation = AppAttestService(
             transport: session.transport,
             attestor: MockAppAttestor(),
@@ -181,64 +209,45 @@ private final class Tokens: @unchecked Sendable {
     }
 }
 
-/// Holds the provider's renewal open until the test releases it, and says when it has been asked.
-private final class RenewalGate: @unchecked Sendable {
-    private let lock = NSLock()
-    private var asked = false
-    private var released = false
-    private var waiting: CheckedContinuation<Void, Never>?
-
-    func ask() async {
-        await withCheckedContinuation { continuation in
-            let resumeNow: Bool = lock.withLock {
-                asked = true
-                if released {
-                    return true
-                }
-                waiting = continuation
-                return false
-            }
-            if resumeNow {
-                continuation.resume()
-            }
-        }
-    }
-
-    func release() {
-        let continuation: CheckedContinuation<Void, Never>? = lock.withLock {
-            released = true
-            defer { waiting = nil }
-            return waiting
-        }
-        continuation?.resume()
-    }
-
-    /// Polled under a ceiling, so a renewal that never starts fails the test rather than hanging the suite.
-    func waitUntilAsked(file: StaticString = #filePath, line: UInt = #line) async {
-        for _ in 0 ..< 300 {
-            if lock.withLock({ asked }) {
-                return
-            }
-            try? await Task.sleep(nanoseconds: 10_000_000)
-        }
-        release()
-        XCTFail("the renewal was never asked for", file: file, line: line)
-    }
-}
-
 /// Every device route answering as the service does, with one route refusing its first `times` requests with a bare
 /// 401. A request outside the device routes is recorded under its path and answered with success.
 private final class Wire: @unchecked Sendable {
+    struct DeliveredEvent: Equatable {
+        let event: String
+        let outcome: String?
+    }
+
     private let lock = NSLock()
     private let refused: String
     private let registersPending: Bool
+    private let telemetryRefusedOn: String?
     private var refusalsLeft: Int
     private var seen: [String: [String]] = [:]
+    private var delivered: [String: [DeliveredEvent]] = [:]
+    private var telemetryRefusals = 0
 
-    init(refusing route: String, times: Int = 1, registersPending: Bool = false) {
+    /// - Parameter telemetryRefusedOn: a bearer every telemetry batch carrying it is refused with a bare 401.
+    init(refusing route: String, times: Int = 1, registersPending: Bool = false, refusesTelemetryOn: String? = nil) {
         refused = route
         refusalsLeft = times
         self.registersPending = registersPending
+        telemetryRefusedOn = refusesTelemetryOn
+    }
+
+    var refusedTelemetry: Bool {
+        lock.withLock { telemetryRefusals > 0 }
+    }
+
+    /// The events of every telemetry batch answered with success under `bearer`, in the order they arrived.
+    func deliveredEvents(under bearer: String) -> [DeliveredEvent] {
+        lock.withLock { delivered[bearer] ?? [] }
+    }
+
+    /// Returns once a telemetry batch has been refused, or after five seconds.
+    func waitForRefusedTelemetry() async {
+        for _ in 0 ..< 500 where !refusedTelemetry {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
     }
 
     /// The bearer each request to `route` carried, in order.
@@ -255,6 +264,14 @@ private final class Wire: @unchecked Sendable {
         let bearer = request.value(forHTTPHeaderField: "Authorization")?.replacingOccurrences(of: "Bearer ", with: "")
         let refuses: Bool = lock.withLock {
             seen[route, default: []].append(bearer ?? "")
+            if route == "telemetry" {
+                guard bearer != telemetryRefusedOn else {
+                    telemetryRefusals += 1
+                    return true
+                }
+                delivered[bearer ?? "", default: []] += Self.events(in: request)
+                return false
+            }
             guard route == refused, refusalsLeft > 0 else { return false }
             refusalsLeft -= 1
             return true
@@ -271,6 +288,18 @@ private final class Wire: @unchecked Sendable {
             return AttestFixture.ok(request, ["credentials": ["secretKey": "s", "apiKey": "a", "merchantId": "m", "terminalId": "t"]])
         default:
             return AttestFixture.ok(request, ["ok": true])
+        }
+    }
+
+    private static func events(in request: URLRequest) -> [DeliveredEvent] {
+        guard let body = request.httpBody,
+              let json = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let events = json["events"] as? [[String: Any]]
+        else { return [] }
+        return events.compactMap { event in
+            (event["event"] as? String).map {
+                DeliveredEvent(event: $0, outcome: (event["properties"] as? [String: String])?["outcome"])
+            }
         }
     }
 }

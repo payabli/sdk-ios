@@ -38,6 +38,8 @@ package enum TelemetryCatalog {
 
     private static let payIn: Set<TelemetryProperty> = failed.union([.origin])
 
+    private static let deviceRoute: Set<TelemetryProperty> = [.outcome, .code, .durationMs]
+
     private static let allowed: [String: Set<TelemetryProperty>] = [
         TelemetryEventName.payinCaptureCompleted: payIn.union([.method]),
         TelemetryEventName.payinAuthorizeCompleted: payIn.union([.method]),
@@ -65,6 +67,11 @@ package enum TelemetryCatalog {
         TelemetryEventName.ttpReinitializeStarted: [],
         TelemetryEventName.ttpReinitializeSucceeded: timed,
         TelemetryEventName.ttpStateChanged: [.from, .to, .reason],
+        TelemetryEventName.ttpDeviceChallengeCompleted: deviceRoute,
+        TelemetryEventName.ttpDeviceRegisterCompleted: deviceRoute,
+        TelemetryEventName.ttpDeviceAttestCompleted: deviceRoute,
+        TelemetryEventName.ttpDeviceActivateCompleted: deviceRoute,
+        TelemetryEventName.ttpDeviceConfigCompleted: deviceRoute,
         TelemetryEventName.sdkInitialized: [.state],
         TelemetryEventName.sdkInitializeStarted: [.state],
         TelemetryEventName.sdkInitializeFailed: failed.union([.reason]),

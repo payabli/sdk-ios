@@ -26,9 +26,9 @@ package extension AppAttestService {
         // The assertion's handle, so the body and the headers come from one
         // binding. Read separately they can name two devices.
         try await postAttestationRequestExpectingNoBody(
+            .activate,
             path: "/api/v2/device/taptopay/activate",
             body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
-            label: "activate",
             assertion: assertion,
             readsRefusalBeforeStatus: true,
             pinsCredential: true,

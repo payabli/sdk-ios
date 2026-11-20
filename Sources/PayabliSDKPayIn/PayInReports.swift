@@ -1,7 +1,7 @@
 import Foundation
 import PayabliSDKCore
 
-/// What the card-not-present flow reports about each operation it runs, through its session's client.
+/// What the card-not-present flow reports about each operation it runs, as belonging to the session it runs on.
 ///
 /// Reports run in order off the caller's path, each stamped with the time it is made. No instrument or payer data.
 @MainActor
@@ -30,11 +30,12 @@ final class PayInReports {
         case direct
     }
 
-    private let telemetry: TelemetryClient
-    private var tail: Task<Void, Never>?
+    private let session: TelemetrySessionContext?
 
-    init(telemetry: TelemetryClient) {
-        self.telemetry = telemetry
+    /// - Parameter session: the session the flow runs on, which every report carries; `nil` for a flow built on a
+    ///   bare transport, whose reports belong to whichever session is installed.
+    init(session: TelemetrySessionContext?) {
+        self.session = session
     }
 
     /// Reports an operation that ran, by how it ended.
@@ -71,13 +72,11 @@ final class PayInReports {
         if outcome != "refused_locally", let duration {
             properties[TelemetryProperty.durationMs.rawValue] = Self.milliseconds(duration)
         }
-        enqueue { [properties] in await $0.emit(operation.event, properties: properties, occurredAt: now) }
-    }
-
-    /// Waits until every report made so far has reached the client, and every send it started has ended.
-    func sent() async {
-        await tail?.value
-        await telemetry.settled()
+        if let session {
+            TelemetryRecorders.recordFor(session, operation.event, properties: properties, occurredAt: now)
+        } else {
+            TelemetryRecorders.record(operation.event, properties: properties, occurredAt: now)
+        }
     }
 
     /// The `method` a payment reports: a channel such as cash or a cloud device names no instrument, so reports none.
@@ -187,15 +186,6 @@ final class PayInReports {
             return redacted.simpleTypeName
         }
         return RedactedCause(error).simpleTypeName
-    }
-
-    private func enqueue(_ report: @escaping @Sendable (TelemetryClient) async -> Void) {
-        let previous = tail
-        let telemetry = telemetry
-        tail = Task {
-            await previous?.value
-            await report(telemetry)
-        }
     }
 
     private static func milliseconds(_ duration: Duration) -> String {
