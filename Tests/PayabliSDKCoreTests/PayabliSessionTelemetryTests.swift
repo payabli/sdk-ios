@@ -45,7 +45,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         XCTAssertEqual(events.first?.sessionId, session.telemetry.sessionId)
     }
 
-    func testARefusedRepeatCallReportsAStartAndAFailureOnTheLiveSession() async throws {
+    func testARefusedRepeatCallReportsOnlyItsFailureOnTheLiveSession() async throws {
         let transport = InMemoryTelemetryTransport()
         let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
 
@@ -56,12 +56,11 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         await live.telemetry.settled()
 
         let events = await transport.batches.flatMap { $0 }
-        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.started", "sdk.initialize.failed"] else {
+        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.failed"] else {
             return XCTFail("sent without a flush, because a failure leaves at once: \(events.map(\.event))")
         }
         XCTAssertTrue(events.allSatisfy { $0.sessionId == live.telemetry.sessionId && $0.entry == "demo" })
-        XCTAssertEqual(events[1].properties, ["state": "ready"])
-        let failed = events[2].properties
+        let failed = events[1].properties
         XCTAssertEqual(Set(failed.keys), ["outcome", "code", "error_number", "reason", "duration_ms"])
         XCTAssertEqual(failed["outcome"], "refused")
         XCTAssertEqual(failed["code"], "INVALID_CONFIGURATION")
@@ -93,12 +92,11 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         await live.telemetry.settled()
 
         let events = await transport.batches.flatMap { $0 }
-        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.started", "sdk.initialize.failed"] else {
+        guard events.map(\.event) == ["sdk.initialized", "sdk.initialize.failed"] else {
             return XCTFail("sent without a flush, because a failure leaves at once: \(events.map(\.event))")
         }
         XCTAssertTrue(events.allSatisfy { $0.sessionId == live.telemetry.sessionId && $0.entry == "demo" })
-        XCTAssertEqual(events[1].properties, ["state": "ready"])
-        let failed = events[2].properties
+        let failed = events[1].properties
         XCTAssertEqual(Set(failed.keys), ["outcome", "code", "error_number", "reason", "duration_ms", "failure_type"])
         XCTAssertEqual(failed["outcome"], "failed")
         XCTAssertEqual(failed["code"], "UNKNOWN")

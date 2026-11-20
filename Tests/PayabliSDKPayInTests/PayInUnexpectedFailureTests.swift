@@ -249,20 +249,16 @@ final class PayInUnexpectedFailureTests: XCTestCase {
             queued: []
         )
         self.telemetry = telemetry
-        return PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport,
-            telemetry: telemetry
-        )
+        TelemetryRecorders.install(telemetry)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        return PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
     }
 
     /// The one event the flow reported; fails unless there is exactly one.
     private func onlyEvent(of flow: PayabliPayIn, file: StaticString = #filePath, line: UInt = #line) async throws
         -> TelemetryEvent
     {
-        let reports = try XCTUnwrap(flow.reports, file: file, line: line)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await telemetry?.flush()
         let events = await recorder.batches.flatMap { $0 }
         XCTAssertEqual(events.count, 1, "\(events.map(\.event))", file: file, line: line)

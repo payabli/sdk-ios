@@ -30,6 +30,7 @@ enum AttestFixture {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: .none,
             session: urlSession
         )

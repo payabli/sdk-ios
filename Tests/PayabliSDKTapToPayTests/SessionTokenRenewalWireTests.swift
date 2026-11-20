@@ -10,6 +10,7 @@ import XCTest
 final class SessionTokenRenewalWireTests: XCTestCase {
     override func tearDown() {
         StubURLProtocol.handler = nil
+        TelemetryRecorders.clear()
         super.tearDown()
     }
 
@@ -93,11 +94,11 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
         let setup = Task { try await ttp.initialize() }
         await renewal.waitUntilAsked()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         XCTAssertEqual(wire.bearers(for: "telemetry"), [], "a batch was sent while the token was being replaced")
         renewal.release()
         try await setup.value
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
 
         XCTAssertEqual(wire.bearers(for: "telemetry").first, "renewed-2")
     }
@@ -128,7 +129,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         _ = try await ttp.session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
         XCTAssertEqual(wire.bearers(for: "/api/v2/ping"), ["renewed-2"], "the session refused a later call", file: file, line: line)
         // The failure's report is sent after the throw, and would otherwise reach the next test's stub.
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
     }
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
@@ -143,6 +144,12 @@ final class SessionTokenRenewalWireTests: XCTestCase {
             return call == 1 ? "seed" : "renewed-\(call)"
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
+        TelemetryRecorders.install(session.telemetry)
+        addTeardownBlock {
+            await TelemetryRecorders.settled()
+            TelemetryRecorders.clear()
+            await session.telemetry.discard()
+        }
         let attestation = AppAttestService(
             transport: session.transport,
             attestor: MockAppAttestor(),

@@ -141,7 +141,7 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.retryPolicy = retryPolicy
 
         self.session = session
-        self.reports = TapToPayReports(telemetry: session.telemetry)
+        self.reports = TapToPayReports(session: session.telemetry.context)
         self.transactionClient = TTPTransactionClient(transport: session.transport, retryPolicy: retryPolicy)
         self.chargeKeys = chargeKeys
         self.configClient = TTPConfigClient(

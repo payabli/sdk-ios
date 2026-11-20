@@ -31,7 +31,7 @@ package extension AppAttestService {
             label: "activate",
             assertion: assertion,
             readsRefusalBeforeStatus: true,
-            pinsCredential: true,
+            isCredentialPinned: true,
             makeDeclineError: { code, reason in
                 // The service holds no attestation for this key, so the binding names a key that buys nothing. Drop
                 // it and let the next `initialize()` enrol. Any other 401 goes to the table and keeps it.

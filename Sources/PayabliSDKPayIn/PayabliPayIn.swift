@@ -47,8 +47,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     private var activeSubmissionCount = 0
     private let heldKeys = PayInKeyStore.process
     private let logger = PayabliLogger(category: .tokenization)
-    /// Nil on a flow built on a bare transport without a telemetry client.
-    private(set) var reports: PayInReports?
+    private(set) var reports: PayInReports
 
     /// Builds the flow on a session, which carries the credential and the transport that sends it.
     ///
@@ -63,7 +62,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         injectedTransport = nil
         client = PayInPaymentFlowClient(transport: session.transport)
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: session.transport)
-        reports = PayInReports(telemetry: session.telemetry)
+        reports = PayInReports(session: session.telemetry.context)
         super.init()
     }
 
@@ -75,12 +74,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// - Parameter entryPoint: the paypoint's entry point, as the requests carry it.
     /// - Parameter environment: the environment the requests go to, whose base URL builds the routes.
     /// - Parameter transport: the transport that sends every request, used whole.
-    /// - Parameter telemetry: where the flow reports its operations, nil to report nothing.
     init(
         entryPoint: String,
         environment: PayabliEnvironment,
-        transport: any PayabliTransport,
-        telemetry: TelemetryClient? = nil
+        transport: any PayabliTransport
     ) {
         self.entryPoint = entryPoint
         self.environment = environment
@@ -88,7 +85,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         injectedTransport = transport
         client = PayInPaymentFlowClient(transport: transport)
         tokenStorageClient = PayInPaymentFlowTokenStorageClient(transport: transport)
-        reports = telemetry.map(PayInReports.init(telemetry:))
+        reports = PayInReports(session: nil)
         super.init()
     }
 
@@ -110,7 +107,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
             entryPoint = config.entryPoint
             environment = config.environment
             session = installed
-            reports = PayInReports(telemetry: installed.telemetry)
+            reports = PayInReports(session: installed.telemetry.context)
             transport = installed.transport
         } else {
             transport = RefusedTransport(refusal: PayabliGenericError(
@@ -187,7 +184,7 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         method: PayabliPayInMethodType,
         operation: PayabliPayInOperation.Kind
     ) {
-        reports?.completed(
+        reports.completed(
             PayInReports.operation(of: operation),
             origin: .form,
             method: PayInReports.method(of: method),
@@ -385,10 +382,10 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         let refusal = PayInLocalRefusal()
         do {
             let value = try await PayInLocalRefusal.$current.withValue(refusal) { try await body() }
-            reports?.completed(operation, origin: origin, method: method, after: now() - startedAt, error: nil)
+            reports.completed(operation, origin: origin, method: method, after: now() - startedAt, error: nil)
             return value
         } catch {
-            reports?.completed(
+            reports.completed(
                 operation,
                 origin: origin,
                 method: method,

@@ -5,9 +5,9 @@ import PayabliSDKTestUtils
 
 @available(iOS 16.7, *)
 extension PayabliTTP {
-    /// A facade on a session of its own, outside the installed one, so a test needs no reset. Telemetry goes to
-    /// memory unless a test passes its own, so no report reaches the stubbed network a test is counting. The session
-    /// reads as live unless a test says otherwise, since it was never installed.
+    /// A facade on a session of its own, outside the installed one, so a test needs no session reset. Its channel stays
+    /// installed in the process recorder until the next install or clear, so a test whose transport reaches a stub
+    /// clears it. The session reads as live unless a test says otherwise, since it was never installed.
     convenience init(
         config: PayabliConfig,
         provider: TapToPayProvider,
@@ -18,8 +18,10 @@ extension PayabliTTP {
         isLive: @escaping @Sendable () -> Bool = { true },
         chargeKeys: ChargeKeyStore = ChargeKeyStore()
     ) {
+        let payabliSession = PayabliSession(config: config, urlSession: session, telemetryTransport: telemetry)
+        TelemetryRecorders.install(payabliSession.telemetry)
         self.init(
-            session: PayabliSession(config: config, urlSession: session, telemetryTransport: telemetry),
+            session: payabliSession,
             provider: provider,
             attestation: attestation,
             retryPolicy: retryPolicy,

@@ -21,6 +21,7 @@ final class ClientHeaderWireTests: XCTestCase {
         let service = PayabliService.makeWithChain(
             environment: .sandbox,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: facts,
             session: StubURLProtocol.makeSession(),
             logger: logger

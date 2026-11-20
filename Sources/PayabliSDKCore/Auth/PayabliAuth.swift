@@ -14,6 +14,7 @@ actor PayabliAuth {
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
     private var pinnedRefusal: String?
+    private var reentryRefusal: (mintID: UUID, error: PayabliGenericError)?
 
     /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`
     /// so a test can race the deadline deterministically instead of waiting thirty real seconds —
@@ -72,11 +73,7 @@ actor PayabliAuth {
             // path there is no held token to answer it with. Refusing names the cycle; joining would
             // await the call this caller is inside.
             logger.error("The token provider requested a token before returning its first one")
-            throw PayabliGenericError(
-                type: .tokenProviderFailed,
-                reason: "Access token unavailable",
-                detail: "The tokenProvider made a request that needs the token it was asked to supply."
-            )
+            throw refuseReentry(into: mintID)
         }
 
         if let failure = terminalFailure {
@@ -113,11 +110,12 @@ actor PayabliAuth {
         finished.failure = failure
     }
 
-    /// The token held right now, without minting one.
+    /// The token held now, without calling the provider.
     ///
-    /// - Returns: the token held right now, or `nil` when none is held.
+    /// - Returns: the token held, or `nil` when none is held, a mint is in flight, or this holder is finished.
     func heldToken() -> String? {
-        currentToken
+        guard inFlightMint == nil, terminalFailure == nil else { return nil }
+        return currentToken
     }
 
     /// Reports `rejectedToken` as refused and returns the token to use instead.
@@ -130,11 +128,7 @@ actor PayabliAuth {
         if let mintID = inFlightMintID, RefreshInProgress.carries(self, refresh: mintID) {
             guard let held = currentToken else {
                 logger.error("The token provider requested a token before returning its first one")
-                throw PayabliGenericError(
-                    type: .tokenProviderFailed,
-                    reason: "Access token unavailable",
-                    detail: "The tokenProvider made a request that needs the token it was asked to supply."
-                )
+                throw refuseReentry(into: mintID)
             }
             return held
         }
@@ -191,23 +185,25 @@ actor PayabliAuth {
         let clock = self.clock
         let task = Task<String, Error> { [logger] in
             logger.info("Requesting an access token from the partner tokenProvider")
+            let startedAt = ContinuousClock.now
             let minted: String
             do {
                 minted = try await Self.racedMint(holder: self, mintID: mintID, provider: provider, clock: clock)
             } catch is ProviderTimedOut {
-                // Named apart from every other provider throw below: a caller can tell a slow broker
-                // from a rejected credential or a thrown error, which is the whole point of the bound.
                 logger.error("The token provider did not return within the deadline")
+                self.reportFailure(.timedOut, since: startedAt)
                 throw PayabliGenericError(
                     type: .tokenProviderFailed,
                     reason: "Token request failed",
                     detail: "The tokenProvider did not return within \(Int(Self.providerTimeout)) seconds."
                 )
             } catch {
-                // Any throw from the provider is host code, this SDK's own error type included. The detail is
-                // fixed because a host's error can carry request data; its type name still reaches a caller
-                // through `underlying` via `RedactedCause`.
                 logger.error("The token provider failed")
+                if self.raisedReentryRefusal(error, into: mintID) {
+                    self.reportFailure(.reentered, since: startedAt)
+                } else {
+                    self.reportFailure(.threw, thrown: error, since: startedAt)
+                }
                 throw PayabliGenericError(
                     type: .tokenProviderFailed,
                     reason: "Token request failed",
@@ -215,11 +211,10 @@ actor PayabliAuth {
                     underlying: RedactedCause(error)
                 )
             }
-            do {
-                try Self.check(minted, replacing: rejectedToken)
-            } catch {
+            if let refusal = Self.refusal(of: minted, replacing: rejectedToken) {
                 logger.error("The minted token was refused before it was committed")
-                throw error
+                self.reportFailure(refusal.reason, since: startedAt)
+                throw refusal.error
             }
             self.commit(minted, mintID: mintID)
             return minted
@@ -322,6 +317,9 @@ actor PayabliAuth {
     ///
     /// - Parameter mintID: the id of the mint whose mark this is; a later mint's mark is left alone.
     private func releaseMint(_ mintID: UUID) {
+        if reentryRefusal?.mintID == mintID {
+            reentryRefusal = nil
+        }
         guard inFlightMintID == mintID else { return }
         inFlightMint = nil
         inFlightMintID = nil
@@ -338,34 +336,93 @@ actor PayabliAuth {
         logger.info("Access token installed")
     }
 
-    /// Throws rather than let a minted token be committed. Every token this holder installs passes
-    /// here, so nothing downstream re-checks one.
-    /// A blank one goes out unauthenticated, and a repeat of the refused one costs a provider call per 401 with no end.
+    /// Why a minted token may not be committed, or `nil` when it may. Every token this holder installs passes here, so
+    /// nothing downstream re-checks one. A blank one goes out unauthenticated, and a repeat of the refused one costs a
+    /// provider call per 401 with no end.
     ///
     /// - Parameter fresh: the token the provider returned, refused when blank, unsafe as a header value, or a repeat of the refusal.
     /// - Parameter rejectedToken: the token a rejection named; a mint equal to it is refused rather than installed.
-    private static func check(_ fresh: String, replacing rejectedToken: String?) throws {
-        guard !fresh.isBlank else {
-            throw PayabliGenericError(
-                type: .tokenProviderFailed,
-                reason: "Token request failed",
-                detail: "The tokenProvider returned a blank token."
-            )
+    /// - Returns: the refusal's reported reason and the error a caller receives, or `nil` for a token that may be installed.
+    private static func refusal(
+        of fresh: String,
+        replacing rejectedToken: String?
+    ) -> (reason: TokenFailureReason, error: PayabliGenericError)? {
+        let refused: (TokenFailureReason, String)? = if fresh.isBlank {
+            (.blankToken, "The tokenProvider returned a blank token.")
+        } else if !fresh.isHeaderSafe {
+            (.unusableToken, "The tokenProvider returned a token that cannot be an HTTP header value.")
+        } else if fresh == rejectedToken {
+            (.unchangedToken, "The tokenProvider returned the token the server rejected.")
+        } else {
+            nil
         }
-        guard fresh.isHeaderSafe else {
-            throw PayabliGenericError(
-                type: .tokenProviderFailed,
-                reason: "Token request failed",
-                detail: "The tokenProvider returned a token that cannot be an HTTP header value."
-            )
+        guard let (reason, detail) = refused else { return nil }
+        return (reason, PayabliGenericError(type: .tokenProviderFailed, reason: "Token request failed", detail: detail))
+    }
+
+    /// Builds the refusal of a read made from inside the provider call `mintID` runs, and keeps it for that call.
+    ///
+    /// - Parameter mintID: the provider call the read came from.
+    /// - Returns: the refusal to throw.
+    private func refuseReentry(into mintID: UUID) -> PayabliGenericError {
+        let refusal = PayabliGenericError(
+            type: .tokenProviderFailed,
+            reason: "Access token unavailable",
+            detail: "The tokenProvider made a request that needs the token it was asked to supply."
+        )
+        reentryRefusal = (mintID, refusal)
+        return refusal
+    }
+
+    /// Whether the provider call `mintID` threw back the refusal this holder raised into it, rather than an error of
+    /// its own.
+    ///
+    /// - Parameter error: what the provider threw.
+    /// - Parameter mintID: the provider call that threw it.
+    /// - Returns: true only when `error` matches that refusal in every field and wraps nothing.
+    private func raisedReentryRefusal(_ error: Error, into mintID: UUID) -> Bool {
+        guard let raised = reentryRefusal, raised.mintID == mintID,
+              let thrown = error as? PayabliGenericError else { return false }
+        let refusal = raised.error
+        return thrown.underlying == nil && thrown.type == refusal.type && thrown.reason == refusal.reason
+            && thrown.detail == refusal.detail && thrown.httpStatus == refusal.httpStatus && thrown.rawCode == refusal.rawCode
+    }
+
+    /// Records `auth.tokenFailed` for the provider call this mint ran. Callers that joined the mint record nothing.
+    ///
+    /// - Parameter reason: which of the six refusals it was.
+    /// - Parameter thrown: what the provider threw, named as `failure_type`, only when `reason` is `threw`.
+    /// - Parameter startedAt: when the provider was called.
+    private nonisolated func reportFailure(_ reason: TokenFailureReason, thrown: Error? = nil, since startedAt: ContinuousClock.Instant) {
+        let (seconds, attoseconds) = (ContinuousClock.now - startedAt).components
+        // A token failure waits for its batch instead of forcing a send.
+        TelemetryRecorders.record(
+            TelemetryEventName.authTokenFailed,
+            properties: Self.failureProperties(reason, thrown: thrown, milliseconds: seconds * 1000 + attoseconds / 1_000_000_000_000_000),
+            waitsForBatch: true
+        )
+    }
+
+    /// The properties `auth.tokenFailed` carries.
+    ///
+    /// - Parameter reason: which of the six refusals it was.
+    /// - Parameter thrown: what the provider threw, named as `failure_type`; `nil` for every reason but `threw`.
+    /// - Parameter milliseconds: how long the provider call took.
+    /// - Returns: the event's properties.
+    private static func failureProperties(
+        _ reason: TokenFailureReason,
+        thrown: Error?,
+        milliseconds: Int64
+    ) -> [String: String] {
+        var properties = [
+            TelemetryProperty.outcome.rawValue: "failed",
+            TelemetryProperty.reason.rawValue: reason.rawValue,
+            TelemetryProperty.durationMs.rawValue: String(milliseconds)
+        ]
+        if let thrown {
+            properties[TelemetryProperty.failureType.rawValue] = RedactedCause(thrown).simpleTypeName
         }
-        guard fresh != rejectedToken else {
-            throw PayabliGenericError(
-                type: .tokenProviderFailed,
-                reason: "Token request failed",
-                detail: "The tokenProvider returned the token the server rejected."
-            )
-        }
+        return properties
     }
 
     /// Drops the held token and any call in flight, and revives a finished holder, so the next read mints again.
@@ -387,4 +444,14 @@ private final class FinishedSlot: @unchecked Sendable {
         get { lock.withLock { stored } }
         set { lock.withLock { stored = newValue } }
     }
+}
+
+/// Why a provider call did not produce a token the holder could install, as `auth.tokenFailed` names it.
+enum TokenFailureReason: String {
+    case threw
+    case timedOut
+    case blankToken
+    case unusableToken
+    case unchangedToken
+    case reentered
 }

@@ -15,7 +15,8 @@ final class TelemetryClientTests: XCTestCase {
         deviceId: String? = nil,
         queued: [(name: String, properties: [String: String])] = [],
         logger: PayabliLogger = PayabliLogger(category: .telemetry, sink: RecordingLogSink()),
-        predecessor: TelemetryClient? = nil
+        predecessor: TelemetryClient? = nil,
+        predecessorUnreachable: @escaping @Sendable (TelemetryClient) async -> Void = { _ in }
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -32,7 +33,8 @@ final class TelemetryClientTests: XCTestCase {
             deviceId: { deviceId },
             queued: queued,
             logger: logger,
-            predecessor: predecessor
+            predecessor: predecessor,
+            predecessorUnreachable: predecessorUnreachable
         )
     }
 
@@ -158,7 +160,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnEventWhoseNameMeansFailureLeavesAtOnce() async {
         let client = makeClient()
-        await client.emit(TelemetryEventName.ttpAttestationQuotaExhausted, properties: ["code": "429"])
+        await client.emit(TelemetryEventName.ttpNfcFailed, properties: ["code": "429"])
         await client.settled()
 
         let batches = await transport.batches
@@ -202,7 +204,7 @@ final class TelemetryClientTests: XCTestCase {
     func testTheSendAtOnceRule() {
         XCTAssertTrue(TelemetryClient.sendsAtOnce("x", ["outcome": "refused_locally"]))
         XCTAssertTrue(TelemetryClient.sendsAtOnce("x", ["outcome": "something_new"]))
-        XCTAssertTrue(TelemetryClient.sendsAtOnce(TelemetryEventName.authTokenFailed, [:]))
+        XCTAssertFalse(TelemetryClient.sendsAtOnce(TelemetryEventName.authTokenFailed, ["outcome": "failed", "reason": "threw"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce("x", ["outcome": "succeeded"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce("x", ["outcome": "approved"]))
         XCTAssertFalse(TelemetryClient.sendsAtOnce(TelemetryEventName.ttpInitializePending, ["state": "pending_terms"]))

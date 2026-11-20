@@ -59,16 +59,16 @@ final class PinnedCredentialTests: XCTestCase {
     }
 
     func testThePinAndTheCallerRefusalSurviveTheDecorationCopy() async throws {
-        let decorated = try await BearerDecoration(readToken: { "chain" }).decorate(
+        let decorated = try await BearerDecoration(readToken: { "chain" }, readHeldToken: { "chain" }).decorate(
             PayabliRequest(
                 method: .get,
                 path: "/api/v2/device/taptopay/config/entry",
                 isCallerRefusal: { $0.statusCode == 401 },
-                pinsCredential: true
+                isCredentialPinned: true
             )
         )
 
-        XCTAssertTrue(decorated.pinsCredential)
+        XCTAssertTrue(decorated.isCredentialPinned)
         XCTAssertTrue(decorated.isCallerRefusal(answered(401)), "the caller refusal survived the copy")
         XCTAssertFalse(decorated.isCallerRefusal(answered(200)), "and still answers only a 401")
     }
@@ -145,7 +145,7 @@ final class PinnedCredentialTests: XCTestCase {
     // MARK: - Helpers
 
     private func pinned(_ method: HTTPMethod) -> PayabliRequest {
-        PayabliRequest(method: method, path: "/api/v2/device/taptopay/config/entry", pinsCredential: true)
+        PayabliRequest(method: method, path: "/api/v2/device/taptopay/config/entry", isCredentialPinned: true)
     }
 
     /// A session on the stubbed network whose first token is `testToken` and whose provider serves every call after.
