@@ -150,12 +150,14 @@ final class TelemetryRecordersTests: XCTestCase {
         TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
         let reading = await gate.waitUntilReading()
         XCTAssertTrue(reading, "the failure's send never started")
-        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
-        try await Task.sleep(for: .milliseconds(100))
+        let builder = BlockingBuilder()
+        let recording = await recordWhileBuilding(builder)
 
         TelemetryRecorders.install(Self.client(entry: "e", transport: InMemoryTelemetryTransport()))
         try await Task.sleep(for: .milliseconds(100))
         let whileARecordWasOnItsWay = await retired.value
+        builder.release()
+        await recording.value
         gate.release()
         await waiting.value
 
@@ -190,9 +192,8 @@ final class TelemetryRecordersTests: XCTestCase {
         TelemetryRecorders.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
         let reading = await gate.waitUntilReading()
         XCTAssertTrue(reading, "the failure's send never started")
-        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted)
-        // Long enough for that record to reach the first channel, whose send is held.
-        try await Task.sleep(for: .milliseconds(100))
+        let builder = BlockingBuilder()
+        let recording = await recordWhileBuilding(builder)
         TelemetryRecorders.install(second)
         let waitingOnSecond = Task {
             await TelemetryRecorders.unreachable(second)
@@ -205,6 +206,8 @@ final class TelemetryRecordersTests: XCTestCase {
         let firstWhileOnItsWay = await firstRetired.value
         let secondWhileOnItsWay = await secondRetired.value
 
+        builder.release()
+        await recording.value
         gate.release()
         await waitingOnFirst.value
         await waitingOnSecond.value
@@ -213,16 +216,14 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertFalse(secondWhileOnItsWay, "a record made while the second channel was installed had not arrived")
         await first.flush()
         let onFirst = await firstTransport.drainBatches().flatMap { $0 }.map(\.event)
-        XCTAssertEqual(onFirst, [TelemetryEventName.ttpInitializeFailed, TelemetryEventName.ttpInitializeStarted])
+        XCTAssertEqual(onFirst, [TelemetryEventName.ttpInitializeFailed])
         await second.flush()
         let onSecond = await secondTransport.drainBatches().flatMap { $0 }
         XCTAssertEqual(onSecond.map(\.event), [])
         let onLatest = await sent(latestTransport)
-        XCTAssertEqual(
-            onLatest.map(\.event),
-            [TelemetryEventName.ttpAttestationStarted, TelemetryEventName.ttpAttestationSucceeded]
-        )
-        XCTAssertEqual(onLatest.map(\.sessionId), [second.sessionId, latest.sessionId])
+        let attestation = [TelemetryEventName.ttpAttestationStarted, TelemetryEventName.ttpAttestationSucceeded]
+        XCTAssertEqual(onLatest.map(\.event), [TelemetryEventName.ttpInitializeStarted] + attestation)
+        XCTAssertEqual(onLatest.map(\.sessionId), [first.sessionId, second.sessionId, latest.sessionId])
     }
 
     func testAChannelClearedWhileARecordBuildsItsPropertiesIsUnreachableOnlyOnceThatRecordArrives() async throws {
@@ -310,6 +311,19 @@ private final class PropertyBuilds: @unchecked Sendable {
         lock.withLock { count += 1 }
         return [:]
     }
+}
+
+/// Records an event on another thread, and returns once its properties are being built and `builder` holds them.
+///
+/// - Parameter builder: the gate the properties wait on.
+/// - Returns: the recording, which ends once `builder` is released.
+private func recordWhileBuilding(_ builder: BlockingBuilder) async -> Task<Void, Never> {
+    let recording = Task.detached {
+        TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted, properties: builder.build())
+    }
+    let building = await builder.waitUntilBuilding()
+    XCTAssertTrue(building, "the properties were never built")
+    return recording
 }
 
 /// A device id read that blocks its client's actor until released, so a delivery to that client waits behind it.
