@@ -126,6 +126,9 @@ struct TapToPayFailure: DisplayedFailure, CodedFailure {
     /// Whether the session landed on a reason no setup repairs, which the enable step reports.
     let isRefused: Bool
 
+    /// The payment the failure belongs to, which a close can still be sent for.
+    let paymentTransId: String?
+
     init(_ error: Error, session: TapToPaySessionStatus) {
         let failure = error as? TapToPayError
         message = ActionLine.chargeMessage(
@@ -140,5 +143,6 @@ struct TapToPayFailure: DisplayedFailure, CodedFailure {
         isDeviceNotPending = failure?.type == .deviceNotPending
         isRefused = session == .refused
         isPendingActivation = session == .pendingActivation
+        paymentTransId = failure?.paymentTransId
     }
 }

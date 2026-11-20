@@ -504,6 +504,7 @@ struct PaymentTapToPayQAView: View {
             chargeMessage = "✗ Enter an amount greater than zero"
             return
         }
+        closeTransId = ""
         isWorking = true
         Task { @MainActor in
             defer { isWorking = false }
@@ -517,6 +518,7 @@ struct PaymentTapToPayQAView: View {
             } catch {
                 chargeMessage = ActionLine.failed(error)
                 logEntry(ActionLine.failureEvent(step: "charge", error: error))
+                closeTransId = (error as? TapToPayFailure)?.paymentTransId ?? ""
             }
         }
     }
