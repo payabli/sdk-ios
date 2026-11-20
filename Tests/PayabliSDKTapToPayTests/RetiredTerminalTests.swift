@@ -158,6 +158,35 @@ final class RetiredTerminalTests: XCTestCase {
         XCTAssertEqual(requests.updates, 0, "the close was refused before it was sent")
     }
 
+    func testAPaymentLeftHeldByAReplacedSessionIsClosedByATerminalOfTheCurrentOne() async throws {
+        let keys = ChargeKeyStore()
+        let held = HeldPayments()
+        let live = LiveFlag()
+        let (retired, provider, _, _) = try makeTTP(live: live, keys: keys, held: held)
+        try await retired.initialize()
+        provider.whileReading = { [session = retired.session] in
+            await session.auth.finish(with: PayabliGenericError(type: .tokenExpired, reason: "finished"))
+            live.value = false
+        }
+        _ = await failure { _ = try await self.charge(retired) }
+        let (current, _, _, requests) = try makeTTP(live: LiveFlag(), keys: keys, held: held)
+
+        try await current.closeCapturedCharge(paymentTransId: Self.paymentTransId)
+
+        XCTAssertEqual(requests.updates, 1)
+        XCTAssertFalse(
+            keys.holdsRetryOf(
+                entry: "e",
+                environment: .sandbox,
+                description: ChargeDescription(
+                    paymentDetails: PayabliTTPPaymentDetails(amount: 1, currency: .usd),
+                    invoice: PayabliTTPInvoiceData()
+                )
+            ),
+            "the close did not find the payment the replaced session held"
+        )
+    }
+
     func testAnInstalledSessionsTerminalIsLiveAndAReplacedOnesIsNot() async throws {
         StubURLProtocol.handler = { request in
             (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: "HTTP/1.1", headerFields: nil)!, Data())
@@ -201,7 +230,9 @@ final class RetiredTerminalTests: XCTestCase {
     }
 
     private func makeTTP(
-        live: LiveFlag
+        live: LiveFlag,
+        keys: ChargeKeyStore = ChargeKeyStore(),
+        held: HeldPayments = HeldPayments()
     ) throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService, Requests) {
         let requests = Requests()
         StubURLProtocol.handler = requests.handler(paymentTransId: Self.paymentTransId)
@@ -213,7 +244,9 @@ final class RetiredTerminalTests: XCTestCase {
             attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
             session: StubURLProtocol.makeSession(),
-            isLive: { live.value }
+            isLive: { live.value },
+            chargeKeys: keys,
+            heldPayments: held
         )
         return (ttp, provider, attestation, requests)
     }
