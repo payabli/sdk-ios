@@ -196,9 +196,7 @@ extension PayabliTTP {
                 orderDescription: context.orderDescription
             )
         }
-        progress.paymentTransId = paymentTransId
-        // Only the newest payment on an entry point can be closed from what is held.
-        heldPayments.dropAny(entry: entryPoint, environment: environment)
+        opened(paymentTransId, progress: progress)
 
         // Again here, because a replacement can land while the payment opens, and by then the reader may be armed
         // for another merchant.
@@ -223,16 +221,6 @@ extension PayabliTTP {
         recordChargeActivity(.waitingForCard, for: charge)
         do {
             readResult = try await provider.startReading(readRequest)
-            heldPayments.hold(
-                HeldPayment(
-                    paymentTransId: paymentTransId,
-                    outcome: readResult.outcome,
-                    key: reservation.key,
-                    resentKey: reservation.reused
-                ),
-                entry: entryPoint,
-                environment: environment
-            )
         } catch {
             let failure = readFailure(error, paymentTransId: paymentTransId)
             let touchedNoCard = Self.touchedNoCard(failure)
@@ -280,6 +268,16 @@ extension PayabliTTP {
         return try await runSuccessUpdate(paymentTransId: paymentTransId, readResult: readResult, reservation: reservation)
     }
 
+    /// Records the payment this charge opened. Only the newest payment on an entry point can be closed from what is
+    /// held, so whatever was held there is dropped.
+    ///
+    /// - Parameter paymentTransId: the payment the opening minted.
+    /// - Parameter progress: how far the charge got.
+    private func opened(_ paymentTransId: String, progress: ChargeProgress) {
+        progress.paymentTransId = paymentTransId
+        heldPayments.dropAny(entry: entryPoint, environment: environment)
+    }
+
     /// Releases a key this charge minted, because its charge reached an outcome not in doubt. A resent key names an
     /// earlier charge, so nothing this one learns settles it.
     ///
@@ -305,8 +303,8 @@ extension PayabliTTP {
         return refusal.detail == processorHasNoRecord
     }
 
-    /// Step 3 — the update, sent whatever the processor answered. Only an approval is a payment, and a
-    /// refusal stays a refusal even when the update then fails.
+    /// Step 3 — the update, sent whatever the processor answered, with the payment held until it lands. Only an
+    /// approval is a payment, and a refusal stays a refusal even when the update then fails.
     ///
     /// - Parameter paymentTransId: the transaction the update closes, minted at initiate.
     /// - Parameter readResult: what the reader read, whose outcome decides the capture.
@@ -317,6 +315,16 @@ extension PayabliTTP {
         readResult: CardReadResult,
         reservation: ChargeKeyStore.Reservation
     ) async throws -> TransactionResult {
+        heldPayments.hold(
+            HeldPayment(
+                paymentTransId: paymentTransId,
+                outcome: readResult.outcome,
+                key: reservation.key,
+                resentKey: reservation.reused
+            ),
+            entry: entryPoint,
+            environment: environment
+        )
         let update = await tryUpdate { [transactionClient] in
             try await transactionClient.update(paymentTransId: paymentTransId, result: readResult)
         }
