@@ -10,6 +10,8 @@ end to end against sandbox.
   reader prepare via `try await ttp.initialize()`.
 - **Charge** — full sale pipeline (`/initiate` → NFC tap → `/update`)
   via `try await ttp.charge(paymentDetails:customer:)`.
+- **Close a payment** — sends the close for a transaction ID, filled in
+  from the last charge, via `try await ttp.closeCapturedCharge(paymentTransId:)`.
 - **Activate device** — pending-device activation with an out-of-band
   code via `ttp.activateDevice(activationCode:)`.
 - **State log** — every session state the terminal moves through,

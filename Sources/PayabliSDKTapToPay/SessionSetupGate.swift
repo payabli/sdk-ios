@@ -34,6 +34,13 @@ final class SessionSetupGate {
     /// waiting for the operation before it, or has setups queued behind it.
     private(set) var runningCharge: RunningCharge?
 
+    /// The closes waiting for the running charge to return, each resumed when it does or when its caller is cancelled.
+    /// `Task.value` does not resume a cancelled awaiting task.
+    private var closesWaiting: [UUID: CheckedContinuation<Void, Error>] = [:]
+
+    /// The closes holding each entry point, counted from the call until it returns, whether sending or waiting.
+    private var closes: [String: Int] = [:]
+
     /// Runs `work` after every operation already in the gate, or joins `owner`'s pending setup of an equal `kind`.
     ///
     /// - Parameters:
@@ -101,6 +108,9 @@ final class SessionSetupGate {
         runningCharge = charge
         defer {
             runningCharge = nil
+            let waiting = closesWaiting
+            closesWaiting = [:]
+            waiting.values.forEach { $0.resume() }
             release.finish()
             self.release(claim.id)
         }
@@ -109,6 +119,58 @@ final class SessionSetupGate {
             _ = try? await previous.value
         }
         return try await body()
+    }
+
+    /// Counts a close on `entryPoint` until ``releaseClose(_:)``, so a charge arriving there meanwhile is refused.
+    ///
+    /// - Parameter entryPoint: the entry point the close is for.
+    func admitClose(_ entryPoint: String) {
+        closes[entryPoint, default: 0] += 1
+    }
+
+    /// Returns once no charge runs on `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point the close is for.
+    /// - Throws: `CancellationError` as soon as the caller is cancelled.
+    func waitForCharge(on entryPoint: String) async throws {
+        guard runningCharge?.entryPoint == entryPoint else { return }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                // Nothing suspends between this check and the insert, so a caller cancelled on arrival is not
+                // left waiting with no handler to resume it.
+                guard !Task.isCancelled else {
+                    continuation.resume(throwing: CancellationError())
+                    return
+                }
+                closesWaiting[id] = continuation
+            }
+        } onCancel: {
+            Task { @MainActor in self.abandonWait(id) }
+        }
+    }
+
+    /// Resumes a cancelled close's wait, unless the charge's return already resumed it.
+    ///
+    /// - Parameter id: the wait to resume.
+    private func abandonWait(_ id: UUID) {
+        closesWaiting.removeValue(forKey: id)?.resume(throwing: CancellationError())
+    }
+
+    /// Removes one close from `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point the close was for.
+    func releaseClose(_ entryPoint: String) {
+        guard let count = closes[entryPoint] else { return }
+        closes[entryPoint] = count > 1 ? count - 1 : nil
+    }
+
+    /// Whether a close holds `entryPoint`.
+    ///
+    /// - Parameter entryPoint: the entry point a charge is for.
+    /// - Returns: `true` from a close's call until it returns.
+    func isClosing(_ entryPoint: String) -> Bool {
+        closes[entryPoint] != nil
     }
 
     /// The charge holding the gate: the entry point it is for and the sale it describes.

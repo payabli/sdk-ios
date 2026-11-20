@@ -138,6 +138,11 @@ enum DemoConfiguration {
             baseURL.appendingPathComponent("health")
         }
 
+        /// Issues an activation code for a pending device, as the paypoint's backend would.
+        static var activationCodeURL: URL {
+            baseURL.appendingPathComponent("payabli/activation-code")
+        }
+
         /// One line for the Configuration screen, so the resolved host is never
         /// a guess.
         static var explanation: String {

@@ -3,12 +3,8 @@ import Foundation
 import os
 import PayabliSDKTapToPay
 
-/// A screen's grip on the card reader.
-///
-/// The terminal itself stays in here, and so does every state and error type it
-/// publishes. A screen drives it through these four calls and reads
-/// ``TapToPaySessionStatus``, so nothing outside this group names an SDK type for
-/// the card-present surface.
+/// A screen's grip on the card reader. A screen drives the terminal through these calls and reads its
+/// state as ``TapToPaySessionStatus``.
 @MainActor
 final class TapToPayTerminal: ObservableObject {
     /// Where the reader has got to. Republished from the SDK's own state, mapped
@@ -65,6 +61,13 @@ final class TapToPayTerminal: ObservableObject {
         }
     }
 
+    /// Sends the close for a payment, in any session state.
+    ///
+    /// - Parameter paymentTransId: the payment to close.
+    func close(paymentTransId: String) async throws {
+        try await run { try await terminal.closeCapturedCharge(paymentTransId: paymentTransId) }
+    }
+
     /// Presents an activation code for a device the service is holding.
     func activate(code: String) async throws {
         try await run { try await terminal.activateDevice(activationCode: code) }
@@ -103,25 +106,13 @@ final class TapToPayTerminal: ObservableObject {
 
 /// Something the reader refused.
 struct TapToPayFailure: DisplayedFailure, CodedFailure {
-    /// The message for whether the card was charged, then for the failure's category; the error's own text goes to no screen.
     let message: String
-
     let eventCode: String
-
-    /// Whether the session was left waiting for an activation code, which the activation step asks for rather than
-    /// reports as a failure.
     let isPendingActivation: Bool
-
-    /// Whether this device has to be set up again: its attestation was revoked,
-    /// its registration was replaced, or its key is gone. The way out is a fresh
-    /// cold attestation rather than another activation code.
     let isDeviceSetupRequired: Bool
-
-    /// Whether the service said this device is not waiting for an activation code, which another enable answers.
     let isDeviceNotPending: Bool
-
-    /// Whether the session landed on a reason no setup repairs, which the enable step reports.
     let isRefused: Bool
+    let paymentTransId: String?
 
     init(_ error: Error, session: TapToPaySessionStatus) {
         let failure = error as? TapToPayError
@@ -137,5 +128,6 @@ struct TapToPayFailure: DisplayedFailure, CodedFailure {
         isDeviceNotPending = failure?.type == .deviceNotPending
         isRefused = session == .refused
         isPendingActivation = session == .pendingActivation
+        paymentTransId = failure?.paymentTransId
     }
 }

@@ -9,10 +9,14 @@ import PayabliSDKCore
 ///
 package final class TTPTransactionClient: Sendable {
     private let transport: any PayabliTransport
+    private let retryPolicy: RetryPolicy
     private let logger = PayabliLogger(category: .taptopay)
 
-    package init(transport: any PayabliTransport) {
+    /// - Parameter transport: the session's authenticated transport.
+    /// - Parameter retryPolicy: the policy every close runs under.
+    package init(transport: any PayabliTransport, retryPolicy: RetryPolicy = .default) {
         self.transport = transport
+        self.retryPolicy = retryPolicy
     }
 
     /// `POST /api/v2/MoneyIn/initiate`, returning the authoritative `paymentTransId`.
@@ -114,11 +118,16 @@ package final class TTPTransactionClient: Sendable {
     /// and would name a route instead.
     ///
     /// - Parameter paymentTransId: the payment an approved opening named.
-    /// - Returns: `false` when it is blank, `.` or `..` once trimmed.
-    private static func isAddressable(_ paymentTransId: String) -> Bool {
-        let trimmed = paymentTransId.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// - Returns: `false` when it is blank, `.` or `..` once ``blank`` is trimmed.
+    static func isAddressable(_ paymentTransId: String) -> Bool {
+        let trimmed = paymentTransId.trimmingCharacters(in: blank)
         return !trimmed.isEmpty && trimmed != "." && trimmed != ".."
     }
+
+    /// Unicode's spaces, separators and the information separators U+001C to U+001F, without U+0085 or U+200B.
+    private static let blank = CharacterSet.whitespacesAndNewlines
+        .union(CharacterSet(charactersIn: "\u{1C}\u{1D}\u{1E}\u{1F}"))
+        .subtracting(CharacterSet(charactersIn: "\u{85}\u{200B}"))
 
     /// The words a refusal's body gives, when it gives any.
     ///
@@ -171,28 +180,82 @@ package final class TTPTransactionClient: Sendable {
         )
     }
 
-    /// Encodes a typed update payload for `PATCH /MoneyIn/update/{id}`.
+    /// Closes the transaction with what the reader's processor answered, under the `fiservResponse` key.
     ///
-    /// Atomic providers forward their full response; payload-only providers are wrapped into the same
-    /// shape.
-    ///
-    /// - Parameter payload: what the reader did, as the success or failure to encode.
-    /// - Returns: the wire body for the update: the response under the `fiservResponse` key on a success, an `error` object on a failure.
-    static func updateBody(for payload: TTPUpdatePayload) -> Data {
-        let encoder = JSONEncoder()
-        switch payload {
-        case let .success(result):
-            let body = UpdateSuccessBody(providerResponse: providerResponse(from: result))
-            return (try? encoder.encode(body)) ?? Data()
+    /// - Parameter paymentTransId: the transaction to close, minted at initiate.
+    /// - Parameter result: what the reader read.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func update(paymentTransId: String, result: CardReadResult) async throws {
+        let body = UpdateSuccessBody(providerResponse: Self.providerResponse(from: result))
+        try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
+    }
 
-        case let .nfcFailure(description):
-            let body = UpdateErrorBody(error: .init(
-                title: "NFC Tap Failed",
-                description: description,
-                failureReason: "nfc_read"
-            ))
-            return (try? encoder.encode(body)) ?? Data()
+    /// Closes the transaction after a tap that never completed, so an opened transaction is not left standing.
+    ///
+    /// - Parameter paymentTransId: the transaction to close, minted at initiate.
+    /// - Parameter description: why the read failed, sent as a record only.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func updateAfterFailedRead(paymentTransId: String, description: String) async throws {
+        let body = UpdateErrorBody(error: .init(
+            title: "NFC Tap Failed",
+            description: description,
+            failureReason: "nfc_read"
+        ))
+        try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
+    }
+
+    /// Closes a transaction this SDK holds no reader answer for, with a body that claims no outcome.
+    ///
+    /// - Parameter paymentTransId: the transaction to close.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
+    func close(paymentTransId: String) async throws {
+        try await send(paymentTransId: paymentTransId, body: Data("{}".utf8))
+    }
+
+    /// The closes' shared `PATCH /api/v2/MoneyIn/update/{paymentTransId}`, retried. Any 2xx is success and the
+    /// response is not decoded.
+    ///
+    /// - Parameter paymentTransId: the transaction the close is sent for.
+    /// - Parameter body: the encoded close.
+    /// - Throws: the last attempt's mapped error; `permissionDenied` at once, unretried, for a caller the route says
+    ///   may not act on the payment.
+    private func send(paymentTransId: String, body: Data) async throws {
+        let logger = self.logger
+        let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
+        let transport = self.transport
+
+        try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
+            let request = PayabliRequest(
+                method: .patch,
+                path: path,
+                headers: ["Content-Type": "application/json"],
+                body: body
+            )
+            // The success body carries the provider's whole response, and with
+            // it `paymentTokens.tokenData` and the card's expiry. Size only.
+            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
+            let response = try await transport.perform(request)
+            logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
+            if let refusal = Self.notPermitted(response) {
+                throw refusal
+            }
+            try mapPayabliHTTPError(response: response)
         }
+    }
+
+    /// The refusal of a caller that may not act on the payment's paypoint, which the update route answers 400 with
+    /// code `E9001`.
+    ///
+    /// - Parameter response: the update's answer.
+    /// - Returns: `permissionDenied` carrying the status and code, or nil for any other answer.
+    static func notPermitted(_ response: PayabliResponse) -> PayabliGenericError? {
+        guard response.statusCode == 400, serviceCode(of: response) == "E9001" else { return nil }
+        return PayabliGenericError(
+            type: .permissionDenied,
+            reason: PayabliErrorType.permissionDenied.message,
+            httpStatus: response.statusCode,
+            rawCode: "E9001"
+        )
     }
 
     /// Prefer the provider's own response JSON when it's available (atomic

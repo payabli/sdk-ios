@@ -13,7 +13,9 @@ struct PaymentTapToPayQAView: View {
     @State private var enableMessage = ""
     @State private var termsMessage = ""
     @State private var activationMessage = ""
+    @State private var codeFetchMessage = ""
     @State private var chargeMessage = ""
+    @State private var closeTransId = ""
     @State private var stateLog: [TapToPayQAStateEntry] = []
     @State private var isActivationPresented = false
     @State private var isActivationHelpPresented = false
@@ -36,6 +38,7 @@ struct PaymentTapToPayQAView: View {
                     QAContextLine()
                     TerminalReadinessView()
                     stepsSection
+                    TapToPayCloseSection(terminal: terminal, paymentTransId: $closeTransId, log: logEntry)
                     recoverySection
                     stateLogSection
                 }
@@ -221,11 +224,19 @@ struct PaymentTapToPayQAView: View {
                     Button("Where do I get a code?") { isActivationHelpPresented = true }
                         .font(.caption)
                 }
-                Button("Activate") {
-                    isActivationPresented = false
-                    runActivate()
+                if activationCode.isEmpty, let activationId = terminal.activationId {
+                    Button("Get Activation Code") { runGetActivationCode(activationId) }
+                        .disabled(isWorking)
+                    if !codeFetchMessage.isEmpty {
+                        Text(codeFetchMessage).font(.caption)
+                    }
+                } else {
+                    Button("Activate") {
+                        isActivationPresented = false
+                        runActivate()
+                    }
+                    .disabled(activationCode.isEmpty || isWorking)
                 }
-                .disabled(activationCode.isEmpty)
             }
             .navigationTitle("Activate device")
             .sheet(isPresented: $isActivationHelpPresented) { activationHelpSheet }
@@ -493,6 +504,7 @@ struct PaymentTapToPayQAView: View {
             chargeMessage = "✗ Enter an amount greater than zero"
             return
         }
+        closeTransId = ""
         isWorking = true
         Task { @MainActor in
             defer { isWorking = false }
@@ -502,9 +514,11 @@ struct PaymentTapToPayQAView: View {
                     suppliesCustomer: demoCustomer.suppliesDemoCustomer
                 )
                 chargeMessage = "✓ Charged · txn \(paymentTransId)"
+                closeTransId = paymentTransId
             } catch {
                 chargeMessage = ActionLine.failed(error)
                 logEntry(ActionLine.failureEvent(step: "charge", error: error))
+                closeTransId = (error as? TapToPayFailure)?.paymentTransId ?? ""
             }
         }
     }
@@ -630,6 +644,107 @@ private struct ActivationIdSection: View {
             } else {
                 Text("No activation is owed.")
             }
+        }
+    }
+}
+
+/// Closes a payment by its transaction ID. The close runs whatever the session's state, so it is not a step.
+private struct TapToPayCloseSection: View {
+    @ObservedObject var terminal: TapToPayTerminal
+    @Binding var paymentTransId: String
+    let log: (String) -> Void
+
+    @State private var message = ""
+    @State private var isClosing = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Close a payment")
+                .font(.headline)
+            TextField("Transaction ID", text: $paymentTransId)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .textFieldStyle(.roundedBorder)
+            Button { runClose() } label: {
+                Label("Close payment", systemImage: "checkmark.seal")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .disabled(isClosing || trimmedId.isEmpty)
+            if !message.isEmpty {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(message.hasPrefix("✗") ? .payabliError : .payabliOnSurfaceVariant)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    private var trimmedId: String {
+        paymentTransId.trimmingCharacters(in: .whitespaces)
+    }
+
+    private func runClose() {
+        let id = trimmedId
+        message = ""
+        isClosing = true
+        Task { @MainActor in
+            defer { isClosing = false }
+            do {
+                try await terminal.close(paymentTransId: id)
+                message = "✓ Closed · txn \(id)"
+            } catch {
+                message = ActionLine.failed(error)
+                log(ActionLine.failureEvent(step: "close", error: error))
+            }
+        }
+    }
+}
+
+private extension PaymentTapToPayQAView {
+    /// Fills the code field with this device's code from the local token server, a development helper.
+    private func runGetActivationCode(_ activationId: String) {
+        codeFetchMessage = ""
+        isWorking = true
+        Task { @MainActor in
+            defer { isWorking = false }
+            do {
+                activationCode = try await TokenServerActivationCode.issue(for: activationId)
+            } catch {
+                codeFetchMessage = "✗ The token server issued no code: \(error.localizedDescription)"
+            }
+        }
+    }
+}
+
+/// The local token server's activation code for a pending device.
+private enum TokenServerActivationCode {
+    /// - Parameter deviceId: the device's `activationId`.
+    /// - Returns: the code the token server issued.
+    /// - Throws: a transport error, or ``Refusal`` carrying the server's `detail` when the answer carries no code.
+    static func issue(for deviceId: String) async throws -> String {
+        var request = URLRequest(url: DemoConfiguration.TokenServer.activationCodeURL, timeoutInterval: 60)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(
+            withJSONObject: ["entry": DemoConfiguration.entryPoint, "deviceId": deviceId]
+        )
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        guard (200 ..< 300).contains(status), let code = body?["code"] as? String, !code.isEmpty else {
+            let detail = body?["detail"] as? String ?? body?["error"] as? String
+            throw Refusal(message: "HTTP \(status)" + (detail.map { ": \($0)" } ?? ""))
+        }
+        return code
+    }
+
+    /// The token server's answer when it issued no code.
+    struct Refusal: LocalizedError {
+        let message: String
+        var errorDescription: String? {
+            message
         }
     }
 }
