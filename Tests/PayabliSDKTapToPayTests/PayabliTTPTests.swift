@@ -436,8 +436,9 @@ final class PayabliTTPTests: XCTestCase {
         )
     }
 
-    /// A 401 in the body with any other text is not the binding being gone, so the binding stays.
-    func testAConfigRefusalInTheBodyWithAnyOtherTextKeepsTheBinding() async throws {
+    /// A 401 in the body is the binding being gone whatever its text. A kept binding is presented on the next setup
+    /// and refused again.
+    func testAConfigRefusalInTheBodyWithAnyOtherTextDiscardsTheBinding() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
         StubURLProtocol.handler = { request in
@@ -463,7 +464,8 @@ final class PayabliTTPTests: XCTestCase {
             thrown = error
         }
 
-        XCTAssertTrue(attestation.isAlreadyAttested, "a binding the refusal did not name as gone was dropped")
+        XCTAssertFalse(attestation.isAlreadyAttested, "a refused binding must not be presented again")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired))
         XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .deviceSetupRequired)
     }
 

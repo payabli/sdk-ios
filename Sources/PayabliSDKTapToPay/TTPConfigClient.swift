@@ -74,9 +74,9 @@ final class TTPConfigClient: Sendable {
                 let code = rawCode ?? 0
                 // Same as the attestation path: the code, not the service's sentence.
                 logger.error("[config] declined (isSuccess=false code=\(code))")
-                // A binding the service no longer holds is dropped here, where which handle the request presented is
-                // known. Any other 401 in the body keeps it.
-                if BindingRefusal.isBindingGone(code: code, reason: reason) {
+                // A 401 in the body is the service holding no live attestation for the binding, whatever its text. It is
+                // dropped here, where which handle the request presented is known, so the next setup attests again.
+                if code == 401 {
                     guard dropRefusedBinding(entry: entry, presented: headers) else {
                         throw PayabliTTPError.attestationRevoked(
                             reason: "\(reason) — the stored binding could not be dropped",
