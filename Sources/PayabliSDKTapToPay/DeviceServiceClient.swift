@@ -82,7 +82,7 @@ final class DeviceServiceClient: Sendable {
     ) -> (outcome: String, code: Int?) {
         // Otherwise a refused token, a timeout and a rate limit are the transport's, not the route's answer.
         if let refusal = error as? DeviceRouteRefusal {
-            return refusal.isRefusal ? ("refused", refusal.rawCode.flatMap { Int($0) }) : ("failed", nil)
+            return refusal.isRefusal ? ("refused", refusal.resultCode) : ("failed", nil)
         }
         guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500,
               ![408, 429].contains(answer.statusCode)
@@ -206,7 +206,10 @@ final class DeviceServiceClient: Sendable {
             if let decline = makeDeclineError(code ?? response.statusCode, reason) {
                 throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
             }
-            throw DeviceRouteRefusal.of(code: code ?? response.statusCode, reason: reason, httpStatus: response.statusCode)
+            // A refusal naming no code is left to the status mapping below, so the status is never read as its code.
+            if let code {
+                throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
+            }
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
