@@ -45,8 +45,8 @@ public extension PayabliTTP {
     /// the reader's answer allows.
     ///
     /// - Parameter paymentTransId: the payment to close.
-    /// - Returns: success once the service confirmed the close; otherwise the host's error, with the held payment's
-    ///   capture, or unknown for a payment not held.
+    /// - Returns: success once the service confirmed the close; otherwise the host's error, with the capture of the
+    ///   payment if it is still held, or unknown.
     private func sendClose(_ paymentTransId: String) async -> Result<Void, TapToPayError> {
         let held = heldPayments.payment(named: paymentTransId, entry: entryPoint, environment: environment)
         do {
@@ -64,12 +64,14 @@ public extension PayabliTTP {
                 ? .permissionDenied
                 : .paymentNotClosed
             let answer = TapToPayErrorTranslation.answer(of: error)
+            // Read again, because another close of the same payment may have landed meanwhile.
+            let stillHeld = heldPayments.payment(named: paymentTransId, entry: entryPoint, environment: environment)
             return .failure(TapToPayError(
                 type: type,
                 reason: type.message,
                 detail: nil,
                 paymentTransId: paymentTransId,
-                capture: held?.capture ?? .unknown,
+                capture: stillHeld?.capture ?? .unknown,
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
                 httpStatus: answer.httpStatus,
                 rawCode: answer.rawCode
