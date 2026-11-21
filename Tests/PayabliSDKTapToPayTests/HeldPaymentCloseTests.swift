@@ -120,6 +120,23 @@ final class HeldPaymentCloseTests: XCTestCase {
         XCTAssertEqual(failure?.capture, .unknown)
     }
 
+    /// The other close lands while this one waits to send again, so the payment is no longer held when this one fails.
+    func testAHeldCloseThatFailsAfterAnotherCloseLandedIsUnknown() async throws {
+        let (terminal, _) = try await makeReadyTerminal()
+        try await leaveHeld(on: terminal, read: .approved)
+        let (waiting, _) = try await makeReadyTerminal(retryPolicy: Self.twoAttempts(apart: 0.5))
+        Self.wire.reset()
+        Self.wire.script(updates: [500, 200, 500])
+
+        let failing = Task { await Self.failure { try await waiting.closeCapturedCharge(paymentTransId: Self.opened) } }
+        await Self.wire.waitUntilAnUpdateArrives()
+        try await terminal.closeCapturedCharge(paymentTransId: Self.opened)
+        let failure = await failing.value
+
+        XCTAssertEqual(Self.wire.updates.count, 3, "the closes did not overlap as scripted")
+        XCTAssertEqual(failure?.capture, .unknown, "a failed close reported a payment another close had closed")
+    }
+
     // MARK: - What holds it
 
     func testAPaymentHeldByOneTerminalIsClosedByAnotherForTheSameEntryPoint() async throws {
@@ -250,7 +267,8 @@ final class HeldPaymentCloseTests: XCTestCase {
 
     private func makeReadyTerminal(
         entryPoint: String = "e",
-        environment: PayabliEnvironment = .sandbox
+        environment: PayabliEnvironment = .sandbox,
+        retryPolicy: RetryPolicy = noWait
     ) async throws -> (PayabliTTP, MockTapToPayProvider) {
         let provider = MockTapToPayProvider()
         provider.readingResult = .success(Self.read(.approved))
@@ -259,7 +277,7 @@ final class HeldPaymentCloseTests: XCTestCase {
             config: config,
             provider: provider,
             attestation: MockDeviceAttestationService(),
-            retryPolicy: Self.noWait,
+            retryPolicy: retryPolicy,
             session: StubURLProtocol.makeSession(),
             chargeKeys: keys,
             heldPayments: held
@@ -278,6 +296,11 @@ final class HeldPaymentCloseTests: XCTestCase {
         maxJitter: 0,
         jitter: .none
     )
+
+    /// Two attempts, `delay` seconds apart.
+    private static func twoAttempts(apart delay: TimeInterval) -> RetryPolicy {
+        RetryPolicy(maxAttempts: 2, baseDelay: delay, maxDelay: delay, multiplier: 1, maxJitter: 0, jitter: .none)
+    }
 
     private static func failure(_ body: @MainActor () async throws -> Void) async -> TapToPayError? {
         do {
