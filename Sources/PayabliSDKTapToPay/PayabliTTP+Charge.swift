@@ -292,8 +292,8 @@ extension PayabliTTP {
     /// - Parameter failure: the read's failure.
     /// - Parameter paymentTransId: the payment the charge opened.
     /// - Parameter reservation: the key the charge sent, and whether it was already held.
-    /// - Returns: given whether the close's refusal says the processor holds no record of the payment, not charged for
-    ///   that refusal under a key this charge minted, otherwise the read failure's capture.
+    /// - Returns: a function of whether the close's refusal says the processor holds no record of the payment. It
+    ///   answers not charged for that refusal under a key this charge minted, and otherwise the read failure's capture.
     private static func readCapture(
         _ failure: Error,
         _ paymentTransId: String,
