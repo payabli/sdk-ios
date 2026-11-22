@@ -109,8 +109,8 @@ Each operation needs its own permission on those credentials:
 | List authorized apps through the API | `pos_read` |
 
 Your backend's credentials need every permission your app uses, because the token they mint can only carry
-permissions the credentials have. Mint the token your app receives with only the permissions it needs, and never
-`pos_read` or a `device_` permission.
+permissions the credentials have. Mint the token your app receives with only the permissions it needs. Never
+give it `pos_read` or a `device_` permission.
 
 ### Build your token endpoint
 
