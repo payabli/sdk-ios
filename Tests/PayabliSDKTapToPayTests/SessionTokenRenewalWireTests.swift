@@ -89,7 +89,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         let (ttp, _) = try makeTTP(renewal: renewal)
         // Three short of a batch with the session's own start: the setup's start, the attempt and its refusal make twenty.
         for _ in 0 ..< 16 {
-            await ttp.session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
+            ttp.session.telemetry.record(TelemetryEventName.ttpInitializeStarted)
         }
 
         let setup = Task { try await ttp.initialize() }

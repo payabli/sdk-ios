@@ -23,7 +23,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
             telemetryTransport: transport
         )
 
-        await session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
+        session.telemetry.record(TelemetryEventName.ttpInitializeStarted)
         await session.telemetry.flush()
 
         let events = await transport.batches.flatMap { $0 }
@@ -36,7 +36,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         let transport = InMemoryTelemetryTransport()
         let session = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
 
-        await session.telemetry.emit(TelemetryEventName.ttpInitializeStarted)
+        session.telemetry.record(TelemetryEventName.ttpInitializeStarted)
         await session.telemetry.flush()
 
         let events = await transport.batches.flatMap { $0 }
@@ -140,7 +140,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         let transport = InMemoryTelemetryTransport()
         await transport.refuse(true)
         let live = try PayabliSession.install(config: makeConfig(), telemetryTransport: transport)
-        await live.telemetry.emit(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        live.telemetry.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
         await live.telemetry.settled()
 
         let again = try await PayabliSession.initialize(config: makeConfig())
@@ -202,7 +202,7 @@ final class PayabliSessionTelemetryTests: XCTestCase {
         )
 
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/before"))
-        await session.telemetry.emit(TelemetryEventName.ttpInitializeFailed)
+        session.telemetry.record(TelemetryEventName.ttpInitializeFailed)
         // Settled first, so the explicit flush below is its own drain rather than joining the one the
         // failure event already scheduled: the two sends this test asserts are then deterministic.
         await session.telemetry.settled()

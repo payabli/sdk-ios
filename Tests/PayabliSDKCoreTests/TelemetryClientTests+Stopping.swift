@@ -138,7 +138,7 @@ extension TelemetryClientTests {
     func testAPredecessorTakesRecordsUntilItIsUnreachableAndThenHandsThemOver() async {
         let old = makeClient(batchSize: 100)
         let gate = Gate()
-        let successor = makeClient(batchSize: 100, predecessor: old, predecessorUnreachable: { _ in await gate.wait() })
+        let successor = makeClient(batchSize: 100, predecessor: old, predecessorReplaced: { _ in await gate.wait() })
 
         try? await Task.sleep(for: .milliseconds(100))
         await record(old, "late")
@@ -190,7 +190,7 @@ extension TelemetryClientTests {
         let client = makeClient(logger: PayabliLogger(category: .telemetry, sink: sink))
 
         await client.stop()
-        await client.emit(TelemetryEventName.sdkInitialized)
+        client.record(TelemetryEventName.sdkInitialized)
         await client.flush()
 
         let buffered = await client.bufferedCount
