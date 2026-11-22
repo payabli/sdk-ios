@@ -188,7 +188,8 @@ final class DeviceServiceClient: Sendable {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
+        if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
+           code == response.statusCode,
            let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
         {
             logger.error("[\(route.rawValue)] refused: the app is not registered on the paypoint")

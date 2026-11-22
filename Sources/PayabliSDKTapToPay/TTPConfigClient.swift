@@ -111,7 +111,7 @@ final class TTPConfigClient: Sendable {
 
     /// Throws the refusals told apart by their text before the status is mapped: an app the paypoint has not registered,
     /// an entry point the request may not use, and a binding the service no longer holds, which is dropped here while
-    /// the handle the request presented is known.
+    /// the handle the request presented is known. Only an envelope whose code is its status is read here.
     ///
     /// - Parameter response: the answer to the config request.
     /// - Parameter entry: the entry point the request was made for.
@@ -121,7 +121,9 @@ final class TTPConfigClient: Sendable {
         entry: String,
         presented headers: AssertionHeaders
     ) throws {
-        guard let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body) else { return }
+        guard let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body), code == response.statusCode else {
+            return
+        }
         if let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason) {
             logger.error("[config] refused: the app is not registered on the paypoint")
             throw unregistered
@@ -131,7 +133,7 @@ final class TTPConfigClient: Sendable {
             throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
         }
         // A 401 naming 401 is the service holding no live attestation for this binding, whatever its words.
-        guard response.statusCode == 401, code == 401 else { return }
+        guard code == 401 else { return }
         logger.error("[config] the service holds no live attestation for this binding")
         guard dropRefusedBinding(entry: entry, presented: headers) else {
             throw PayabliTTPError.attestationRevoked(
