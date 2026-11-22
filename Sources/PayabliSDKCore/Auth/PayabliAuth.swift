@@ -14,7 +14,6 @@ actor PayabliAuth {
     /// rather than answering a later rejection.
     private var inFlightMintID: UUID?
     private var pinnedRefusal: String?
-    private var reentryRefusal: (mintID: UUID, error: PayabliGenericError)?
 
     /// What times the provider bound below. A parameter rather than a hardwired `SystemRetryClock()`
     /// so a test can race the deadline deterministically instead of waiting thirty real seconds —
@@ -317,9 +316,6 @@ actor PayabliAuth {
     ///
     /// - Parameter mintID: the id of the mint whose mark this is; a later mint's mark is left alone.
     private func releaseMint(_ mintID: UUID) {
-        if reentryRefusal?.mintID == mintID {
-            reentryRefusal = nil
-        }
         guard inFlightMintID == mintID else { return }
         inFlightMint = nil
         inFlightMintID = nil
@@ -360,18 +356,17 @@ actor PayabliAuth {
         return (reason, PayabliGenericError(type: .tokenProviderFailed, reason: "Token request failed", detail: detail))
     }
 
-    /// Builds the refusal of a read made from inside the provider call `mintID` runs, and keeps it for that call.
+    /// Builds the refusal of a read made from inside the provider call `mintID` runs, marked as raised into that call.
     ///
     /// - Parameter mintID: the provider call the read came from.
     /// - Returns: the refusal to throw.
     private func refuseReentry(into mintID: UUID) -> PayabliGenericError {
-        let refusal = PayabliGenericError(
+        PayabliGenericError(
             type: .tokenProviderFailed,
             reason: "Access token unavailable",
-            detail: "The tokenProvider made a request that needs the token it was asked to supply."
+            detail: "The tokenProvider made a request that needs the token it was asked to supply.",
+            raisedInto: mintID
         )
-        reentryRefusal = (mintID, refusal)
-        return refusal
     }
 
     /// Whether the provider call `mintID` threw back the refusal this holder raised into it, rather than an error of
@@ -379,13 +374,9 @@ actor PayabliAuth {
     ///
     /// - Parameter error: what the provider threw.
     /// - Parameter mintID: the provider call that threw it.
-    /// - Returns: true only when `error` matches that refusal in every field and wraps nothing.
+    /// - Returns: true only for the refusal itself; a copy a provider built from its fields is the provider's own error.
     private func raisedReentryRefusal(_ error: Error, into mintID: UUID) -> Bool {
-        guard let raised = reentryRefusal, raised.mintID == mintID,
-              let thrown = error as? PayabliGenericError else { return false }
-        let refusal = raised.error
-        return thrown.underlying == nil && thrown.type == refusal.type && thrown.reason == refusal.reason
-            && thrown.detail == refusal.detail && thrown.httpStatus == refusal.httpStatus && thrown.rawCode == refusal.rawCode
+        (error as? PayabliGenericError)?.raisedInto == mintID
     }
 
     /// Records `auth.tokenFailed` for the provider call this mint ran. Callers that joined the mint record nothing.

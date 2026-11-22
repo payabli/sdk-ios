@@ -99,6 +99,29 @@ final class TokenFailureReportingTests: XCTestCase {
         XCTAssertEqual(properties["failure_type"], "HostBrokerDown")
     }
 
+    func testAProviderThatCopiedEveryFieldOfTheRefusalReportsThrew() async throws {
+        let holder = Slot<PayabliAuth>()
+        let (auth, telemetry) = try makeAuth {
+            do {
+                return try await XCTUnwrap(holder.value).currentAccessToken()
+            } catch let refusal as PayabliGenericError {
+                throw PayabliGenericError(
+                    type: refusal.type,
+                    reason: refusal.reason,
+                    detail: refusal.detail,
+                    underlying: refusal.underlying
+                )
+            }
+        }
+        holder.set(auth)
+
+        await assertThrows { _ = try await auth.currentAccessToken() }
+
+        let properties = try await onlyReport(from: telemetry)
+        XCTAssertEqual(properties["reason"], "threw", "a copy the provider built is the provider's own error")
+        XCTAssertEqual(properties["failure_type"], "PayabliGenericError")
+    }
+
     func testAProviderThatRebuiltTheRefusalWithItsOwnReasonReportsThrew() async throws {
         let holder = Slot<PayabliAuth>()
         let (auth, telemetry) = try makeAuth {
