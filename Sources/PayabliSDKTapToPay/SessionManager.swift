@@ -56,6 +56,13 @@ final class SessionManager: ObservableObject {
         }
     }
 
+    /// Records a failure without moving the session.
+    ///
+    /// - Parameter error: the failure to record.
+    func recordError(_ error: Error) {
+        lastError = error
+    }
+
     /// Lands a failure where the map says it lands. A failure that leaves the
     /// session where it was moves nothing but `lastError`.
     ///

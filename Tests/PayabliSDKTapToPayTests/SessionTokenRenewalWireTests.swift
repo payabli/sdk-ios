@@ -44,6 +44,31 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
+    func testAnActivationWhoseRenewalFailsRecordsTheProvidersFailureAndStaysWaiting() async throws {
+        let wire = Wire(refusing: "activate", registersPending: true)
+        StubURLProtocol.handler = wire.handle
+        let (ttp, _) = try makeTTP(renewalFails: true)
+        do {
+            try await ttp.initialize()
+            XCTFail("a pending registration reported ready")
+        } catch {}
+        let pending = ttp.sessionState
+        guard case .pendingActivation = pending else {
+            return XCTFail("the fixture itself is broken: \(pending)")
+        }
+
+        do {
+            try await ttp.activateDevice(activationCode: "123456")
+            XCTFail("an activation whose renewal failed reported success")
+        } catch {}
+
+        let recorded = ttp.sessionManager.lastError as? any PayabliError
+        XCTAssertEqual(recorded?.type, .tokenProviderFailed, "\(String(describing: ttp.sessionManager.lastError))")
+        XCTAssertEqual(ttp.sessionState, pending)
+        XCTAssertEqual(wire.bearers(for: "activate"), ["seed"], "nothing was sent after the failed renewal")
+        await ttp.reports.sent()
+    }
+
     // MARK: - The routes before a binding exists
 
     func testAColdStartWhoseChallengeRefusedItsTokenRenewsItAndAttests() async throws {
@@ -159,11 +184,17 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP(renewal: RenewalGate? = nil) throws -> (PayabliTTP, Tokens) {
+    ///
+    /// - Parameter renewal: holds the provider's renewal open until the test releases it.
+    /// - Parameter renewalFails: whether the provider throws instead of renewing.
+    private func makeTTP(renewal: RenewalGate? = nil, renewalFails: Bool = false) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
             if call > 1 {
+                if renewalFails {
+                    throw URLError(.notConnectedToInternet)
+                }
                 await renewal?.ask()
             }
             return call == 1 ? "seed" : "renewed-\(call)"
