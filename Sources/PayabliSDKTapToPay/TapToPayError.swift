@@ -69,10 +69,9 @@ extension TapToPayError {
     }
 }
 
-/// Bridges to `NSError` with the catalog number as its code, so an Objective-C caller branches on the same number
-/// telemetry reports. `userInfo` carries ``PayabliError/answerUserInfo``, a refused customer adds `refusal` and
-/// `requiredFields`, every identifier the paypoint requires named by its ``PayabliTTPCustomerData`` property, and an
-/// unexpected failure's redacted cause goes under `NSUnderlyingErrorKey`, naming its type only.
+/// Bridges to `NSError` with the catalog number as its code, the number telemetry reports. `userInfo` carries
+/// ``PayabliError/answerUserInfo``; a refused customer adds `refusal` and `requiredFields`, named by their
+/// ``PayabliTTPCustomerData`` properties; an unexpected failure's redacted cause goes under `NSUnderlyingErrorKey`.
 extension TapToPayError: CustomNSError {
     public static var errorDomain: String {
         "com.payabli.ttp"
