@@ -51,9 +51,7 @@ final class TapToPayReports {
             if let told {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
-            if let cause = told?.underlying as? RedactedCause {
-                properties[TelemetryProperty.failureType.rawValue] = cause.simpleTypeName
-            }
+            properties[TelemetryProperty.failureType.rawValue] = Self.failureType(of: error)
             if let code = told?.rawCode {
                 properties[TelemetryProperty.code.rawValue] = code
             }
@@ -100,6 +98,20 @@ final class TapToPayReports {
 
     private func record(_ name: String, properties: [String: String] = [:], occurredAt: Date) {
         TelemetryRecorders.recordFor(session, name, properties: properties, occurredAt: occurredAt)
+    }
+
+    /// The simple name of the type the run raised, read through a redaction to the type it stands in for; never a message.
+    ///
+    /// - Parameter error: what the run threw, before it was translated for the host.
+    /// - Returns: the redacted type's name, or the thrown type's otherwise.
+    static func failureType(of error: any Error) -> String {
+        if let redacted = (error as? TapToPayError)?.underlying as? RedactedCause {
+            return redacted.simpleTypeName
+        }
+        if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
+            return redacted.simpleTypeName
+        }
+        return RedactedCause(error).simpleTypeName
     }
 
     private static func milliseconds(_ duration: Duration) -> String {

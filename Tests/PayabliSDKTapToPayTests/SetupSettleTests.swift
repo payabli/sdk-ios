@@ -69,6 +69,15 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertFalse("\(bridged)".contains("MESSAGE-SENTINEL"))
     }
 
+    func testASetupWhoseTokenProviderThrowsNamesTheHostsTypeAsItsFailureType() async throws {
+        let (ttp, _, _, transport) = try makeTTP(tokenProvider: { throw HostThrew() })
+
+        _ = try? await ttp.initialize()
+
+        let event = try await failedEvent(ttp, transport)
+        XCTAssertEqual(event["failure_type"], "HostThrew")
+    }
+
     func testARearmReportsItsStartAndItsSuccess() async throws {
         let (ttp, provider, _, transport) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.readerUnavailable(reason: "busy"))
@@ -96,7 +105,7 @@ final class SetupSettleTests: XCTestCase {
         _ = try? await refused.0.initialize()
         let refusedEvent = try await failedEvent(refused.0, refused.3)
         XCTAssertNil(refusedEvent["code"], "a device route's result code is its status, not a condition")
-        XCTAssertNil(refusedEvent["failure_type"])
+        XCTAssertEqual(refusedEvent["failure_type"], "DeviceRouteRefusal", "a refusal names the SDK error's own type")
 
         let named = try makeTTP()
         named.1.configureResult = .failure(
@@ -138,14 +147,14 @@ final class SetupSettleTests: XCTestCase {
         return try XCTUnwrap(failed.first?.properties)
     }
 
-    private func makeTTP() throws -> (
-        PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService, InMemoryTelemetryTransport
-    ) {
+    private func makeTTP(
+        tokenProvider: @escaping @Sendable () async throws -> String = { "seed_token" }
+    ) throws -> (PayabliTTP, MockTapToPayProvider, MockDeviceAttestationService, InMemoryTelemetryTransport) {
         let provider = MockTapToPayProvider()
         let attestation = MockDeviceAttestationService()
         let transport = InMemoryTelemetryTransport()
         let ttp = PayabliTTP(
-            config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: { "seed_token" }),
+            config: try PayabliConfig(entryPoint: "e", environment: .sandbox, tokenProvider: tokenProvider),
             provider: provider,
             attestation: attestation,
             retryPolicy: RetryPolicy(maxAttempts: 1, baseDelay: 0, maxDelay: 0, multiplier: 1, maxJitter: 0),
