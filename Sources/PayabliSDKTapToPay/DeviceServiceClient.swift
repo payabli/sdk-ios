@@ -74,7 +74,8 @@ final class DeviceServiceClient: Sendable {
     /// - Parameter error: what the call threw.
     /// - Parameter route: the route the call sent.
     /// - Parameter answer: the response the call read, or `nil` when none arrived.
-    /// - Returns: `refused` and the service's code when the service answered no, `failed` and no code otherwise.
+    /// - Returns: `refused` and the code the host's error is read by when the service answered no under a code below
+    ///   500, `failed` and no code otherwise. An error status is that code, whatever the envelope says.
     static func outcome(
         of error: Error,
         on route: DeviceRoute,
@@ -88,7 +89,11 @@ final class DeviceServiceClient: Sendable {
               ![408, 429].contains(answer.statusCode)
         else { return ("failed", nil) }
         if let (code, _) = PayabliEnvelope.declineOutcome(from: answer.body) {
-            return ("refused", code)
+            let told: Int? = answer.statusCode >= 400 ? answer.statusCode : code
+            if let told, told >= 500 {
+                return ("failed", nil)
+            }
+            return ("refused", told)
         }
         // The gateway refuses `/config` with a bare 403 when the device owes its activation code.
         if route == .config, answer.statusCode == 403 {

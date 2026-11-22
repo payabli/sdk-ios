@@ -45,8 +45,8 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["code"], "409")
     }
 
-    func testADeclineNamingNoCodeIsRefusedWithoutOne() async throws {
-        let (client, telemetry) = makeClient(answering: .status(400, body: Data(#"{"isSuccess":false}"#.utf8)))
+    func testADeclineNamingNoCodeInsideASuccessfulStatusIsRefusedWithoutOne() async throws {
+        let (client, telemetry) = makeClient(answering: .status(200, body: Data(#"{"isSuccess":false}"#.utf8)))
 
         await assertThrows { _ = try await client.measured(.register) { try await Self.readRefusal(client.get(.register, Self.request)) } }
 
@@ -73,6 +73,32 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         let properties = try await onlyEvent(of: telemetry)
         XCTAssertEqual(properties["outcome"], "failed")
         XCTAssertNil(properties["code"])
+    }
+
+    func testAServerFailureInsideASuccessfulStatusIsFailedWithoutACode() async throws {
+        for route in [DeviceRoute.activate, .config] {
+            let (client, telemetry) = makeClient(answering: .status(200, body: Self.decline(code: 503)))
+
+            await assertThrows { _ = try await client.measured(route) { try await Self.readRefusal(client.get(route, Self.request)) } }
+
+            let events = try await sent(by: telemetry)
+            XCTAssertEqual(events.map(\.event), ["ttp.device.\(route.rawValue).completed"])
+            XCTAssertEqual(events.first?.properties["outcome"], "failed", route.rawValue)
+            XCTAssertNil(events.first?.properties["code"], route.rawValue)
+        }
+    }
+
+    func testADeclineWhoseCodeIsNotItsStatusIsRefusedWithTheStatus() async throws {
+        let answers: [(status: Int, body: Data)] = [(403, Self.decline(code: 400)), (400, Data(#"{"isSuccess":false}"#.utf8))]
+        for answer in answers {
+            let (client, telemetry) = makeClient(answering: .status(answer.status, body: answer.body))
+
+            await assertThrows { _ = try await client.measured(.activate) { try await Self.readRefusal(client.get(.activate, Self.request)) } }
+
+            let properties = try await onlyEvent(of: telemetry)
+            XCTAssertEqual(properties["outcome"], "refused")
+            XCTAssertEqual(properties["code"], String(answer.status))
+        }
     }
 
     func testAnAnswerThatCannotBeReadIsFailed() async throws {
