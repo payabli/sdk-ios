@@ -26,7 +26,7 @@ final class SendsOnHeldCredentialOnlyTests: XCTestCase {
             _ = await provider.increment()
             return "host-token"
         })
-        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
+        session.telemetry.record(TelemetryEventName.sdkInitialized)
         let queued = await session.telemetry.bufferedCount
 
         await session.telemetry.flush()
@@ -47,7 +47,7 @@ final class SendsOnHeldCredentialOnlyTests: XCTestCase {
             await "host-token-\(provider.increment())"
         })
         _ = try await session.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
-        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
+        session.telemetry.record(TelemetryEventName.sdkInitialized)
 
         await session.telemetry.flush()
 
@@ -73,7 +73,7 @@ final class SendsOnHeldCredentialOnlyTests: XCTestCase {
         while entered.value == nil {
             await Task.yield()
         }
-        await session.telemetry.emit(TelemetryEventName.sdkInitialized)
+        session.telemetry.record(TelemetryEventName.sdkInitialized)
 
         let flushed = Slot<Bool>()
         let flush = Task {
