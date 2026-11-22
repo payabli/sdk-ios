@@ -140,8 +140,8 @@ final class DeviceServiceClient: Sendable {
     /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
-    /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding is
-    ///   gone, before the status mapping.
+    /// - Parameter readsRefusalBeforeStatus: reads a 400, 401, 403 or 404's refusal envelope whose code is that status
+    ///   before the status mapping.
     /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
     ///   service sent, or `nil` where the words name nothing the route classifies, so the code decides.
@@ -194,22 +194,18 @@ final class DeviceServiceClient: Sendable {
             logger.error("[\(route.rawValue)] refused: the app is not registered on the paypoint")
             throw unregistered
         }
-        // Only the statuses a refusal is sent with. Every other status keeps the transport's own
-        // classification, a rate limit's wait among them. A classifier that knows the words throws its own
-        // failure; one that does not leaves the status mapping to answer.
+        // The service sends a refusal with its status equal to its code, so only that envelope is the route's answer,
+        // and only at the statuses a refusal is sent with. Every other answer keeps the transport's classification, a
+        // rate limit's wait and a refused token among them.
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
-           [400, 403, 404].contains(response.statusCode)
-           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason)
+           let code, code == response.statusCode, [400, 401, 403, 404].contains(code)
         {
-            logger.error("[\(route.rawValue)] refused (code=\(code.map(String.init) ?? "nil"))")
-            if let decline = makeDeclineError(code ?? response.statusCode, reason) {
+            logger.error("[\(route.rawValue)] refused (code=\(code))")
+            if let decline = makeDeclineError(code, reason) {
                 throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
             }
-            // A refusal naming no code is left to the status mapping below, so the status is never read as its code.
-            if let code {
-                throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
-            }
+            throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")

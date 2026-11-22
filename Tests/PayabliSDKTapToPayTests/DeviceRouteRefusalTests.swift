@@ -109,6 +109,15 @@ final class DeviceRouteRefusalTests: XCTestCase {
         }
     }
 
+    func testADeclineWhoseCodeIsNotItsStatusIsReadAsTheStatusAlone() async throws {
+        for (status, code) in [(403, 400), (404, 401), (400, 404)] {
+            let mismatched = try await attestFailure(status: status, body: Self.decline(code: code))
+            let bare = try await attestFailure(status: status, body: Data())
+            XCTAssertEqual(mismatched.type, bare.type, "status \(status) naming \(code)")
+            XCTAssertEqual(mismatched.httpStatus, status)
+        }
+    }
+
     func testAnAttestDeclineTheServiceCannotVerifyKeepsTheStatusItCameWith() async throws {
         let reason = "Attestation verification failed: Apple attestation root is unavailable."
         StubURLProtocol.handler = { request in
@@ -189,6 +198,21 @@ final class DeviceRouteRefusalTests: XCTestCase {
     }
 
     // MARK: - Fixtures
+
+    /// The host error `/challenge` lands on when it answers `status` with `body`.
+    private func attestFailure(status: Int, body: Data) async throws -> TapToPayError {
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!, body)
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+        } catch {
+            return try XCTUnwrap(TapToPayErrorTranslation.hostError(for: error) as? TapToPayError)
+        }
+        XCTFail("expected the attestation to fail")
+        throw CancellationError()
+    }
 
     private static func decline(code: Int) -> Data {
         decline(code: code, reason: "REASON-SENTINEL")

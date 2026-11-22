@@ -243,7 +243,7 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["code"], "404")
     }
 
-    func testARefusedTokenWithADeclineBodyIsFailed() async throws {
+    func testA401WhoseEnvelopeSays401IsRefusedWithItsCode() async throws {
         let telemetry = makeTelemetry()
         StubURLProtocol.handler = { request in
             (
@@ -257,8 +257,8 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         await assertThrows { _ = try await sut.attest(entry: "myEntry") }
 
         let properties = try await onlyEvent(of: telemetry)
-        XCTAssertEqual(properties["outcome"], "failed", "the token was refused, not the route")
-        XCTAssertNil(properties["code"])
+        XCTAssertEqual(properties["outcome"], "refused", "the service refused the device, not the token")
+        XCTAssertEqual(properties["code"], "401")
     }
 
     func testARateLimitIsFailed() async throws {

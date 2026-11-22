@@ -4,8 +4,8 @@ import PayabliSDKTestUtils
 import XCTest
 
 /// Device routes that pin their credential, over the wire: `/challenge`, `/register`, `/attest` and `/activate` each send
-/// a refused token once and keep it for the session to renew. On `/activate`, a 401 saying the binding is gone is told
-/// apart from a refused token by its text.
+/// a refused token once and keep it for the session to renew. A 401 whose envelope declines under 401 is the device
+/// refused, not the token.
 final class DeviceRoutePinTests: XCTestCase {
     private static let challenge = "/api/v2/device/taptopay/challenge"
     private static let register = "/api/v2/device/taptopay/register"
@@ -86,6 +86,25 @@ final class DeviceRoutePinTests: XCTestCase {
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "a refused token keeps the binding")
     }
 
+    func testA401WhoseEnvelopeSays401OnEachColdRouteIsTheDeviceRefusedNotTheToken() async throws {
+        for route in [Self.challenge, Self.register, Self.attest] {
+            let paths = PathsBox()
+            StubURLProtocol.handler = Self.coldSequence(paths: paths, refusing: route, body: Self.declining401)
+            let provider = Counter()
+            let (sut, _, _) = try AttestFixture.makeService(tokenProvider: Self.rotating(provider))
+
+            let failure = await failure { _ = try await sut.attest(entry: "myEntry") }
+
+            XCTAssertFalse(failure is PinnedTokenRefusal, "\(route): an envelope 401 was read as a refused token")
+            XCTAssertEqual(
+                (TapToPayErrorTranslation.hostError(for: failure) as? any PayabliError)?.code, 3005, "\(route): got \(failure)"
+            )
+            XCTAssertEqual(paths.values.filter { $0 == route }.count, 1, "\(route): no replay")
+            let calls = await provider.count
+            XCTAssertEqual(calls, 1, "\(route): the first token only: nothing was renewed")
+        }
+    }
+
     // MARK: - A binding the service no longer holds
 
     func testAnActivationRefusedBecauseTheBindingIsGoneDropsItAndAsksForSetupAgain() async throws {
@@ -102,22 +121,48 @@ final class DeviceRoutePinTests: XCTestCase {
         XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service no longer holds was kept")
     }
 
-    func testAnActivation401WithAnyOtherTextIsARefusedToken() async throws {
+    func testAnActivation401WhoseEnvelopeSays401WithAnyOtherTextDropsTheBindingAndRenewsNothing() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
-        // The text the service sends, with a final period it does not send.
-        StubURLProtocol.handler = Self.refusingActivation(reason: BindingRefusal.text + ".")
+        StubURLProtocol.handler = Self.refusingActivation(reason: "Unauthorized")
+        let provider = Counter()
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage, tokenProvider: Self.rotating(provider))
+
+        let failure = await failure {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+        }
+
+        XCTAssertFalse(failure is PinnedTokenRefusal, "an envelope 401 was read as a refused token")
+        XCTAssertEqual((TapToPayErrorTranslation.hostError(for: failure) as? any PayabliError)?.code, 3005, "got \(failure)")
+        XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service refused was kept")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only: nothing was renewed")
+    }
+
+    func testAnActivation401WithTheRevocationTextButNoCodeIsARefusedToken() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultText":"\#(BindingRefusal.text)"}}"#
+        StubURLProtocol.handler = { request in
+            if request.url!.path == Self.activate {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(body.utf8)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         let failure = await failure {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
         }
 
-        XCTAssertTrue(failure is PinnedTokenRefusal, "got \(failure)")
+        XCTAssertTrue(failure is PinnedTokenRefusal, "an envelope naming no code was read by its text: \(failure)")
         XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1")
     }
 
-    func testAnActivationRefusalInTheBodyWithAnyOtherTextKeepsTheBinding() async throws {
+    func testAnActivationRefusalInTheBodyWithAnyOtherTextDropsTheBinding() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
         let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Unauthorized"}}"#
@@ -132,11 +177,12 @@ final class DeviceRoutePinTests: XCTestCase {
         }
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
-        _ = await failure {
+        let failure = await failure {
             try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
         }
 
-        XCTAssertEqual(try sut.binding(for: "myEntry")?.deviceId, "dev_1", "the binding was dropped on another text")
+        XCTAssertEqual((TapToPayErrorTranslation.hostError(for: failure) as? any PayabliError)?.code, 3005, "got \(failure)")
+        XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service refused was kept")
     }
 
     func testAnActivationRefusalInTheBodyWithTheBindingGoneTextDropsIt() async throws {
@@ -172,13 +218,17 @@ final class DeviceRoutePinTests: XCTestCase {
         }
     }
 
-    /// The cold sequence, with `refused` answering 401 to every token.
-    private static func coldSequence(paths: PathsBox, refusing refused: String) -> StubURLProtocol.Handler {
+    private static let declining401 = Data(
+        #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"Unauthorized"}}"#.utf8
+    )
+
+    /// The cold sequence, with `refused` answering 401 to every token, carrying `body`.
+    private static func coldSequence(paths: PathsBox, refusing refused: String, body: Data = Data()) -> StubURLProtocol.Handler {
         { request in
             let path = request.url!.path
             paths.append(path)
             if path == refused {
-                return status(401, request)
+                return (HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: "HTTP/1.1", headerFields: nil)!, body)
             }
             switch path {
             case challenge:
