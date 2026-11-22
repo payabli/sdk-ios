@@ -251,6 +251,32 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(events.last?.properties["outcome"], "failed")
     }
 
+    func testAnActivationServerFailureInsideASuccessfulStatusIsFailedWithoutACode() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.decline(code: 503)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        defer { StubURLProtocol.handler = nil }
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        await assertThrows {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev")
+        }
+
+        let events = try await sent(by: telemetry)
+        XCTAssertEqual(events.last?.event, "ttp.device.activate.completed")
+        XCTAssertEqual(events.last?.properties["outcome"], "failed")
+        XCTAssertNil(events.last?.properties["code"])
+    }
+
     func testARouteRefusalReadByTheRealClientIsRefusedWithItsCode() async throws {
         let telemetry = makeTelemetry()
         StubURLProtocol.handler = { request in
