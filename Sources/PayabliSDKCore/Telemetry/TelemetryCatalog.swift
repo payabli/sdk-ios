@@ -14,6 +14,8 @@ package enum TelemetryProperty: String, CaseIterable, Sendable {
     case method
     case errorNumber = "error_number"
     case failureType = "failure_type"
+    case capture
+    case httpStatus = "http_status"
     /// How many events the queue evicted, as text.
     case dropped
 }
@@ -61,7 +63,9 @@ package enum TelemetryCatalog {
         TelemetryEventName.ttpNfcStarted: [],
         TelemetryEventName.ttpNfcSucceeded: timed,
         TelemetryEventName.ttpNfcFailed: [.outcome, .reason, .code, .errorNumber, .durationMs],
-        TelemetryEventName.ttpCloseFailed: failed.union([.origin]),
+        TelemetryEventName.ttpCloseStarted: [.origin],
+        TelemetryEventName.ttpCloseSucceeded: timed.union([.origin]),
+        TelemetryEventName.ttpCloseFailed: failed.union([.origin, .capture, .httpStatus, .reason]),
         TelemetryEventName.ttpReinitializeStarted: [],
         TelemetryEventName.ttpReinitializeSucceeded: timed,
         TelemetryEventName.ttpStateChanged: [.from, .to, .reason],

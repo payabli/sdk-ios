@@ -95,6 +95,67 @@ final class TapToPayReports {
         }
     }
 
+    /// Which call sent a close: the charge that read the card, or `closeCapturedCharge`.
+    enum CloseOrigin: String {
+        case charge
+        case retry
+    }
+
+    /// - Parameter origin: the call sending the close.
+    func closeStarted(_ origin: CloseOrigin) {
+        let now = Date()
+        let properties = [TelemetryProperty.origin.rawValue: origin.rawValue]
+        enqueue { await $0.emit(TelemetryEventName.ttpCloseStarted, properties: properties, occurredAt: now) }
+    }
+
+    /// - Parameter origin: the call that sent the close.
+    /// - Parameter duration: how long the close took.
+    func closeSucceeded(_ origin: CloseOrigin, after duration: Duration) {
+        let now = Date()
+        let properties = [
+            TelemetryProperty.origin.rawValue: origin.rawValue,
+            TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)
+        ]
+        enqueue { await $0.emit(TelemetryEventName.ttpCloseSucceeded, properties: properties, occurredAt: now) }
+    }
+
+    /// Reports a close that was not confirmed, by what the host is told. A close follows the reader's answer, so its
+    /// failure is never a decline.
+    ///
+    /// - Parameter error: what the close failed with, before it was translated for the host.
+    /// - Parameter origin: the call that sent the close.
+    /// - Parameter capture: what the host is told about the money.
+    /// - Parameter processorHasNoRecord: whether the refusal says the processor holds no record of the payment.
+    /// - Parameter type: the catalog entry the host is told, whose number this reports.
+    /// - Parameter duration: how long the close took.
+    func closeFailed(
+        _ error: Error,
+        origin: CloseOrigin,
+        capture: PayabliTTPCapture,
+        processorHasNoRecord: Bool,
+        type: PayabliErrorType,
+        after duration: Duration
+    ) {
+        let now = Date()
+        let answer = TapToPayErrorTranslation.answer(of: error)
+        var properties = [
+            TelemetryProperty.outcome.rawValue: "failed",
+            TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration),
+            TelemetryProperty.errorNumber.rawValue: String(type.number),
+            TelemetryProperty.origin.rawValue: origin.rawValue,
+            TelemetryProperty.failureType.rawValue: Self.failureType(of: error),
+            TelemetryProperty.capture.rawValue: Self.spelled(capture)
+        ]
+        properties[TelemetryProperty.code.rawValue] = answer.rawCode
+        properties[TelemetryProperty.httpStatus.rawValue] = answer.httpStatus.map(String.init)
+        if processorHasNoRecord {
+            properties[TelemetryProperty.reason.rawValue] = "processor_no_record"
+        }
+        enqueue { [properties] in
+            await $0.emit(TelemetryEventName.ttpCloseFailed, properties: properties, occurredAt: now)
+        }
+    }
+
     /// Queues the reports held while a token was renewed, in the order they were made, to go with the next batch.
     func releaseHeld() {
         let reports = held
@@ -116,6 +177,23 @@ final class TapToPayReports {
         tail = Task {
             await previous?.value
             await report(telemetry)
+        }
+    }
+
+    /// - Parameter error: what an operation threw.
+    /// - Returns: the simple name of the type a redaction stands in for, or of `error` itself. Never a message.
+    private static func failureType(of error: Error) -> String {
+        if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
+            return redacted.simpleTypeName
+        }
+        return RedactedCause(error).simpleTypeName
+    }
+
+    private static func spelled(_ capture: PayabliTTPCapture) -> String {
+        switch capture {
+        case .notCharged: "not_charged"
+        case .unknown: "unknown"
+        case .charged: "charged"
         }
     }
 

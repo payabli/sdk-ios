@@ -49,8 +49,12 @@ public extension PayabliTTP {
     ///   payment if it is still held, or unknown.
     private func sendClose(_ paymentTransId: String) async -> Result<Void, TapToPayError> {
         let held = heldPayments.payment(named: paymentTransId, entry: entryPoint, environment: environment)
+        let clock = ContinuousClock()
+        let start = clock.now
+        reports.closeStarted(.retry)
         do {
             try await transactionClient.close(paymentTransId: paymentTransId)
+            reports.closeSucceeded(.retry, after: clock.now - start)
             if let held {
                 if held.closeSettlesKey {
                     chargeKeys.settle(entry: entryPoint, environment: environment, key: held.key)
@@ -66,12 +70,21 @@ public extension PayabliTTP {
             let answer = TapToPayErrorTranslation.answer(of: error)
             // Read again, because another close of the same payment may have landed meanwhile.
             let stillHeld = heldPayments.payment(named: paymentTransId, entry: entryPoint, environment: environment)
+            let capture = stillHeld?.capture ?? .unknown
+            reports.closeFailed(
+                error,
+                origin: .retry,
+                capture: capture,
+                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error),
+                type: type,
+                after: clock.now - start
+            )
             return .failure(TapToPayError(
                 type: type,
                 reason: type.message,
                 detail: nil,
                 paymentTransId: paymentTransId,
-                capture: stillHeld?.capture ?? .unknown,
+                capture: capture,
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
                 httpStatus: answer.httpStatus,
                 rawCode: answer.rawCode

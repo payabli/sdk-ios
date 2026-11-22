@@ -229,7 +229,18 @@ extension PayabliTTP {
             // Its outcome does not change what the caller is told.
             recordChargeActivity(.closing, for: charge)
             let description = String(describing: error)
-            let close = await tryUpdate { [transactionClient] in
+            let close = await tryUpdate(capture: { processorHasNoRecord in
+                if processorHasNoRecord, !reservation.reused {
+                    return .notCharged
+                }
+                let told = TapToPayErrorTranslation.hostError(
+                    for: failure,
+                    chargeOf: paymentTransId,
+                    askedForCard: true,
+                    resentKey: reservation.reused
+                )
+                return (told as? TapToPayError)?.capture ?? .unknown
+            }) { [transactionClient] in
                 try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: description)
             }
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
@@ -298,7 +309,9 @@ extension PayabliTTP {
 
     private static let processorHasNoRecord = "Unable to locate the transaction with the payment processor"
 
-    private static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
+    /// - Parameter error: what a close failed with.
+    /// - Returns: whether it is the service's refusal saying the processor holds no record of the payment.
+    static func saysTheProcessorHasNoRecord(_ error: Error) -> Bool {
         guard let refusal = error as? any PayabliError, refusal.type == .validation else { return false }
         return refusal.detail == processorHasNoRecord
     }
@@ -315,17 +328,14 @@ extension PayabliTTP {
         readResult: CardReadResult,
         reservation: ChargeKeyStore.Reservation
     ) async throws -> TransactionResult {
-        heldPayments.hold(
-            HeldPayment(
-                paymentTransId: paymentTransId,
-                outcome: readResult.outcome,
-                key: reservation.key,
-                resentKey: reservation.reused
-            ),
-            entry: entryPoint,
-            environment: environment
+        let payment = HeldPayment(
+            paymentTransId: paymentTransId,
+            outcome: readResult.outcome,
+            key: reservation.key,
+            resentKey: reservation.reused
         )
-        let update = await tryUpdate { [transactionClient] in
+        heldPayments.hold(payment, entry: entryPoint, environment: environment)
+        let update = await tryUpdate(capture: { _ in payment.capture }) { [transactionClient] in
             try await transactionClient.update(paymentTransId: paymentTransId, result: readResult)
         }
         if case .succeeded = update {
@@ -426,7 +436,7 @@ extension PayabliTTP {
     private func refuseRetiredCharge(paymentTransId: String, charge: Int) async throws -> Never {
         recordChargeActivity(.closing, for: charge)
         let reason = Self.retiredReason
-        _ = await tryUpdate { [transactionClient] in
+        _ = await tryUpdate(capture: { _ in .notCharged }) { [transactionClient] in
             try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: reason)
         }
         sessionManager.failCharge(.sessionEnded, for: charge)
@@ -512,25 +522,53 @@ extension PayabliTTP {
         return deviceId
     }
 
-    /// Runs one of the transaction client's closes and reports how it ended.
+    /// Runs one of the charge's closes, reports it, and returns how it ended.
     ///
+    /// - Parameter capture: what the host is told about the money if the close fails, given whether the refusal says
+    ///   the processor holds no record of the payment.
     /// - Parameter send: the close to run.
     /// - Returns: what the update ended as: succeeded, failed with its reason and wait, or cancelled.
-    private func tryUpdate(_ send: @Sendable () async throws -> Void) async -> TTPUpdateOutcome {
+    private func tryUpdate(
+        capture: (_ processorHasNoRecord: Bool) -> PayabliTTPCapture,
+        _ send: @Sendable () async throws -> Void
+    ) async -> TTPUpdateOutcome {
+        let clock = ContinuousClock()
+        let start = clock.now
+        reports.closeStarted(.charge)
         do {
             try await send()
+            reports.closeSucceeded(.charge, after: clock.now - start)
             return .succeeded
-        } catch is CancellationError {
+        } catch {
+            let processorHasNoRecord = Self.saysTheProcessorHasNoRecord(error)
+            reports.closeFailed(
+                error,
+                origin: .charge,
+                capture: capture(processorHasNoRecord),
+                processorHasNoRecord: processorHasNoRecord,
+                type: .paymentNotClosed,
+                after: clock.now - start
+            )
+            return Self.outcome(of: error, processorHasNoRecord: processorHasNoRecord)
+        }
+    }
+
+    /// - Parameter error: what a close failed with.
+    /// - Parameter processorHasNoRecord: whether the refusal says the processor holds no record of the payment.
+    /// - Returns: the close's outcome: cancelled, or failed with its reason, wait and answer.
+    private static func outcome(of error: Error, processorHasNoRecord: Bool) -> TTPUpdateOutcome {
+        switch error {
+        case is CancellationError:
             // A cancelled request is not retried. What the caller is told depends on what the tap did.
             return .cancelled
-        } catch {
+        default:
             // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
             // layer underneath produced the failure.
             let answer = TapToPayErrorTranslation.answer(of: error)
             return .failed(
                 reason: error.localizedDescription,
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
-                processorHasNoRecord: Self.saysTheProcessorHasNoRecord(error),
+                processorHasNoRecord: processorHasNoRecord,
                 httpStatus: answer.httpStatus,
                 rawCode: answer.rawCode
             )
