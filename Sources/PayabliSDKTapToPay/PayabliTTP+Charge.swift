@@ -8,9 +8,6 @@ import PayabliSDKCore
 private enum TTPUpdateOutcome {
     case succeeded
     case failed(reason: String, retryAfter: TimeInterval?, processorHasNoRecord: Bool, httpStatus: Int?, rawCode: String?)
-
-    /// The caller cancelled. The best-effort notify after a reader failure ignores it.
-    case cancelled
 }
 
 @available(iOS 16.7, *)
@@ -383,11 +380,6 @@ extension PayabliTTP {
                 httpStatus: httpStatus,
                 rawCode: rawCode
             )
-        case .cancelled:
-            // The card was read, so a caller who cancelled is still told what the tap did.
-            throw PayabliTTPError.updateFailed(
-                reason: "The update was cancelled", paymentTransId: paymentTransId, capture: capture
-            )
         }
     }
 
@@ -537,38 +529,38 @@ extension PayabliTTP {
         return deviceId
     }
 
-    /// Runs one of the charge's closes, reports it, and returns how it ended.
+    /// Runs one of the charge's closes in a task the caller does not own, reports it, and returns how it ended. A close
+    /// the service never receives leaves the payment open, so a caller that cancels does not stop it.
     ///
     /// - Parameter capture: what the host is told about the money if the close fails, given whether the refusal says
     ///   the processor holds no record of the payment.
     /// - Parameter send: the close to run.
-    /// - Returns: what the update ended as: succeeded, failed with its reason and wait, or cancelled.
+    /// - Returns: what the update ended as: succeeded, or failed with its reason and wait.
     private func tryUpdate(
-        capture: (_ processorHasNoRecord: Bool) -> PayabliTTPCapture,
-        _ send: @Sendable () async throws -> Void
+        capture: @escaping (_ processorHasNoRecord: Bool) -> PayabliTTPCapture,
+        _ send: @escaping @Sendable () async throws -> Void
     ) async -> TTPUpdateOutcome {
-        let clock = ContinuousClock()
-        let start = clock.now
-        reports.closeStarted(.charge)
-        do {
-            try await send()
-            reports.closeSucceeded(.charge, after: clock.now - start)
-            return .succeeded
-        } catch is CancellationError {
-            // A cancelled close is not retried and reports no outcome. What the caller is told depends on what the tap did.
-            return .cancelled
-        } catch {
-            let processorHasNoRecord = Self.saysTheProcessorHasNoRecord(error)
-            reports.closeFailed(
-                error,
-                origin: .charge,
-                capture: capture(processorHasNoRecord),
-                processorHasNoRecord: processorHasNoRecord,
-                type: .paymentNotClosed,
-                after: clock.now - start
-            )
-            return Self.outcome(of: error, processorHasNoRecord: processorHasNoRecord)
-        }
+        await Task { @MainActor in
+            let clock = ContinuousClock()
+            let start = clock.now
+            self.reports.closeStarted(.charge)
+            do {
+                try await send()
+                self.reports.closeSucceeded(.charge, after: clock.now - start)
+                return .succeeded
+            } catch {
+                let processorHasNoRecord = Self.saysTheProcessorHasNoRecord(error)
+                self.reports.closeFailed(
+                    error,
+                    origin: .charge,
+                    capture: capture(processorHasNoRecord),
+                    processorHasNoRecord: processorHasNoRecord,
+                    type: .paymentNotClosed,
+                    after: clock.now - start
+                )
+                return Self.outcome(of: error, processorHasNoRecord: processorHasNoRecord)
+            }
+        }.value
     }
 
     /// - Parameter error: what a close failed with.

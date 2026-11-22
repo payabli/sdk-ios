@@ -44,18 +44,20 @@ final class CloseTelemetryTests: XCTestCase {
         XCTAssertNotNil(Int(closes.last?.properties["duration_ms"] ?? ""), "\(closes)")
     }
 
-    func testAChargeCancelledWhileItsCloseIsInFlightReportsNoFailedClose() async throws {
+    func testAChargeCancelledWhileItsCloseIsInFlightReportsHowTheCloseEnded() async throws {
         let (terminal, transport) = try await makeReadyTerminal()
         Self.wire.holdUpdates()
 
-        let charging = Task { _ = try await terminal.charge(paymentDetails: Self.sale) }
+        let charging = Task { try await terminal.charge(paymentDetails: Self.sale) }
         await Self.wire.waitUntilAnUpdateArrives()
         charging.cancel()
         Self.wire.release()
-        _ = try? await charging.value
+        let result = try await charging.value
 
+        XCTAssertFalse(result.paymentTransId.isEmpty, "the cancelled caller was not handed the payment")
         let closes = await reported(terminal, transport)
-        XCTAssertEqual(closes.map(\.event), ["ttp.close.started"], "\(closes.map(\.properties))")
+        XCTAssertEqual(closes.map(\.event), ["ttp.close.started", "ttp.close.succeeded"], "\(closes.map(\.properties))")
+        XCTAssertEqual(closes.map { $0.properties["origin"] }, ["charge", "charge"])
     }
 
     func testAChargeWhoseCloseFailsReportsWhatTheHostWasTold() async throws {

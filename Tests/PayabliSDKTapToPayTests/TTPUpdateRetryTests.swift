@@ -132,9 +132,9 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(Self.updateResponses.sends, 1)
     }
 
-    /// The card was charged at the tap, so a caller who cancels the close is told that rather than only
-    /// that it cancelled.
-    func testCancellingTheCloseOfAnApprovedSaleSaysTheCardWasCharged() async throws {
+    /// The card was charged at the tap, so a caller who cancels while the close is in flight still gets the close
+    /// finished and is handed the payment, rather than a cancellation.
+    func testCancellingTheCloseOfAnApprovedSaleFinishesItAndHandsBackThePayment() async throws {
         Self.updateResponses.holdOpen()
         let ttp = try await makeReadyTTP()
 
@@ -143,13 +143,10 @@ final class TTPUpdateRetryTests: XCTestCase {
         // being reached, which is the branch this case is about.
         await Self.updateResponses.waitUntilEntered()
         task.cancel()
+        Self.updateResponses.release()
 
-        let failure = await chargeFailure(of: task)
-        guard failure?.type == .paymentNotClosed else {
-            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
-        }
-        XCTAssertEqual(failure?.capture, .charged)
-        XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
+        let result = try await task.value
+        XCTAssertEqual(result.paymentTransId, Self.paymentTransId)
     }
 
     func testCancellingTheCloseOfARefusedCardIsStillReportedAsRefused() async throws {
@@ -159,6 +156,7 @@ final class TTPUpdateRetryTests: XCTestCase {
         let task = Task { try await charge(ttp) }
         await Self.updateResponses.waitUntilEntered()
         task.cancel()
+        Self.updateResponses.release()
 
         let failure = await chargeFailure(of: task)
         XCTAssertEqual(failure?.type, .cardDeclined)
@@ -166,18 +164,17 @@ final class TTPUpdateRetryTests: XCTestCase {
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
 
-    func testCancellingTheCloseOfAnOutcomeThatIsNeitherSaysItIsUnknown() async throws {
+    func testCancellingTheCloseOfAnOutcomeThatIsNeitherFinishesItAndSaysItIsUnknown() async throws {
         Self.updateResponses.holdOpen()
         let ttp = try await makeReadyTTP(outcome: .indeterminate)
 
         let task = Task { try await charge(ttp) }
         await Self.updateResponses.waitUntilEntered()
         task.cancel()
+        Self.updateResponses.release()
 
         let failure = await chargeFailure(of: task)
-        guard failure?.type == .paymentNotClosed else {
-            return XCTFail("expected the close to be reported, got \(String(describing: failure))")
-        }
+        XCTAssertEqual(failure?.type, .paymentOutcomeUnknown)
         XCTAssertEqual(failure?.capture, .unknown)
         XCTAssertEqual(failure?.paymentTransId, Self.paymentTransId)
     }
