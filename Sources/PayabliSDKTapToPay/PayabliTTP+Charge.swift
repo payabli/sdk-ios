@@ -229,18 +229,7 @@ extension PayabliTTP {
             // Its outcome does not change what the caller is told.
             recordChargeActivity(.closing, for: charge)
             let description = String(describing: error)
-            let close = await tryUpdate(capture: { processorHasNoRecord in
-                if processorHasNoRecord, !reservation.reused {
-                    return .notCharged
-                }
-                let told = TapToPayErrorTranslation.hostError(
-                    for: failure,
-                    chargeOf: paymentTransId,
-                    askedForCard: true,
-                    resentKey: reservation.reused
-                )
-                return (told as? TapToPayError)?.capture ?? .unknown
-            }) { [transactionClient] in
+            let close = await tryUpdate(capture: Self.readCapture(failure, paymentTransId, reservation)) { [transactionClient] in
                 try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: description)
             }
             // A close that lands keeps the key: the tap's answer is unknown. The processor holding no record of the
@@ -296,6 +285,32 @@ extension PayabliTTP {
     private func settleFresh(_ reservation: ChargeKeyStore.Reservation) {
         guard !reservation.reused else { return }
         chargeKeys.settle(entry: entryPoint, environment: environment, key: reservation.key)
+    }
+
+    /// What the host is told about the money when the close after a failed read fails.
+    ///
+    /// - Parameter failure: the read's failure.
+    /// - Parameter paymentTransId: the payment the charge opened.
+    /// - Parameter reservation: the key the charge sent, and whether it was already held.
+    /// - Returns: given whether the close's refusal says the processor holds no record of the payment, not charged for
+    ///   that refusal under a key this charge minted, otherwise the read failure's capture.
+    private static func readCapture(
+        _ failure: Error,
+        _ paymentTransId: String,
+        _ reservation: ChargeKeyStore.Reservation
+    ) -> (_ processorHasNoRecord: Bool) -> PayabliTTPCapture {
+        { processorHasNoRecord in
+            if processorHasNoRecord, !reservation.reused {
+                return .notCharged
+            }
+            let told = TapToPayErrorTranslation.hostError(
+                for: failure,
+                chargeOf: paymentTransId,
+                askedForCard: true,
+                resentKey: reservation.reused
+            )
+            return (told as? TapToPayError)?.capture ?? .unknown
+        }
     }
 
     /// Whether a read failed before the reader reached a card, so the charge took nothing.

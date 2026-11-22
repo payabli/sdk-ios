@@ -119,8 +119,8 @@ final class TapToPayReports {
         enqueue { await $0.emit(TelemetryEventName.ttpCloseSucceeded, properties: properties, occurredAt: now) }
     }
 
-    /// Reports a close that was not confirmed, by what the host is told. A close follows the reader's answer, so its
-    /// failure is never a decline.
+    /// Reports a close that was not confirmed, by what the host is told. A close records an outcome rather than asking
+    /// for one, so its failure is never a decline.
     ///
     /// - Parameter error: what the close failed with, before it was translated for the host.
     /// - Parameter origin: the call that sent the close.
