@@ -40,6 +40,35 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
+    func testAForeignErrorWhilePreparingTheReaderIsTheSDKsInternalError() async throws {
+        let (ttp, provider, _, _) = try makeTTP()
+        provider.prepareReaderResult = .failure(HostThrew())
+
+        try await assertInternal { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
+    }
+
+    func testAnUnexpectedFailureKeepsItsRedactedCauseWhenAChargeReportsIt() throws {
+        let failure = TapToPayError(type: .sdkInternalError, reason: "r", detail: nil, underlying: RedactedCause(HostThrew()))
+
+        let told = try XCTUnwrap(
+            TapToPayErrorTranslation.hostError(for: failure, chargeOf: "pay_1", askedForCard: false) as? TapToPayError
+        )
+
+        let cause = try XCTUnwrap(told.underlying as? RedactedCause)
+        XCTAssertEqual(cause.originalType, String(reflecting: HostThrew.self))
+    }
+
+    func testAnObjectiveCUnexpectedFailureCarriesItsCausesTypeAndNoneOfItsMessage() throws {
+        let failure = TapToPayError(type: .sdkInternalError, reason: "r", detail: nil, underlying: RedactedCause(HostThrew()))
+
+        let bridged = failure as NSError
+
+        let cause = try XCTUnwrap(bridged.userInfo[NSUnderlyingErrorKey] as? NSError)
+        XCTAssertEqual(cause.localizedDescription, String(reflecting: HostThrew.self))
+        XCTAssertFalse("\(bridged)".contains("MESSAGE-SENTINEL"))
+    }
+
     func testARearmReportsItsStartAndItsSuccess() async throws {
         let (ttp, provider, _, transport) = try makeTTP()
         provider.prepareReaderResult = .failure(PayabliTTPError.readerUnavailable(reason: "busy"))

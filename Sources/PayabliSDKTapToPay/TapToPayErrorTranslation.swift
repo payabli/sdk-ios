@@ -95,7 +95,8 @@ enum TapToPayErrorTranslation {
             retryAfter: failure.retryAfter,
             refusal: failure.refusal,
             httpStatus: failure.httpStatus,
-            rawCode: failure.rawCode
+            rawCode: failure.rawCode,
+            underlying: failure.underlying as? RedactedCause
         )
     }
 
