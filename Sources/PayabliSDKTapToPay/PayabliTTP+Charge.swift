@@ -554,6 +554,9 @@ extension PayabliTTP {
             try await send()
             reports.closeSucceeded(.charge, after: clock.now - start)
             return .succeeded
+        } catch is CancellationError {
+            // A cancelled close is not retried and reports no outcome. What the caller is told depends on what the tap did.
+            return .cancelled
         } catch {
             let processorHasNoRecord = Self.saysTheProcessorHasNoRecord(error)
             reports.closeFailed(
@@ -570,24 +573,18 @@ extension PayabliTTP {
 
     /// - Parameter error: what a close failed with.
     /// - Parameter processorHasNoRecord: whether the refusal says the processor holds no record of the payment.
-    /// - Returns: the close's outcome: cancelled, or failed with its reason, wait and answer.
+    /// - Returns: the close's failure, with its reason, wait and answer.
     private static func outcome(of error: Error, processorHasNoRecord: Bool) -> TTPUpdateOutcome {
-        switch error {
-        case is CancellationError:
-            // A cancelled request is not retried. What the caller is told depends on what the tap did.
-            return .cancelled
-        default:
-            // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
-            // layer underneath produced the failure.
-            let answer = TapToPayErrorTranslation.answer(of: error)
-            return .failed(
-                reason: error.localizedDescription,
-                retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
-                processorHasNoRecord: processorHasNoRecord,
-                httpStatus: answer.httpStatus,
-                rawCode: answer.rawCode
-            )
-        }
+        // The caller still gets this surface's vocabulary, so the outcome reads the same whatever
+        // layer underneath produced the failure.
+        let answer = TapToPayErrorTranslation.answer(of: error)
+        return .failed(
+            reason: error.localizedDescription,
+            retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
+            processorHasNoRecord: processorHasNoRecord,
+            httpStatus: answer.httpStatus,
+            rawCode: answer.rawCode
+        )
     }
 
     /// Two lines: the charge summary, then which customer fields the caller

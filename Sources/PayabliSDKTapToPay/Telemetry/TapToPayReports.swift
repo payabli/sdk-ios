@@ -126,7 +126,8 @@ final class TapToPayReports {
     /// - Parameter origin: the call that sent the close.
     /// - Parameter capture: what the host is told about the money.
     /// - Parameter processorHasNoRecord: whether the refusal says the processor holds no record of the payment.
-    /// - Parameter type: the catalog entry the host is told, whose number this reports.
+    /// - Parameter type: the catalog entry whose number this reports: the close's own for a charge's close, and the one
+    ///   the host is told for `closeCapturedCharge`.
     /// - Parameter duration: how long the close took.
     func closeFailed(
         _ error: Error,
