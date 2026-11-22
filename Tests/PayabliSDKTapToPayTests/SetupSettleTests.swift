@@ -48,6 +48,22 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
+    func testACancellationWhileConfiguringTheReaderStaysACancellation() async throws {
+        let (ttp, provider, _, _) = try makeTTP()
+        provider.configureResult = .failure(CancellationError())
+
+        await assertCancelled { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .idle)
+    }
+
+    func testACancellationWhilePreparingTheReaderStaysACancellation() async throws {
+        let (ttp, provider, _, _) = try makeTTP()
+        provider.prepareReaderResult = .failure(CancellationError())
+
+        await assertCancelled { try await ttp.initialize() }
+        XCTAssertEqual(ttp.sessionState, .idle)
+    }
+
     func testAnUnexpectedFailureKeepsItsRedactedCauseWhenAChargeReportsIt() throws {
         let failure = TapToPayError(type: .sdkInternalError, reason: "r", detail: nil, underlying: RedactedCause(HostThrew()))
 
@@ -136,6 +152,15 @@ final class SetupSettleTests: XCTestCase {
             XCTAssertEqual((error.underlying as? RedactedCause)?.simpleTypeName, "HostThrew", file: file, line: line)
             XCTAssertFalse("\(error)".contains("MESSAGE-SENTINEL"), file: file, line: line)
             XCTAssertFalse(error.localizedDescription.contains("MESSAGE-SENTINEL"), file: file, line: line)
+        }
+    }
+
+    private func assertCancelled(file: StaticString = #filePath, line: UInt = #line, _ call: () async throws -> Void) async {
+        do {
+            try await call()
+            XCTFail("expected the call to fail", file: file, line: line)
+        } catch {
+            XCTAssertTrue(error is CancellationError, "\(error)", file: file, line: line)
         }
     }
 
