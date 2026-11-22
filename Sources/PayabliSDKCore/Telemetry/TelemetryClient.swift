@@ -205,8 +205,7 @@ package actor TelemetryClient {
         await drainWhatWasWaiting()
     }
 
-    /// Appends an event to the queue on the caller's thread. A failure, or the event that fills a batch, asks the client
-    /// to send; nothing here waits on a send.
+    /// Appends an event to the queue on the caller's thread; nothing here waits on a send.
     ///
     /// - Parameter name: the event's catalog name.
     /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
