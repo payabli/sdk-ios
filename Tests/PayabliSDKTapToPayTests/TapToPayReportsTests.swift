@@ -191,6 +191,12 @@ final class TapToPayReportsTests: XCTestCase {
             "the end leaves on the installed channel"
         )
         XCTAssertTrue((before + after).allSatisfy { $0.sessionId == run.first.telemetry.sessionId })
+        let moves = await sent(run.secondTransport).filter { $0.event == "ttp.session.stateChanged" }
+        XCTAssertFalse(moves.isEmpty, "the run's state moves after the install were not reported")
+        XCTAssertTrue(
+            moves.allSatisfy { $0.sessionId == run.first.telemetry.sessionId },
+            "a state move took the installed session's id"
+        )
     }
 
     func testWorkFinishingAfterASessionOnAnotherEntryPointIsInstalledIsNotReportedThere() async throws {

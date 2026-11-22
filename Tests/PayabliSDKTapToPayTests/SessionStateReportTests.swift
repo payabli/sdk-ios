@@ -34,6 +34,32 @@ final class SessionStateReportTests: XCTestCase {
         XCTAssertEqual(count, 0)
     }
 
+    func testAChargeReportsItsStartAndItsEndAndNotItsActivities() throws {
+        let manager = Self.readyManager()
+        var moves: [String] = []
+        manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
+
+        let charge = try XCTUnwrap(manager.beginCharge())
+        for activity in [TapToPayChargeActivity.waitingForCard, .cardDetected, .pinEntryRequested, .pinEntryCompleted, .closing] {
+            manager.recordChargeActivity(activity, for: charge)
+        }
+        manager.endCharge(charge)
+
+        XCTAssertEqual(moves, ["ready -> charging", "charging -> ready"])
+    }
+
+    func testAFailedChargeReportsItsMoveToFailed() throws {
+        let manager = Self.readyManager()
+        var moves: [String] = []
+        manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
+
+        let charge = try XCTUnwrap(manager.beginCharge())
+        manager.recordChargeActivity(.waitingForCard, for: charge)
+        manager.failCharge(.sdkInternalError, for: charge)
+
+        XCTAssertEqual(moves, ["ready -> charging", "charging -> failed"])
+    }
+
     func testAMoveToFailedSaysWhyAndNoOtherMoveDoes() async throws {
         let transport = InMemoryTelemetryTransport()
         let provider = MockTapToPayProvider()
@@ -60,5 +86,13 @@ final class SessionStateReportTests: XCTestCase {
             XCTAssertEqual(Set(move.properties.keys), ["from", "to"], "\(move.properties)")
         }
         XCTAssertFalse(moves.dropLast().isEmpty)
+    }
+
+    private static func readyManager() -> SessionManager {
+        let manager = SessionManager()
+        for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
+            manager.transition(to: state)
+        }
+        return manager
     }
 }
