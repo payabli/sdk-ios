@@ -109,12 +109,14 @@ final class DeviceRouteRefusalTests: XCTestCase {
         }
     }
 
-    func testADeclineWhoseCodeIsNotItsStatusIsReadAsTheStatusAlone() async throws {
-        for (status, code) in [(403, 400), (404, 401), (400, 404)] {
-            let mismatched = try await attestFailure(status: status, body: Self.decline(code: code))
-            let bare = try await attestFailure(status: status, body: Data())
-            XCTAssertEqual(mismatched.type, bare.type, "status \(status) naming \(code)")
-            XCTAssertEqual(mismatched.httpStatus, status)
+    func testADeclineWhoseCodeIsNotItsStatusIsClassifiedByItsStatus() async throws {
+        let cases: [(status: Int, code: Int, type: PayabliErrorType)] = [
+            (403, 400, .devicePendingActivation), (404, 401, .entryPointRefused), (400, 404, .sdkInternalError)
+        ]
+        for row in cases {
+            let failure = try await attestFailure(status: row.status, body: Self.decline(code: row.code))
+            XCTAssertEqual(failure.type, row.type, "status \(row.status) naming \(row.code)")
+            XCTAssertEqual(failure.httpStatus, row.status)
         }
     }
 
@@ -145,10 +147,10 @@ final class DeviceRouteRefusalTests: XCTestCase {
         }
     }
 
-    func testAConfigRefusalOfTheEntryPointUnderA400IsTheEntryPointRefused() async throws {
+    func testAConfigRefusalOfTheEntryPointAtItsOwnStatusIsTheEntryPointRefused() async throws {
         StubURLProtocol.handler = { request in
             (
-                HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: "HTTP/1.1", headerFields: nil)!,
                 Self.decline(code: 403, reason: ColdRouteRefusals.entryPointUnusable)
             )
         }

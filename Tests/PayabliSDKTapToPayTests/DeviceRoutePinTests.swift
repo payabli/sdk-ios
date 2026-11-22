@@ -7,6 +7,9 @@ import XCTest
 /// a refused token once and keep it for the session to renew. A 401 whose envelope declines under 401 is the device
 /// refused, not the token.
 final class DeviceRoutePinTests: XCTestCase {
+    /// The service's words for a binding it no longer holds.
+    private static let revocationText = "Device not attested or attestation revoked"
+
     private static let challenge = "/api/v2/device/taptopay/challenge"
     private static let register = "/api/v2/device/taptopay/register"
     private static let attest = "/api/v2/device/taptopay/attest"
@@ -110,7 +113,7 @@ final class DeviceRoutePinTests: XCTestCase {
     func testAnActivationRefusedBecauseTheBindingIsGoneDropsItAndAsksForSetupAgain() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
-        StubURLProtocol.handler = Self.refusingActivation(reason: BindingRefusal.text)
+        StubURLProtocol.handler = Self.refusingActivation(reason: Self.revocationText)
         let (sut, _, _) = try AttestFixture.makeService(storage: storage)
 
         let failure = await failure {
@@ -142,7 +145,7 @@ final class DeviceRoutePinTests: XCTestCase {
     func testAnActivation401WithTheRevocationTextButNoCodeIsARefusedToken() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
-        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultText":"\#(BindingRefusal.text)"}}"#
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultText":"\#(Self.revocationText)"}}"#
         StubURLProtocol.handler = { request in
             if request.url!.path == Self.activate {
                 return (
@@ -188,7 +191,7 @@ final class DeviceRoutePinTests: XCTestCase {
     func testAnActivationRefusalInTheBodyWithTheBindingGoneTextDropsIt() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
-        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"\#(BindingRefusal.text)"}}"#
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"\#(Self.revocationText)"}}"#
         StubURLProtocol.handler = { request in
             if request.url!.path == Self.activate {
                 return (

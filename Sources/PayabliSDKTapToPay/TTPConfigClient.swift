@@ -52,15 +52,15 @@ final class TTPConfigClient: Sendable {
                 throw PinnedTokenRefusal()
             }
 
+            // A refusal naming no code is left to the status mapping below; one whose code is not its status is classified
+            // by the status.
             if [400, 404].contains(response.statusCode),
-               let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body)
+               let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body), let code
             {
-                // A refusal naming no code, and words this route does not know, is left to the status mapping below.
-                let refused = ColdRouteRefusals.decline(code: code, reason: reason)
-                    ?? code.map { DeviceRouteRefusal.of(code: $0, reason: reason, httpStatus: response.statusCode) }
-                if let refused {
-                    throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
-                }
+                let read = code == response.statusCode ? ColdRouteRefusals.decline(code: code, reason: reason) : nil
+                let refused = read
+                    ?? DeviceRouteRefusal.of(code: response.statusCode, reason: reason, httpStatus: response.statusCode)
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
             }
             try mapPayabliHTTPError(response: response) { code in
                 if code == 403 {
@@ -121,7 +121,7 @@ final class TTPConfigClient: Sendable {
         entry: String,
         presented headers: AssertionHeaders
     ) throws {
-        guard let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body) else { return }
+        guard let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body) else { return }
         if let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason) {
             logger.error("[config] refused: the app is not registered on the paypoint")
             throw unregistered
@@ -130,7 +130,8 @@ final class TTPConfigClient: Sendable {
             logger.error("[config] refused: the entry point is not available")
             throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
         }
-        guard BindingRefusal.isBindingGone(code: response.statusCode, reason: reason) else { return }
+        // A 401 naming 401 is the service holding no live attestation for this binding, whatever its words.
+        guard response.statusCode == 401, code == 401 else { return }
         logger.error("[config] the service holds no live attestation for this binding")
         guard dropRefusedBinding(entry: entry, presented: headers) else {
             throw PayabliTTPError.attestationRevoked(

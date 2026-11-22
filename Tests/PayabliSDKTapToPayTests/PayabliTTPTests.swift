@@ -469,6 +469,61 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .deviceSetupRequired)
     }
 
+    func testAConfig401NamingA401WithAnyOtherTextDiscardsTheBindingAndRenewsNothing() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = Self.configAnswer(status: 401, code: 401)
+
+        let thrown = await failure { try await ttp.initialize() }
+
+        XCTAssertFalse(attestation.isAlreadyAttested, "a refused binding must not be presented again")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired), "a renewed token meets the same refusal")
+        XCTAssertEqual((thrown as? TapToPayError)?.type, .deviceSetupRequired)
+    }
+
+    func testAConfig400NamingA401IsTheSDKsInternalErrorAndKeepsTheBinding() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = Self.configAnswer(status: 400, code: 401)
+
+        let thrown = await failure { try await ttp.initialize() }
+
+        XCTAssertTrue(attestation.isAlreadyAttested, "a body the route did not build says nothing about the binding")
+        XCTAssertEqual((thrown as? TapToPayError)?.type, .sdkInternalError)
+    }
+
+    func testAConfig404NamingA403IsClassifiedByItsStatusNotAsPendingActivation() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = Self.configAnswer(status: 404, code: 403)
+
+        let thrown = await failure { try await ttp.initialize() }
+
+        XCTAssertEqual((thrown as? TapToPayError)?.type, .entryPointRefused)
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
+    }
+
+    /// `/config` answering `status` with an envelope declining under `code`, with words no classifier knows.
+    private static func configAnswer(status: Int, code: Int) -> StubURLProtocol.Handler {
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":\#(code),"resultText":"Unauthorized"}}"#
+        return { request in
+            (
+                HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                Data(body.utf8)
+            )
+        }
+    }
+
+    private func failure(_ call: () async throws -> Void) async -> Error? {
+        do {
+            try await call()
+            XCTFail("expected the call to fail")
+        } catch {
+            return error
+        }
+        return nil
+    }
+
     /// An Objective-C host is told about every state `initialize()` passes through, and reads each one.
     func testInitializeWalksTheSessionStatesAnObserverReads() async throws {
         let (ttp, _, _) = try makeTTP()

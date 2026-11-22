@@ -194,18 +194,18 @@ final class DeviceServiceClient: Sendable {
             logger.error("[\(route.rawValue)] refused: the app is not registered on the paypoint")
             throw unregistered
         }
-        // Only an envelope whose code is the status it came with is the route's refusal, and only at the statuses a
-        // refusal is sent with. Every other answer keeps the transport's classification, a rate limit's wait and a
-        // refused token among them.
+        // At the statuses a refusal is sent with, an envelope naming a code is the route's refusal, read by its words only
+        // when the code is the status it came with and classified by the status otherwise. Every other answer keeps the
+        // transport's classification, a rate limit's wait and a refused token among them.
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
-           let code, code == response.statusCode, [400, 401, 403, 404].contains(code)
+           let code, [400, 401, 403, 404].contains(response.statusCode)
         {
             logger.error("[\(route.rawValue)] refused (code=\(code))")
-            if let decline = makeDeclineError(code, reason) {
+            if code == response.statusCode, let decline = makeDeclineError(code, reason) {
                 throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
             }
-            throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
+            throw DeviceRouteRefusal.of(code: response.statusCode, reason: reason, httpStatus: response.statusCode)
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
