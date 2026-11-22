@@ -12,9 +12,13 @@ package struct TelemetrySessionContext: Sendable, Equatable {
 /// A record is appended to the channel installed when it is made, on the caller's thread, before the call returns;
 /// only sending is asynchronous. With nothing installed, a properties argument is never evaluated.
 package enum TelemetryRecorders {
+    private typealias Replaced = CheckedContinuation<Void, Never>
+
     private static let lock = NSLock()
     private nonisolated(unsafe) static var installed: TelemetryClient?
-    private nonisolated(unsafe) static var waitingForReplacement: [CheckedContinuation<Void, Never>] = []
+    /// Records that read a channel and have not yet appended to it, by channel.
+    private nonisolated(unsafe) static var appending: [ObjectIdentifier: Int] = [:]
+    private nonisolated(unsafe) static var waitingForReplacement: [(client: ObjectIdentifier, replaced: Replaced)] = []
 
     /// Installs `client`, replacing whatever was installed: a re-initialized session reports through its own channel.
     ///
@@ -28,14 +32,16 @@ package enum TelemetryRecorders {
         replace(with: nil)
     }
 
-    /// Returns once `client` is no longer the installed channel, so every later record reaches another one.
+    /// Returns once `client` is no longer the installed channel and every record that read it has been appended, so
+    /// nothing can still reach it.
     ///
     /// - Parameter client: the channel being retired.
     package static func replaced(_ client: TelemetryClient) async {
-        await withCheckedContinuation { (replaced: CheckedContinuation<Void, Never>) in
+        let id = ObjectIdentifier(client)
+        await withCheckedContinuation { (replaced: Replaced) in
             let waits = lock.withLock {
-                guard installed === client else { return false }
-                waitingForReplacement.append(replaced)
+                guard !isReplaced(id) else { return false }
+                waitingForReplacement.append((id, replaced))
                 return true
             }
             if !waits {
@@ -45,12 +51,7 @@ package enum TelemetryRecorders {
     }
 
     private static func replace(with client: TelemetryClient?) {
-        let waiting = lock.withLock {
-            installed = client
-            defer { waitingForReplacement = [] }
-            return waitingForReplacement
-        }
-        waiting.forEach { $0.resume() }
+        changing { installed = client }
     }
 
     /// Appends an event to the installed channel, or does nothing.
@@ -65,7 +66,8 @@ package enum TelemetryRecorders {
         occurredAt: Date = Date(),
         waitsForBatch: Bool = false
     ) {
-        guard let client = lock.withLock({ installed }) else { return }
+        guard let client = reading() else { return }
+        defer { appended(client) }
         client.record(name, properties: properties(), occurredAt: occurredAt, waitsForBatch: waitsForBatch)
     }
 
@@ -84,7 +86,8 @@ package enum TelemetryRecorders {
         occurredAt: Date = Date(),
         waitsForBatch: Bool = false
     ) {
-        guard let client = lock.withLock({ installed }) else { return }
+        guard let client = reading() else { return }
+        defer { appended(client) }
         client.record(
             name,
             properties: properties(),
@@ -104,6 +107,49 @@ package enum TelemetryRecorders {
     package static func flush() async {
         let client = lock.withLock { installed }
         await client?.flush()
+    }
+
+    /// Returns the installed channel, which cannot be replaced until `appended(_:)` is called with it.
+    ///
+    /// - Returns: the installed channel, or `nil` when none is.
+    private static func reading() -> TelemetryClient? {
+        lock.withLock {
+            guard let client = installed else { return nil }
+            appending[ObjectIdentifier(client), default: 0] += 1
+            return client
+        }
+    }
+
+    /// Ends the hold `reading()` took on `client`.
+    ///
+    /// - Parameter client: the channel the record was appended to.
+    private static func appended(_ client: TelemetryClient) {
+        let id = ObjectIdentifier(client)
+        changing {
+            let left = (appending[id] ?? 1) - 1
+            appending[id] = left > 0 ? left : nil
+        }
+    }
+
+    /// Applies `change` under the lock, then resumes every wait whose channel is now replaced.
+    ///
+    /// - Parameter change: the change to the installed channel or to the records still appending.
+    private static func changing(_ change: () -> Void) {
+        let ready: [Replaced] = lock.withLock {
+            change()
+            let ready = waitingForReplacement.filter { isReplaced($0.client) }.map(\.replaced)
+            waitingForReplacement.removeAll { isReplaced($0.client) }
+            return ready
+        }
+        ready.forEach { $0.resume() }
+    }
+
+    /// Whether the channel is not installed and no record still holds it. Called under the lock.
+    ///
+    /// - Parameter client: the channel's identity.
+    /// - Returns: `true` when nothing can still reach it.
+    private static func isReplaced(_ client: ObjectIdentifier) -> Bool {
+        installed.map(ObjectIdentifier.init) != client && appending[client] == nil
     }
 }
 

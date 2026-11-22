@@ -129,17 +129,83 @@ final class TelemetryRecordersTests: XCTestCase {
         XCTAssertEqual(events.map(\.event), names)
     }
 
+    func testARecordBuildingItsPropertiesAcrossAReplacementArrivesUnderTheSessionItWasMadeIn() async throws {
+        let first = Self.client(entry: "e", transport: InMemoryTelemetryTransport())
+        TelemetryRecorders.install(first)
+        let builder = BlockingBuilder()
+        let recording = await recordWhileBuilding(builder) {
+            TelemetryRecorders.record(TelemetryEventName.ttpInitializeStarted, properties: builder.build())
+        }
+
+        let transport = InMemoryTelemetryTransport()
+        TelemetryRecorders.install(Self.client(entry: "e", transport: transport, replacing: first))
+        // Room for a hand-over that does not wait for the record to close the replaced channel's queue.
+        try await Task.sleep(for: .milliseconds(100))
+        builder.release()
+        await recording.value
+
+        let events = await sent(transport)
+        XCTAssertEqual(events.map(\.event), [TelemetryEventName.ttpInitializeStarted])
+        XCTAssertEqual(events.map(\.sessionId), [first.sessionId])
+    }
+
+    func testARecordForASessionBuildingItsPropertiesAcrossAReplacementArrivesUnderThatSession() async throws {
+        let started = Self.client(entry: "e", transport: InMemoryTelemetryTransport())
+        let first = Self.client(entry: "e", transport: InMemoryTelemetryTransport())
+        TelemetryRecorders.install(first)
+        let builder = BlockingBuilder()
+        let recording = await recordWhileBuilding(builder) {
+            TelemetryRecorders.recordFor(
+                started.context,
+                TelemetryEventName.ttpInitializeStarted,
+                properties: builder.build()
+            )
+        }
+
+        let transport = InMemoryTelemetryTransport()
+        TelemetryRecorders.install(Self.client(entry: "e", transport: transport, replacing: first))
+        // Room for a hand-over that does not wait for the record to close the replaced channel's queue.
+        try await Task.sleep(for: .milliseconds(100))
+        builder.release()
+        await recording.value
+
+        let events = await sent(transport)
+        XCTAssertEqual(events.map(\.event), [TelemetryEventName.ttpInitializeStarted])
+        XCTAssertEqual(events.map(\.sessionId), [started.sessionId])
+    }
+
     // MARK: - Fixtures
 
-    private static func client(entry: String, transport: InMemoryTelemetryTransport) -> TelemetryClient {
+    private static func client(
+        entry: String,
+        transport: InMemoryTelemetryTransport,
+        replacing predecessor: TelemetryClient? = nil
+    ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(entry: entry, environment: "sandbox"),
             transport: transport,
             sleep: ManualTelemetryClock().sleep,
             lifecycle: ManualAppLifecycle(),
             deviceId: { nil },
-            queued: []
+            queued: [],
+            predecessor: predecessor,
+            predecessorReplaced: { await TelemetryRecorders.replaced($0) }
         )
+    }
+
+    /// Starts `record` on another thread, and returns once its properties are being built and `builder` holds them.
+    ///
+    /// - Parameter builder: the gate the properties wait on.
+    /// - Parameter record: the record whose properties `builder` builds.
+    /// - Returns: the recording, which ends once `builder` is released.
+    private func recordWhileBuilding(
+        _ builder: BlockingBuilder,
+        _ record: @escaping @Sendable () -> Void
+    ) async -> Task<Void, Never> {
+        let recording = Task.detached { record() }
+        let building = await builder.waitUntilBuilding()
+        XCTAssertTrue(building, "the properties were never built")
+        return recording
     }
 
     private func sent(_ transport: InMemoryTelemetryTransport) async -> [TelemetryEvent] {
@@ -161,5 +227,33 @@ private final class PropertyBuilds: @unchecked Sendable {
     func next() -> [String: String] {
         lock.withLock { count += 1 }
         return [:]
+    }
+}
+
+/// Property building that holds its record until released.
+private final class BlockingBuilder: @unchecked Sendable {
+    private let released = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var started = false
+
+    func build() -> [String: String] {
+        lock.withLock { started = true }
+        _ = released.wait(timeout: .now() + 5)
+        return [:]
+    }
+
+    /// - Returns: whether the building began within five seconds.
+    func waitUntilBuilding() async -> Bool {
+        for _ in 0 ..< 500 {
+            if lock.withLock({ started }) {
+                return true
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return false
+    }
+
+    func release() {
+        released.signal()
     }
 }
