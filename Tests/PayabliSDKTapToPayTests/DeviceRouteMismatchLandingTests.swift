@@ -38,6 +38,22 @@ final class DeviceRouteMismatchLandingTests: XCTestCase {
         }
     }
 
+    func testAnActivation401NamingAnotherCodeLandsOnSetupRequiredWithTheBindingGone() async throws {
+        for code in [400, 403, 404] {
+            let (ttp, attestation) = try await pendingTTP(activateAnswer: { request in
+                Self.refusal(request, status: 401, resultCode: code, reason: "Declined")
+            })
+
+            let thrown = await failure { try await ttp.activateDevice(activationCode: "123456") }
+
+            let label = "status 401 naming \(code)"
+            XCTAssertEqual((thrown as? TapToPayError)?.type, .deviceSetupRequired, "\(label): got \(thrown)")
+            XCTAssertEqual((thrown as? TapToPayError)?.httpStatus, 401, label)
+            XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired), label)
+            XCTAssertNil(try attestation.binding(for: "myEntry"), "\(label): the refused binding is dropped")
+        }
+    }
+
     // MARK: - Cold routes
 
     func testAChallengeDeclineNaming403WithNoRegistrationLandsOnTheConfigurationAndAsksForNoCode() async throws {

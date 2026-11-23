@@ -26,6 +26,21 @@ enum ActivationRefusals {
         return DeviceRefusalStatus.carrying(status, on: refusal)
     }
 
+    /// A 401 whose envelope named another code: the service holds no attestation for the key, so the session lands
+    /// by the refusal.
+    ///
+    /// - Parameter refusal: the route's refusal, read by its status.
+    /// - Returns: `DEVICE_SETUP_REQUIRED` carrying the refusal's status, moving the session.
+    static func deviceRefused(_ refusal: DeviceRouteRefusal) -> any Error {
+        let type = refusal.type
+        let moved = ActivationRefusal(
+            hostError: TapToPayError(type: type, reason: type.message, detail: nil),
+            movesSession: true
+        )
+        guard let status = refusal.httpStatus else { return moved }
+        return DeviceRefusalStatus.carrying(status, on: moved)
+    }
+
     static func hostError(resultCode: Int?, reason: String) -> TapToPayError {
         let type = catalogType(resultCode: resultCode, reason: reason)
         return TapToPayError(type: type, reason: type.message, detail: reason.isEmpty ? nil : reason)

@@ -27,13 +27,13 @@ package extension AppAttestService {
             try await postActivate(activationCode: activationCode, entry: entry, assertion: assertion)
         } catch let refusal as DeviceRouteRefusal where refusal.type == .deviceSetupRequired {
             // A 401 whose envelope names another code is read by its status: the service holds no attestation for this
-            // key. A store that refuses the drop leaves the refusal unchanged.
+            // key, so the session stops waiting for a code. A store that refuses the drop leaves the refusal unchanged.
             do {
                 try forgetRefused(AttestedDevice(entry: entry, deviceId: assertion.deviceId, keyId: assertion.keyId))
             } catch {
                 logger.error("[activate] the refused binding could not be dropped")
             }
-            throw refusal
+            throw ActivationRefusals.deviceRefused(refusal)
         } catch let refusal as DeviceRouteRefusal {
             // An envelope naming another code than its status: no status names one activation refusal, so the
             // binding is kept and the code is still owed.
