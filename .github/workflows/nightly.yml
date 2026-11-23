@@ -199,8 +199,8 @@ jobs:
           fi
 
       # The one DeviceTests class that needs no token server or paypoint: it counts the background tasks the
-      # app's own UIApplication opens, which the package's test host cannot. A filter matching nothing exits 0,
-      # so the step also fails when the result bundle holds no test.
+      # app's own UIApplication opens, which the package's test host cannot. A filter matching nothing, and a run
+      # that only skipped, both exit 0, so the step fails unless a test ran and none skipped.
       - name: Test telemetry's background tasks
         id: background
         continue-on-error: true
@@ -216,10 +216,10 @@ jobs:
             -resultBundlePath BackgroundTasks.xcresult \
             -quiet \
             CODE_SIGNING_ALLOWED=NO
-          total=$(xcrun xcresulttool get test-results summary --path BackgroundTasks.xcresult \
-            | python3 -c 'import json, sys; print(json.load(sys.stdin).get("totalTestCount", 0))')
-          if [ "$total" -eq 0 ]; then
-            echo "::error::no background-task test ran"
+          read -r total skipped < <(xcrun xcresulttool get test-results summary --path BackgroundTasks.xcresult \
+            | python3 -c 'import json, sys; d = json.load(sys.stdin); print(d.get("totalTestCount", 0), d.get("skippedTests", 0))')
+          if [ "$total" -eq 0 ] || [ "$skipped" -ne 0 ]; then
+            echo "::error::background-task tests: $total run, $skipped skipped; a test must run and none may skip"
             exit 1
           fi
 
