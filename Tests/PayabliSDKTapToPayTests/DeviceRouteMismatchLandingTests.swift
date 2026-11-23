@@ -49,6 +49,7 @@ final class DeviceRouteMismatchLandingTests: XCTestCase {
         let thrown = await failure { try await ttp.initialize() }
 
         XCTAssertEqual((thrown as? TapToPayError)?.type, .unknown, "no code can activate an unbound device: \(thrown)")
+        XCTAssertEqual((thrown as? TapToPayError)?.httpStatus, 200, "the status the refusal came with")
         XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
         XCTAssertNil(try attestation.binding(for: "myEntry"), "nothing was bound")
     }
