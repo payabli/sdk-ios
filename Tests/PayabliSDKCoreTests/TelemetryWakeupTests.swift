@@ -45,6 +45,21 @@ final class TelemetryWakeupTests: XCTestCase {
         }
     }
 
+    func testASubscriptionEndingAfterItIsReplacedLeavesTheReplacementSubscribed() async {
+        let replaced = lifecycle.backgroundings()
+        let current = lifecycle.backgroundings()
+
+        let reader = Task {
+            for await _ in replaced {}
+        }
+        reader.cancel()
+        await reader.value
+
+        withExtendedLifetime(current) {
+            XCTAssertTrue(lifecycle.isSubscribed, "a later subscription is not ended by an earlier one's end")
+        }
+    }
+
     func testRequestsSentWhileOneWaitsToStartJoinIt() async {
         let signals = FlushSignals()
         let gate = Gate()

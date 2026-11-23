@@ -54,14 +54,27 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
 
     package func backgroundings() -> AsyncStream<BackgroundWindow> {
         let (stream, continuation) = AsyncStream.makeStream(of: BackgroundWindow.self)
-        lock.withLock {
+        let subscription = lock.withLock {
             self.continuation = continuation
             subscriptions += 1
+            return subscriptions
         }
+        // A replaced subscription ending leaves the one that replaced it in place.
         continuation.onTermination = { [weak self] _ in
-            self?.lock.withLock { self?.continuation = nil }
+            self?.ended(subscription)
         }
         return stream
+    }
+
+    /// Forgets the subscription that ended, when no later one has replaced it.
+    ///
+    /// - Parameter subscription: the ended subscription's number.
+    private func ended(_ subscription: Int) {
+        lock.withLock {
+            if subscriptions == subscription {
+                continuation = nil
+            }
+        }
     }
 }
 
