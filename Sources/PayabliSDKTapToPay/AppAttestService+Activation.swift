@@ -23,19 +23,44 @@ package extension AppAttestService {
             throw ActivationRegistrationChanged()
         }
 
+        do {
+            try await postActivate(activationCode: activationCode, entry: entry, assertion: assertion)
+        } catch let refusal as DeviceRouteRefusal where refusal.type == .deviceSetupRequired {
+            // A 401 whose envelope names another code is read by its status: the service holds no attestation for this
+            // key, so the session stops waiting for a code. A store that refuses the drop leaves the refusal unchanged.
+            do {
+                try forgetRefused(AttestedDevice(entry: entry, deviceId: assertion.deviceId, keyId: assertion.keyId))
+            } catch {
+                logger.error("[activate] the refused binding could not be dropped")
+            }
+            throw ActivationRefusals.deviceRefused(refusal)
+        } catch let refusal as DeviceRouteRefusal {
+            // An envelope naming another code than its status: no status names one activation refusal, so the
+            // binding is kept and the code is still owed.
+            guard let status = refusal.httpStatus, [400, 403, 404].contains(status) else { throw refusal }
+            throw ActivationRefusals.readByStatus(status)
+        }
+    }
+
+    /// Sends `/activate` signed by `assertion`, and classifies its refusal.
+    ///
+    /// - Parameter activationCode: the code the payer entered.
+    /// - Parameter entry: the entry point being activated.
+    /// - Parameter assertion: the assertion the activation is signed with.
+    private func postActivate(activationCode: String, entry: String, assertion: AssertionHeaders) async throws {
         // The assertion's handle, so the body and the headers come from one
         // binding. Read separately they can name two devices.
         try await postAttestationRequestExpectingNoBody(
+            .activate,
             path: "/api/v2/device/taptopay/activate",
             body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
-            label: "activate",
             assertion: assertion,
             readsRefusalBeforeStatus: true,
             pinsCredential: true,
             makeDeclineError: { code, reason in
                 // The service holds no attestation for this key, so the binding names a key that buys nothing. Drop
-                // it and let the next `initialize()` enrol. Any other 401 goes to the table and keeps it.
-                if BindingRefusal.isBindingGone(code: code, reason: reason) {
+                // it and let the next `initialize()` enrol.
+                if code == 401 {
                     self.logger.error("[activate] clearing local attestation cache and signaling attestationRevoked")
                     // The binding this assertion named, not whatever is held now.
                     let refused = AttestedDevice(
@@ -86,7 +111,7 @@ package extension AppAttestService {
             throw error
         } catch let error as TapToPayError {
             throw ActivationSigningFailed(hostError: error)
-        } catch PayabliTTPError.attestationFailed {
+        } catch PayabliTTPError.deviceSetupRequired {
             throw ActivationSigningFailed(hostError: TapToPayError(
                 type: .deviceSetupRequired,
                 reason: "No device binding is held to sign the activation with",

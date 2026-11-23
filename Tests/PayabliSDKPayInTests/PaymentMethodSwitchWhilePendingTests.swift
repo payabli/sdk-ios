@@ -8,7 +8,7 @@ import XCTest
 final class PaymentMethodSwitchWhilePendingTests: XCTestCase {
     /// The configuration moves the method while the card is in flight; the card's refusal is still the card's.
     @MainActor
-    func testARefusalAfterAReconfigurationIsReportedAndMarkedForTheMethodSent() async throws {
+    func testARefusalAfterAReconfigurationIsReportedAndMarkedForTheMethodSent() async {
         let transport = HeldTransport(refusingFields: ["paymentMethod.cardnumber", "paymentMethod.achAccount"])
         let recorder = InMemoryTelemetryTransport()
         let telemetry = TelemetryClient(
@@ -19,7 +19,9 @@ final class PaymentMethodSwitchWhilePendingTests: XCTestCase {
             deviceId: { nil },
             queued: []
         )
-        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport, telemetry: telemetry)
+        TelemetryRecorders.install(telemetry)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        let component = PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
         let operation = PayabliPayInOperation.capture(PayabliPayInRequestConfiguration(
             paymentDetails: PayabliPayInPaymentDetails(totalAmount: 15)
         ))
@@ -48,8 +50,7 @@ final class PaymentMethodSwitchWhilePendingTests: XCTestCase {
         XCTAssertEqual(viewModel.rejectedFields, [.cardNumber], "marked for a method that was not sent")
         XCTAssertTrue(viewModel.cardNumber.isEmpty)
         XCTAssertNotNil(viewModel.failureMessage, "a mark that is off screen left the payer no answer")
-        let reports = try XCTUnwrap(component.reports)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await telemetry.flush()
         let events = await recorder.batches.flatMap { $0 }
         XCTAssertEqual(events.count, 1, "\(events.map(\.event))")

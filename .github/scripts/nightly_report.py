@@ -470,6 +470,7 @@ def main() -> int:
         ("demo app", os.environ.get("APP_BUILD_OUTCOME", "unknown")),
         ("device compile", os.environ.get("DEVICE_COMPILE_OUTCOME", "unknown")),
         ("live bundles", os.environ.get("LIVE_BUNDLES_OUTCOME", "unknown")),
+        ("background tasks", os.environ.get("BACKGROUND_OUTCOME", "unknown")),
         ("XCFramework", os.environ.get("XCFRAMEWORK_OUTCOME", "unknown")),
     ]
 

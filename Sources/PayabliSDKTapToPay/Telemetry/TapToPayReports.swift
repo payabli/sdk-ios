@@ -1,29 +1,28 @@
 import Foundation
 import PayabliSDKCore
 
-/// What the card-present facade reports about its own lifecycle, through its session's client.
+/// What the card-present facade reports about its own lifecycle, as belonging to the session it runs on.
 ///
-/// Reports run in order off the caller's path, each stamped with the time it is made.
+/// Each report is stamped with the time it is made.
 @MainActor
 final class TapToPayReports {
-    private let telemetry: TelemetryClient
-    private var tail: Task<Void, Never>?
-    private var held: [@Sendable (TelemetryClient) async -> Void] = []
+    private let session: TelemetrySessionContext
 
-    init(telemetry: TelemetryClient) {
-        self.telemetry = telemetry
+    /// - Parameter session: the session the facade runs on, which every report carries.
+    init(session: TelemetrySessionContext) {
+        self.session = session
     }
 
     func initializeStarted() {
         let now = Date()
-        enqueue { await $0.emit(TelemetryEventName.ttpInitializeStarted, occurredAt: now) }
+        record(TelemetryEventName.ttpInitializeStarted, occurredAt: now)
     }
 
     /// - Parameter duration: how long the run took.
     func initializeSucceeded(after duration: Duration) {
         let now = Date()
         let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
-        enqueue { await $0.emit(TelemetryEventName.ttpInitializeSucceeded, properties: properties, occurredAt: now) }
+        record(TelemetryEventName.ttpInitializeSucceeded, properties: properties, occurredAt: now)
     }
 
     /// Reports a run that ended without a reader, by what the host is told and never by its text.
@@ -53,23 +52,22 @@ final class TapToPayReports {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
         }
-        enqueue { [properties] in await $0.emit(name, properties: properties, occurredAt: now) }
+        record(name, properties: properties, occurredAt: now)
     }
 
     func attestationStarted() {
         let now = Date()
-        enqueue { await $0.emit(TelemetryEventName.ttpAttestationStarted, occurredAt: now) }
+        record(TelemetryEventName.ttpAttestationStarted, occurredAt: now)
     }
 
     /// - Parameter duration: how long the attestation took.
     func attestationSucceeded(after duration: Duration) {
         let now = Date()
         let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
-        enqueue { await $0.emit(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now) }
+        record(TelemetryEventName.ttpAttestationSucceeded, properties: properties, occurredAt: now)
     }
 
-    /// Reports an attestation that was refused, by the number the host is told, and sends it at once. A token the session
-    /// is about to renew is held for ``releaseHeld()`` instead, since any send before the renewal would carry it.
+    /// Reports an attestation that was refused, by the number the host is told, and sends it at once.
     ///
     /// - Parameter error: what the attestation threw, before it was translated for the host.
     /// - Parameter duration: how long the attestation took.
@@ -79,20 +77,7 @@ final class TapToPayReports {
         if let told = TapToPayErrorTranslation.hostError(for: error) as? any PayabliError {
             properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
         }
-        guard !(error is PinnedTokenRefusal) else {
-            held.append { [properties] in
-                await $0.emit(
-                    TelemetryEventName.ttpAttestationFailed,
-                    properties: properties,
-                    occurredAt: now,
-                    waitsForBatch: true
-                )
-            }
-            return
-        }
-        enqueue { [properties] in
-            await $0.emit(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
-        }
+        record(TelemetryEventName.ttpAttestationFailed, properties: properties, occurredAt: now)
     }
 
     /// Which call sent a close: the charge that read the card, or `closeCapturedCharge`.
@@ -105,7 +90,7 @@ final class TapToPayReports {
     func closeStarted(_ origin: CloseOrigin) {
         let now = Date()
         let properties = [TelemetryProperty.origin.rawValue: origin.rawValue]
-        enqueue { await $0.emit(TelemetryEventName.ttpCloseStarted, properties: properties, occurredAt: now) }
+        record(TelemetryEventName.ttpCloseStarted, properties: properties, occurredAt: now)
     }
 
     /// - Parameter origin: the call that sent the close.
@@ -116,7 +101,7 @@ final class TapToPayReports {
             TelemetryProperty.origin.rawValue: origin.rawValue,
             TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)
         ]
-        enqueue { await $0.emit(TelemetryEventName.ttpCloseSucceeded, properties: properties, occurredAt: now) }
+        record(TelemetryEventName.ttpCloseSucceeded, properties: properties, occurredAt: now)
     }
 
     /// Reports a close that was not confirmed, by what the host is told. A close records an outcome rather than asking
@@ -152,33 +137,11 @@ final class TapToPayReports {
         if processorHasNoRecord {
             properties[TelemetryProperty.reason.rawValue] = "processor_no_record"
         }
-        enqueue { [properties] in
-            await $0.emit(TelemetryEventName.ttpCloseFailed, properties: properties, occurredAt: now)
-        }
+        record(TelemetryEventName.ttpCloseFailed, properties: properties, occurredAt: now)
     }
 
-    /// Queues the reports held while a token was renewed, in the order they were made, to go with the next batch.
-    func releaseHeld() {
-        let reports = held
-        held = []
-        for report in reports {
-            enqueue(report)
-        }
-    }
-
-    /// Waits until every report made so far has reached the client, and every send it started has ended.
-    func sent() async {
-        await tail?.value
-        await telemetry.settled()
-    }
-
-    private func enqueue(_ report: @escaping @Sendable (TelemetryClient) async -> Void) {
-        let previous = tail
-        let telemetry = telemetry
-        tail = Task {
-            await previous?.value
-            await report(telemetry)
-        }
+    private func record(_ name: String, properties: [String: String] = [:], occurredAt: Date) {
+        TelemetryRecorders.recordFor(session, name, properties: properties, occurredAt: occurredAt)
     }
 
     /// - Parameter error: what an operation threw.

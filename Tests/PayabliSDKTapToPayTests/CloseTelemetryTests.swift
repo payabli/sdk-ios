@@ -207,7 +207,7 @@ final class CloseTelemetryTests: XCTestCase {
 
     /// The close events the terminal reported, in the order they reached the transport, after every report was sent.
     private func reported(_ terminal: PayabliTTP, _ transport: InMemoryTelemetryTransport) async -> [TelemetryEvent] {
-        await terminal.reports.sent()
+        await TelemetryRecorders.settled()
         await terminal.session.telemetry.flush()
         return await transport.batches.flatMap { $0 }.filter { $0.event.hasPrefix("ttp.close.") }
     }

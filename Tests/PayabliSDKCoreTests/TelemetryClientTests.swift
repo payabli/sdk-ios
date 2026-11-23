@@ -15,7 +15,8 @@ final class TelemetryClientTests: XCTestCase {
         deviceId: String? = nil,
         queued: [(name: String, properties: [String: String])] = [],
         logger: PayabliLogger = PayabliLogger(category: .telemetry, sink: RecordingLogSink()),
-        predecessor: TelemetryClient? = nil
+        predecessor: TelemetryClient? = nil,
+        predecessorReplaced: @escaping @Sendable (TelemetryClient) async -> Void = { _ in }
     ) -> TelemetryClient {
         TelemetryClient(
             configuration: .init(
@@ -32,18 +33,19 @@ final class TelemetryClientTests: XCTestCase {
             deviceId: { deviceId },
             queued: queued,
             logger: logger,
-            predecessor: predecessor
+            predecessor: predecessor,
+            predecessorReplaced: predecessorReplaced
         )
     }
 
     /// Records an event that waits for its batch, told apart from the others by `label`.
     func record(_ client: TelemetryClient, _ label: String) async {
-        await client.emit(TelemetryEventName.formPresented, properties: ["step": label])
+        client.record(TelemetryEventName.formPresented, properties: ["step": label])
     }
 
     /// Records an event whose outcome sends it at once, told apart from the others by `label`.
     func recordFailure(_ client: TelemetryClient, _ label: String, outcome: String) async {
-        await client.emit(TelemetryEventName.payinCaptureCompleted, properties: ["outcome": outcome, "origin": label])
+        client.record(TelemetryEventName.payinCaptureCompleted, properties: ["outcome": outcome, "origin": label])
     }
 
     /// Fires the timer, failing the test rather than waiting when no timer is running.
@@ -56,8 +58,8 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAFullBatchIsSentWithoutWaitingForTheTimer() async {
         let client = makeClient(batchSize: 2)
-        await client.emit("form.presented")
-        await client.emit("ttp.initialize.started")
+        client.record("form.presented")
+        client.record("ttp.initialize.started")
         await client.settled()
 
         let batches = await transport.batches
@@ -149,7 +151,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnEventReportingAFailureShipsWithoutFillingABatch() async {
         let client = makeClient()
-        await client.emit("payin.capture.completed", properties: ["outcome": "declined"])
+        client.record("payin.capture.completed", properties: ["outcome": "declined"])
         await client.settled()
 
         let batches = await transport.batches
@@ -158,7 +160,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnEventWhoseNameMeansFailureLeavesAtOnce() async {
         let client = makeClient()
-        await client.emit(TelemetryEventName.ttpAttestationQuotaExhausted, properties: ["code": "429"])
+        client.record(TelemetryEventName.ttpAttestationQuotaExhausted, properties: ["code": "429"])
         await client.settled()
 
         let batches = await transport.batches
@@ -167,8 +169,8 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnEventReportingSuccessWaitsForItsBatch() async {
         let client = makeClient()
-        await client.emit("payin.capture.completed", properties: ["outcome": "approved"])
-        await client.emit("payin.void.completed", properties: ["outcome": "succeeded"])
+        client.record("payin.capture.completed", properties: ["outcome": "approved"])
+        client.record("payin.void.completed", properties: ["outcome": "succeeded"])
         await client.settled()
 
         let batches = await transport.batches
@@ -177,7 +179,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAFailureHeldForItsBatchWaitsForIt() async {
         let client = makeClient()
-        await client.emit(
+        client.record(
             TelemetryEventName.ttpAttestationFailed,
             properties: ["outcome": "failed"],
             occurredAt: Date(),
@@ -191,8 +193,8 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAForcedFlushTakesTheQueuedContextWithIt() async {
         let client = makeClient()
-        await client.emit("ttp.initialize.started")
-        await client.emit(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
+        client.record("ttp.initialize.started")
+        client.record(TelemetryEventName.ttpInitializeFailed, properties: ["outcome": "failed"])
         await client.settled()
 
         let batches = await transport.batches
@@ -217,7 +219,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAKeyTheEventDoesNotDeclareIsNotQueued() async {
         let client = makeClient()
-        await client.emit(
+        client.record(
             TelemetryEventName.payinCaptureCompleted,
             properties: ["outcome": "approved", "holder": "undeclared"]
         )
@@ -228,7 +230,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnEventTheCatalogDoesNotNameIsNotQueued() async {
         let client = makeClient()
-        await client.emit("payin.cardNumber.entered", properties: ["outcome": "failed"])
+        client.record("payin.cardNumber.entered", properties: ["outcome": "failed"])
         await client.settled()
 
         let buffered = await client.bufferedCount
@@ -250,7 +252,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testADeclaredValueThatCannotBeReportedDropsItsPairAndKeepsTheRest() async {
         let client = makeClient()
-        await client.emit(TelemetryEventName.payinCaptureCompleted, properties: [
+        client.record(TelemetryEventName.payinCaptureCompleted, properties: [
             "outcome": "approved",
             "code": "",
             "origin": String(repeating: "o", count: 257),
@@ -269,7 +271,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testAnOutcomeTheEventDoesNotDeclareDoesNotSendItAtOnce() async {
         let client = makeClient()
-        await client.emit(TelemetryEventName.ttpInitializeSucceeded, properties: ["outcome": "failed"])
+        client.record(TelemetryEventName.ttpInitializeSucceeded, properties: ["outcome": "failed"])
         await client.settled()
 
         let batches = await transport.batches
@@ -539,10 +541,11 @@ final class TelemetryClientTests: XCTestCase {
     func testAFailedSendNeverReachesTheCaller() async {
         let client = makeClient()
         await transport.refuse(true)
-        await client.emit("payin.capture.completed", properties: ["outcome": "failed"])
+        client.record("payin.capture.completed", properties: ["outcome": "failed"])
         await client.flush()
+        await client.settled()
 
-        let buffered = await client.bufferedCount
+        let buffered = client.bufferedCount
         XCTAssertEqual(buffered, 1, "a refused batch is kept for a later flush, never raised to the caller")
     }
 
@@ -551,7 +554,7 @@ final class TelemetryClientTests: XCTestCase {
     func testEveryEventCarriesTheDeviceIdentifierAsItIs() async {
         let identifier = "0f8d2a1c4b6e4a2f9c3d5e7f8a9b0c1d"
         let client = makeClient(deviceId: identifier, queued: [("sdk.initialized", ["state": "ready"])])
-        await client.emit("ttp.initialize.started")
+        client.record("ttp.initialize.started")
         await client.flush()
 
         let events = await transport.batches.flatMap { $0 }
@@ -570,7 +573,7 @@ final class TelemetryClientTests: XCTestCase {
 
     func testWhatWasQueuedAtConstructionLeavesFirst() async {
         let client = makeClient(queued: [("sdk.initialized", ["state": "ready"])])
-        await client.emit("ttp.initialize.started")
+        client.record("ttp.initialize.started")
         await client.flush()
 
         let batches = await transport.batches

@@ -54,13 +54,14 @@ final class PayInTelemetryTests: XCTestCase {
             tokenProvider: { throw URLError(.notConnectedToInternet) }
         )
         let session = PayabliSession(config: config, telemetryTransport: recorder)
+        TelemetryRecorders.install(session.telemetry)
+        addTeardownBlock { TelemetryRecorders.clear() }
         let flow = PayabliPayIn(session: session)
 
         let told = await PayInFixture.failure { _ = try await flow.capture(PayInFixture.request(cardOnly: true)) }
 
         XCTAssertEqual((told as? any PayabliError)?.type, .tokenProviderFailed)
-        let reports = try XCTUnwrap(flow.reports)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await session.telemetry.flush()
         let captures = await recorder.events.filter { $0.event == "payin.capture.completed" }
         XCTAssertEqual(captures.count, 1)
@@ -196,8 +197,7 @@ final class PayInTelemetryTests: XCTestCase {
         _ = await PayInFixture.failure { _ = try await flow.capture(Self.heldKeyRequest(.newPayment, cvv: "123")) }
         let told = await PayInFixture.failure { _ = try await flow.capture(Self.heldKeyRequest(.retry, cvv: "")) }
 
-        let reports = try XCTUnwrap(flow.reports)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await telemetry?.flush()
         let events = await recorder.events
         XCTAssertEqual(events.count, 2, "\(events.map(\.event))")
@@ -414,7 +414,7 @@ final class PayInTelemetryTests: XCTestCase {
         XCTAssertEqual(event.properties["outcome"], "refused")
     }
 
-    func testASecondFormSubmissionWhileOneRunsIsCountedByItsOutcomeAlone() async throws {
+    func testASecondFormSubmissionWhileOneRunsIsCountedByItsOutcomeAlone() async {
         let transport = GatedTransport(RecordingIdempotencyTransport(body: Self.stored))
         let flow = makeFlow(transport)
         let viewModel = PayabliPayInViewModel(
@@ -434,8 +434,7 @@ final class PayInTelemetryTests: XCTestCase {
         transport.open()
         _ = try? await first.value
 
-        let reports = try XCTUnwrap(flow.reports)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await telemetry?.flush()
         let refused = await recorder.events.filter { $0.properties["outcome"] == "refused_locally" }
         XCTAssertEqual(refused.count, 1)
@@ -468,20 +467,16 @@ final class PayInTelemetryTests: XCTestCase {
             queued: []
         )
         self.telemetry = telemetry
-        return PayabliPayIn(
-            entryPoint: "entry",
-            environment: .sandbox,
-            transport: transport,
-            telemetry: telemetry
-        )
+        TelemetryRecorders.install(telemetry)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        return PayabliPayIn(entryPoint: "entry", environment: .sandbox, transport: transport)
     }
 
     /// The one event the flow reported, failing rather than reading past the end.
     private func onlyEvent(of flow: PayabliPayIn, file: StaticString = #filePath, line: UInt = #line) async throws
         -> TelemetryEvent
     {
-        let reports = try XCTUnwrap(flow.reports, file: file, line: line)
-        await reports.sent()
+        await TelemetryRecorders.settled()
         await telemetry?.flush()
         let events = await recorder.events
         XCTAssertEqual(events.count, 1, "\(events.map(\.event))", file: file, line: line)

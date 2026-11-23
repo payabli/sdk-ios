@@ -104,7 +104,8 @@ public final class PayabliSession: @unchecked Sendable {
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
             queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])],
-            predecessor: predecessor
+            predecessor: predecessor,
+            predecessorReplaced: { await TelemetryRecorders.replaced($0) }
         )
     }
 
@@ -161,7 +162,7 @@ public final class PayabliSession: @unchecked Sendable {
     private func reportRefusedInitialize(_ refusal: PayabliGenericError, after duration: Duration) async {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
-        await telemetry.emit([
+        telemetry.record([
             (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
                 TelemetryProperty.outcome.rawValue: "refused",
@@ -182,7 +183,7 @@ public final class PayabliSession: @unchecked Sendable {
     private func reportFailedInitialize(_ failure: PayabliGenericError, original: any Error, after duration: Duration) async {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
-        await telemetry.emit([
+        telemetry.record([
             (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
                 TelemetryProperty.outcome.rawValue: "failed",
@@ -245,6 +246,7 @@ public final class PayabliSession: @unchecked Sendable {
             )
             session.machine.markReady()
             installed = session
+            TelemetryRecorders.install(session.telemetry)
 
             if let current {
                 if !inherits {
@@ -286,6 +288,7 @@ public final class PayabliSession: @unchecked Sendable {
         lock.withLock {
             installed?.machine.finish()
             installed = nil
+            TelemetryRecorders.clear()
             sink.value = .uninitialized
             testTelemetryTransport = telemetryTransport
         }

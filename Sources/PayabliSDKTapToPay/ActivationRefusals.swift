@@ -2,14 +2,43 @@ import Foundation
 import PayabliSDKCore
 
 /// Turns an `/activate` refusal into the catalog entry a host receives, by the service's own words: each comparison is
-/// exact, or a prefix where the service appends detail, and one matching nothing reports `unknown`. A binding that is gone
-/// (`BindingRefusal`) and an unregistered app (`AppRegistrationRefusals`) are read before it; a 5xx keeps its own error.
+/// exact, or a prefix where the service appends detail, and one matching nothing reports `unknown`. A binding that is gone (any
+/// envelope 401) and an unregistered app (`AppRegistrationRefusals`) are read before it; a 5xx keeps its own error.
 enum ActivationRefusals {
     static func refusal(resultCode: Int?, reason: String) -> ActivationRefusal {
         ActivationRefusal(
             hostError: hostError(resultCode: resultCode, reason: reason),
             movesSession: movesSession(resultCode: resultCode, reason: reason)
         )
+    }
+
+    /// A refusal at 400, 403 or 404 whose envelope named another code. Its words say nothing reliable, so it is
+    /// classified without them and leaves the session waiting for its code.
+    ///
+    /// - Parameter status: the HTTP status the refusal came with.
+    /// - Returns: `SDK_INTERNAL_ERROR` at 400 and `UNKNOWN` otherwise, carrying `status` and moving nothing.
+    static func readByStatus(_ status: Int) -> any Error {
+        let type: PayabliErrorType = status == 400 ? .sdkInternalError : .unknown
+        let refusal = ActivationRefusal(
+            hostError: TapToPayError(type: type, reason: type.message, detail: nil),
+            movesSession: false
+        )
+        return DeviceRefusalStatus.carrying(status, on: refusal)
+    }
+
+    /// A 401 whose envelope named another code: the service holds no attestation for the key, so the session lands
+    /// by the refusal.
+    ///
+    /// - Parameter refusal: the route's refusal, read by its status.
+    /// - Returns: `DEVICE_SETUP_REQUIRED` carrying the refusal's status, moving the session.
+    static func deviceRefused(_ refusal: DeviceRouteRefusal) -> any Error {
+        let type = refusal.type
+        let moved = ActivationRefusal(
+            hostError: TapToPayError(type: type, reason: type.message, detail: nil),
+            movesSession: true
+        )
+        guard let status = refusal.httpStatus else { return moved }
+        return DeviceRefusalStatus.carrying(status, on: moved)
     }
 
     static func hostError(resultCode: Int?, reason: String) -> TapToPayError {
