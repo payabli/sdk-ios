@@ -285,7 +285,7 @@ package actor TelemetryClient {
         let flushes = sendsAtOnce || offered >= configuration.batchSize
         guard flushes || offered == events.count else { return }
         backgroundings.subscribe()
-        flushSignals.send { await self.recorded(flushes: flushes) }
+        flushSignals.send(flushes: flushes) { await self.recorded(flushes: $0) }
     }
 
     /// Starts the timer once, and sends what is queued when a record asked for it.
@@ -489,20 +489,29 @@ package actor TelemetryClient {
     }
 }
 
-/// The records' requests to the client, each run after the one before it, so `settled()` can wait for the last.
+/// The records' requests to the client, each run after the one before it, so `settled()` can wait for the last. A request
+/// sent while another waits to start joins it, so a burst of records leaves at most one request waiting.
 final class FlushSignals: @unchecked Sendable {
     private let lock = NSLock()
     private var latest: Task<Void, Never>?
+    /// Whether the request waiting to start sends what is queued; `nil` when none waits.
+    private var waiting: Bool?
 
-    /// Runs `request` on its own task, after every request sent before it.
+    /// Runs `request` on its own task, after every request sent before it, or joins the request waiting to start.
     ///
-    /// - Parameter request: what the client does for a record.
-    func send(_ request: @escaping @Sendable () async -> Void) {
+    /// - Parameter flushes: whether the record asked for a send.
+    /// - Parameter request: what the client does for a record, given whether any record it answers asked for a send.
+    func send(flushes: Bool, _ request: @escaping @Sendable (_ flushes: Bool) async -> Void) {
         lock.withLock {
+            if let waiting {
+                self.waiting = waiting || flushes
+                return
+            }
             let previous = latest
+            waiting = flushes
             latest = Task {
                 await previous?.value
-                await request()
+                await request(self.started())
             }
         }
     }
@@ -511,6 +520,16 @@ final class FlushSignals: @unchecked Sendable {
     func sent() async {
         let last = lock.withLock { latest }
         await last?.value
+    }
+
+    /// Marks the waiting request started, so a later record queues a new one.
+    ///
+    /// - Returns: whether a record the request answers asked for a send.
+    private func started() -> Bool {
+        lock.withLock {
+            defer { waiting = nil }
+            return waiting ?? false
+        }
     }
 }
 
