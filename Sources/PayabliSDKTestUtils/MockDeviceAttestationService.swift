@@ -216,7 +216,7 @@ package final class MockDeviceAttestationService: DeviceAttestationService, @unc
             return (deviceId, storedKeys[key] ?? Self.defaultKeyId)
         }
         guard let held else {
-            throw PayabliTTPError.attestationFailed(reason: "Missing attestation state")
+            throw PayabliTTPError.deviceSetupRequired(reason: "Missing attestation state")
         }
         if let failure = assertionFailure {
             throw failure

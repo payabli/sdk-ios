@@ -72,6 +72,28 @@ final class AppRegistrationRefusalsTests: XCTestCase {
         }
     }
 
+    /// The words are read only under a code that is the status; otherwise the status classifies the refusal.
+    func testAnAttestRefusalWhoseCodeIsNotItsStatusIsNotReadByItsWords() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "/api/v2/device/taptopay/attest":
+                return Self.refusal(request, status: 403, code: 400, reason: "Application is not authorized for this paypoint.")
+            default:
+                return AttestFixture.ok(request, ["deviceId": "dev_1"])
+            }
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        do {
+            _ = try await sut.attest(entry: "myEntry")
+            XCTFail("a refused attestation reported success")
+        } catch {
+            XCTAssertNotEqual((error as? TapToPayError)?.type, .deviceSetupNotConfigured, "\(error)")
+        }
+    }
+
     // MARK: - /activate, a phone holding a registration
 
     func testAnActivationRefusedForAnUnregisteredAppIs3008AndKeepsTheBinding() async throws {
@@ -135,6 +157,22 @@ final class AppRegistrationRefusalsTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_1"))
     }
 
+    func testAConfigurationRefusalWhoseCodeIsNotItsStatusIsReadByTheStatus() async throws {
+        let (ttp, attestation) = try makeTTP()
+        attestation.cachedDeviceId = "dev_1"
+        StubURLProtocol.handler = { request in
+            Self.refusal(request, status: 403, code: 400, reason: "Application is not authorized for this paypoint.")
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("initialize proceeded past a refusal")
+        } catch {
+            XCTAssertEqual((error as? TapToPayError)?.type, .devicePendingActivation, "\(error)")
+        }
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_1"))
+    }
+
     // MARK: - Support
 
     private func makeTTP() throws -> (PayabliTTP, MockDeviceAttestationService) {
@@ -150,16 +188,17 @@ final class AppRegistrationRefusalsTests: XCTestCase {
         return (ttp, attestation)
     }
 
-    /// A refusal the way the service sends one: its result code as the HTTP status.
+    /// A refusal the way the service sends one, its result code as the HTTP status, unless `code` names another.
     private nonisolated static func refusal(
         _ request: URLRequest,
         status: Int,
+        code: Int? = nil,
         reason: String
     ) -> (HTTPURLResponse, Data) {
         let body: [String: Any] = [
             "isSuccess": false,
             "responseText": "Declined",
-            "responseData": ["resultCode": status, "resultText": reason]
+            "responseData": ["resultCode": code ?? status, "resultText": reason]
         ]
         return (
             HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: nil)!,

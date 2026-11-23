@@ -153,8 +153,9 @@ Public state:
 
 Configuration methods:
 
-- `configure(config:)`: keeps the installed session when `config` matches it. A different
-  configuration is not applied, and later submissions fail with `invalidConfiguration`.
+- `configure(config:)`: keeps the flow on the session it was built on, when that session is installed and
+  `config` matches it. Otherwise nothing is applied and later submissions fail with `invalidConfiguration`;
+  a flow for a newly installed session is built on that session.
 - `configure(config:theme:)`; theme is accepted for component uniformity.
 
 ## Hosted SwiftUI View

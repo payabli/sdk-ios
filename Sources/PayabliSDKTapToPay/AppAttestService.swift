@@ -10,6 +10,7 @@ import Security
 /// `activateDevice` takes a partner-supplied out-of-band code; `entry` comes per call and is never cached.
 package final class AppAttestService: DeviceAttestationService, @unchecked Sendable {
     let transport: any PayabliTransport
+    let routes: DeviceServiceClient
     let attestor: AppAttestor
     let storage: SecureStorage
     let bindingStore: AttestedDeviceStore
@@ -31,14 +32,17 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
     ///   - attestor: what signs and attests on this device.
     ///   - storage: the Keychain the bindings and the install identifier are held in.
     ///   - deviceIdentity: the install identifier `hardwareId()` sends.
+    ///   - telemetrySession: the session each attestation route's report belongs to; `nil` for the installed one.
     package convenience init(
         transport: any PayabliTransport,
         attestor: AppAttestor,
         storage: KeychainStorage,
-        deviceIdentity: DeviceIdentity
+        deviceIdentity: DeviceIdentity,
+        telemetrySession: TelemetrySessionContext? = nil
     ) {
         self.init(
             transport: transport,
+            telemetrySession: telemetrySession,
             attestor: attestor,
             storage: storage,
             hardwareIdProvider: { try deviceIdentity.value() },
@@ -52,6 +56,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
 
     init(
         transport: any PayabliTransport,
+        telemetrySession: TelemetrySessionContext? = nil,
         attestor: AppAttestor,
         storage: SecureStorage,
         hardwareIdProvider: @Sendable @escaping () throws -> String,
@@ -60,6 +65,7 @@ package final class AppAttestService: DeviceAttestationService, @unchecked Senda
         osVersionProvider: @Sendable @escaping () -> String
     ) {
         self.transport = transport
+        routes = DeviceServiceClient(transport: transport, telemetrySession: telemetrySession)
         self.attestor = attestor
         self.storage = storage
         bindingStore = AttestedDeviceStore(storage: storage)

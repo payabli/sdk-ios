@@ -149,7 +149,7 @@ final class SessionReplacementTests: XCTestCase {
         )
 
         await client.stop()
-        await client.emit(TelemetryEventName.sdkInitialized)
+        client.record(TelemetryEventName.sdkInitialized)
 
         await fulfillment(of: [timerStarted], timeout: 0.5)
     }
@@ -162,7 +162,7 @@ final class SessionReplacementTests: XCTestCase {
         defer { stub.uninstall() }
         let delivered = InMemoryTelemetryTransport()
         let first = try install(entryPoint: "first")
-        await first.telemetry.emit(TelemetryEventName.formPresented, properties: ["step": "before"])
+        first.telemetry.record(TelemetryEventName.formPresented, properties: ["step": "before"])
         await finishTheCredential(of: first)
         await first.telemetry.settled()
         let left = await first.telemetry.queuedEvents
@@ -189,7 +189,7 @@ final class SessionReplacementTests: XCTestCase {
         defer { stub.uninstall() }
         let delivered = InMemoryTelemetryTransport()
         let first = try install(entryPoint: "first")
-        await first.telemetry.emit(TelemetryEventName.formPresented, properties: ["step": "before"])
+        first.telemetry.record(TelemetryEventName.formPresented, properties: ["step": "before"])
         await finishTheCredential(of: first)
 
         let second = try install(entryPoint: "second", telemetryTransport: delivered)
