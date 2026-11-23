@@ -56,7 +56,7 @@ jobs:
     # A backstop above the sum of the step bounds below, not a bound on the expected run. If it sits near
     # that sum, steps running near their own limits let the job time out first, which takes the collect step
     # and the suite gate with it. Raise it whenever a step bound goes up.
-    timeout-minutes: 220
+    timeout-minutes: 240
 
     steps:
       - name: Checkout
@@ -198,6 +198,31 @@ jobs:
             exit 1
           fi
 
+      # The one DeviceTests class that needs no token server or paypoint: it counts the background tasks the
+      # app's own UIApplication opens, which the package's test host cannot. A filter matching nothing, and a run
+      # that only skipped, both exit 0, so the step fails unless a test ran and none skipped.
+      - name: Test telemetry's background tasks
+        id: background
+        continue-on-error: true
+        timeout-minutes: 20
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -project Example/PayabliDemo/PayabliDemo.xcodeproj \
+            -scheme PayabliDemoDeviceTests \
+            -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+            -clonedSourcePackagesDirPath .build/checkouts \
+            -only-testing:PayabliDemoDeviceTests/TelemetryBackgroundOnDeviceTests \
+            -resultBundlePath BackgroundTasks.xcresult \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+          read -r total skipped < <(xcrun xcresulttool get test-results summary --path BackgroundTasks.xcresult \
+            | python3 -c 'import json, sys; d = json.load(sys.stdin); print(d.get("totalTestCount", 0), d.get("skippedTests", 0))')
+          if [ "$total" -eq 0 ] || [ "$skipped" -ne 0 ]; then
+            echo "::error::background-task tests: $total run, $skipped skipped; a test must run and none may skip"
+            exit 1
+          fi
+
       # The shipped artifact. `release.yml` runs on workflow_dispatch only, so without this a change that
       # breaks the distribution build is invisible until someone cuts a release and finds out.
       - name: Build the release XCFrameworks
@@ -222,6 +247,7 @@ jobs:
           APP_BUILD_OUTCOME: ${{ steps.app.outcome }}
           DEVICE_COMPILE_OUTCOME: ${{ steps.device_compile.outcome }}
           LIVE_BUNDLES_OUTCOME: ${{ steps.bundles.outcome }}
+          BACKGROUND_OUTCOME: ${{ steps.background.outcome }}
           XCFRAMEWORK_OUTCOME: ${{ steps.xcframework.outcome }}
         run: python3 .github/scripts/nightly_report.py "$RUNNER_TEMP/nightly-facts/nightly-facts.json"
 
@@ -259,7 +285,8 @@ jobs:
           failed=0
           for outcome in "${{ steps.sdk.outcome }}" "${{ steps.flow.outcome }}" \
                          "${{ steps.app.outcome }}" "${{ steps.device_compile.outcome }}" \
-                         "${{ steps.bundles.outcome }}" "${{ steps.xcframework.outcome }}"; do
+                         "${{ steps.bundles.outcome }}" "${{ steps.background.outcome }}" \
+                         "${{ steps.xcframework.outcome }}"; do
             case "$outcome" in failure|cancelled|timed_out) failed=1 ;; esac
           done
           if [ "${{ steps.collect.outputs.verdict }}" = "red" ]; then

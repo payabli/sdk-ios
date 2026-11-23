@@ -205,6 +205,70 @@ final class AppAttestFailureCodeTests: XCTestCase {
         }
     }
 
+    func testAnAttestAcknowledgementThatCannotBeReadIsADecodingErrorAndStoresNothing() async throws {
+        for body in Self.unreadableAcknowledgements {
+            StubURLProtocol.handler = { request in
+                switch request.url!.path {
+                case "/api/v2/device/taptopay/challenge":
+                    AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+                case "/api/v2/device/taptopay/register":
+                    AttestFixture.ok(request, ["deviceId": "dev_1"])
+                default:
+                    (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!, body)
+                }
+            }
+            let (sut, _, _) = try AttestFixture.makeService()
+
+            await assertAttestThrows(sut, .decodingError, String(bytes: body, encoding: .utf8) ?? "")
+            XCTAssertNil(try sut.cachedDeviceId(for: "myEntry"), String(bytes: body, encoding: .utf8) ?? "")
+        }
+    }
+
+    func testAnAttestAcknowledgementWithNoPayloadIsASuccess() async throws {
+        StubURLProtocol.handler = { request in
+            switch request.url!.path {
+            case "/api/v2/device/taptopay/challenge":
+                AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            case "/api/v2/device/taptopay/register":
+                AttestFixture.ok(request, ["deviceId": "dev_1"])
+            default:
+                (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Data(#"{"isSuccess":true}"#.utf8)
+                )
+            }
+        }
+        let (sut, _, _) = try AttestFixture.makeService()
+
+        _ = try await sut.attest(entry: "myEntry")
+    }
+
+    func testAnActivationAcknowledgementThatCannotBeReadIsADecodingErrorAndKeepsTheBinding() async throws {
+        for body in Self.unreadableAcknowledgements {
+            StubURLProtocol.handler = { request in
+                if request.url!.path == "/api/v2/device/taptopay/activate" {
+                    return (
+                        HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                        body
+                    )
+                }
+                return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+            }
+            let storage = InMemorySecureStorage()
+            try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+            let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+            do {
+                try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev")
+                XCTFail("the activation succeeded on an unreadable answer: \(String(bytes: body, encoding: .utf8) ?? "")")
+            } catch {
+                let host = TapToPayErrorTranslation.hostError(for: error)
+                XCTAssertEqual((host as? TapToPayError)?.type, .decodingError, "\(error)")
+            }
+            XCTAssertEqual(try sut.cachedDeviceId(for: "myEntry"), "dev")
+        }
+    }
+
     // MARK: - A device that cannot be identified
 
     /// With no bundle identifier there is no install identity, and `/register` answers a blank one
@@ -255,9 +319,9 @@ final class AppAttestFailureCodeTests: XCTestCase {
         await assertAttestThrows(sut, .deviceSetupRefused)
     }
 
-    /// The root-unavailable sentence is ruled to keep the validation answer, so the
-    /// verification match above must be the whole sentence, not a prefix.
-    func testAnAttestationRootUnavailableFailureKeepsTheValidationError() async throws {
+    /// The service cannot load Apple's root, so it is the service failing, matched on the whole sentence before
+    /// the verification prefix.
+    func testAnAttestationRootUnavailableFailureIsTheServiceFailing() async throws {
         stubColdRoutes(
             refusing: "/api/v2/device/taptopay/attest",
             status: 400,
@@ -265,7 +329,7 @@ final class AppAttestFailureCodeTests: XCTestCase {
         )
         let (sut, _, _) = try AttestFixture.makeService()
 
-        await assertAttestThrows(sut, .validation)
+        await assertAttestThrows(sut, .serverError)
     }
 
     /// A device the service no longer holds is set up again, whichever words told
@@ -283,12 +347,12 @@ final class AppAttestFailureCodeTests: XCTestCase {
         }
     }
 
-    /// A refusal none of the tables knows keeps the status's own answer.
-    func testAnUnmatchedRefusalKeepsItsStatusAnswer() async throws {
+    /// A refusal none of the tables knows is read by its code: a 403 is an activation owed.
+    func testAnUnmatchedRefusalIsReadByItsCode() async throws {
         stubColdRoutes(refusing: "/api/v2/device/taptopay/attest", status: 403, text: "Some other refusal.")
         let (sut, _, _) = try AttestFixture.makeService()
 
-        await assertAttestThrows(sut, .permissionDenied)
+        await assertAttestThrows(sut, .devicePendingActivation)
     }
 
     // MARK: - The activation code itself
@@ -328,6 +392,13 @@ final class AppAttestFailureCodeTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    /// 2xx bodies that are not an `isSuccess: true` envelope. `isSuccess: false` is absent: it always reads as a decline.
+    private static let unreadableAcknowledgements: [Data] = [
+        Data("not json".utf8),
+        Data("{}".utf8),
+        Data(#"{"isSuccess":null}"#.utf8)
+    ]
 
     private func deviceCheck(_ code: Int) -> NSError {
         NSError(domain: AppAttestService.deviceCheckErrorDomain, code: code)

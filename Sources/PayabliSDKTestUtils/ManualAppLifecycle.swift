@@ -8,12 +8,18 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: AsyncStream<BackgroundWindow>.Continuation?
     private var closed = 0
+    private var subscriptions = 0
 
     package init() {}
 
-    /// Whether delivery has subscribed to backgroundings.
+    /// Whether delivery holds a subscription to backgroundings.
     package var isSubscribed: Bool {
         lock.withLock { continuation != nil }
+    }
+
+    /// How many times delivery has subscribed.
+    package var subscriptionCount: Int {
+        lock.withLock { subscriptions }
     }
 
     /// How many windows delivery has closed.
@@ -26,6 +32,13 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
     /// - Returns: `false` when the window was not closed within two seconds.
     @discardableResult
     package func background() async -> Bool {
+        await post()()
+    }
+
+    /// Moves the app to the background without waiting.
+    ///
+    /// - Returns: waits for delivery to close the window, and answers `false` when it was not closed within two seconds.
+    package func post() -> @Sendable () async -> Bool {
         let closedOrTimedOut = Once()
         let window = BackgroundWindow { [self] in
             lock.withLock { closed += 1 }
@@ -36,13 +49,32 @@ package final class ManualAppLifecycle: AppLifecycle, @unchecked Sendable {
             closedOrTimedOut.settle(false)
         }
         _ = lock.withLock { continuation }?.yield(window)
-        return await closedOrTimedOut.value()
+        return { await closedOrTimedOut.value() }
     }
 
     package func backgroundings() -> AsyncStream<BackgroundWindow> {
         let (stream, continuation) = AsyncStream.makeStream(of: BackgroundWindow.self)
-        lock.withLock { self.continuation = continuation }
+        let subscription = lock.withLock {
+            self.continuation = continuation
+            subscriptions += 1
+            return subscriptions
+        }
+        // A replaced subscription ending leaves the one that replaced it in place.
+        continuation.onTermination = { [weak self] _ in
+            self?.ended(subscription)
+        }
         return stream
+    }
+
+    /// Forgets the subscription that ended, when no later one has replaced it.
+    ///
+    /// - Parameter subscription: the ended subscription's number.
+    private func ended(_ subscription: Int) {
+        lock.withLock {
+            if subscriptions == subscription {
+                continuation = nil
+            }
+        }
     }
 }
 

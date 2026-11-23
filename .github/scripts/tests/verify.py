@@ -261,6 +261,7 @@ ALL_GREEN_STEPS = {
     "APP_BUILD_OUTCOME": "success",
     "DEVICE_COMPILE_OUTCOME": "success",
     "LIVE_BUNDLES_OUTCOME": "success",
+    "BACKGROUND_OUTCOME": "success",
     "XCFRAMEWORK_OUTCOME": "success",
 }
 
@@ -399,7 +400,7 @@ def test_collector() -> None:
         )
         check("C11 a failed build is red", facts and facts["verdict"] == "red", facts)
         check("C11b and the build line names which one failed",
-              at((facts or {}).get("suites") or [], 2).get("label") == "XCFramework failed, 3 built",
+              at((facts or {}).get("suites") or [], 2).get("label") == "XCFramework failed, 4 built",
               at((facts or {}).get("suites") or [], 2))
         _, _, facts, _, _ = run_collector(repo, bin_dir, {**ALL_GREEN_STEPS, **base})
         check("C11c a clean build line says so without counting",
@@ -1247,9 +1248,9 @@ def test_workflows() -> None:
     test_job = jobs.get("nightly") or {}
     steps = test_job.get("steps") or []
     suites = [s for s in steps if s.get("id") in
-              {"sdk", "flow", "app", "device_compile", "bundles", "xcframework"}]
+              {"sdk", "flow", "app", "device_compile", "bundles", "background", "xcframework"}]
     check("W6 every suite and build carries an id and continues on error",
-          len(suites) == 6 and all(s.get("continue-on-error") is True for s in suites),
+          len(suites) == 7 and all(s.get("continue-on-error") is True for s in suites),
           [(s.get("id"), s.get("continue-on-error")) for s in suites])
     check("W6b and each one is bounded",
           all(isinstance(s.get("timeout-minutes"), int) for s in suites),

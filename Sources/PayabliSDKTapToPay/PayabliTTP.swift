@@ -141,12 +141,13 @@ public final class PayabliTTP: NSObject, ObservableObject {
         self.retryPolicy = retryPolicy
 
         self.session = session
-        self.reports = TapToPayReports(telemetry: session.telemetry)
+        self.reports = TapToPayReports(session: session.telemetry.context)
         self.transactionClient = TTPTransactionClient(transport: session.transport, retryPolicy: retryPolicy)
         self.chargeKeys = chargeKeys
         self.configClient = TTPConfigClient(
             transport: session.transport,
-            attestation: attestation
+            attestation: attestation,
+            telemetrySession: session.telemetry.context
         )
         super.init()
     }
@@ -166,7 +167,8 @@ public final class PayabliTTP: NSObject, ObservableObject {
                 transport: payabliSession.transport,
                 attestor: RealAppAttestor(),
                 storage: KeychainStorage(migrating: PayabliKeychainKey.all),
-                deviceIdentity: payabliSession.deviceIdentity
+                deviceIdentity: payabliSession.deviceIdentity,
+                telemetrySession: payabliSession.telemetry.context
             )
             return PayabliTTP(
                 session: payabliSession,

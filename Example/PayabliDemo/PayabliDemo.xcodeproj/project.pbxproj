@@ -123,6 +123,7 @@
 		E31640000000000000000007 /* PayabliSDKPayIn in Frameworks */ = {isa = PBXBuildFile; productRef = E31640000000000000000002 /* PayabliSDKPayIn */; };
 		F40000000000000000000022 /* KeychainOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000021 /* KeychainOnDeviceTests.swift */; };
 		F40000000000000000000024 /* InstallIdentifierOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000023 /* InstallIdentifierOnDeviceTests.swift */; };
+		F4000000000000000000002D /* TelemetryBackgroundOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4000000000000000000002C /* TelemetryBackgroundOnDeviceTests.swift */; };
 		F40000000000000000000026 /* LiveEnvironment.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000025 /* LiveEnvironment.swift */; };
 		F40000000000000000000028 /* TapToPayOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000027 /* TapToPayOnDeviceTests.swift */; };
 		F4000000000000000000002A /* CardNotPresentOnDeviceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F40000000000000000000029 /* CardNotPresentOnDeviceTests.swift */; };
@@ -253,6 +254,7 @@
 		F40000000000000000000030 /* DeviceTests.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; path = DeviceTests.xcconfig; sourceTree = "<group>"; };
 		F40000000000000000000021 /* KeychainOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainOnDeviceTests.swift; sourceTree = "<group>"; };
 		F40000000000000000000023 /* InstallIdentifierOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallIdentifierOnDeviceTests.swift; sourceTree = "<group>"; };
+		F4000000000000000000002C /* TelemetryBackgroundOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryBackgroundOnDeviceTests.swift; sourceTree = "<group>"; };
 		F40000000000000000000025 /* LiveEnvironment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveEnvironment.swift; sourceTree = "<group>"; };
 		F40000000000000000000027 /* TapToPayOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TapToPayOnDeviceTests.swift; sourceTree = "<group>"; };
 		F40000000000000000000029 /* CardNotPresentOnDeviceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardNotPresentOnDeviceTests.swift; sourceTree = "<group>"; };
@@ -496,6 +498,7 @@
 			children = (
 				F40000000000000000000021 /* KeychainOnDeviceTests.swift */,
 				F40000000000000000000023 /* InstallIdentifierOnDeviceTests.swift */,
+				F4000000000000000000002C /* TelemetryBackgroundOnDeviceTests.swift */,
 				F40000000000000000000025 /* LiveEnvironment.swift */,
 				F40000000000000000000027 /* TapToPayOnDeviceTests.swift */,
 				F40000000000000000000029 /* CardNotPresentOnDeviceTests.swift */,
@@ -729,6 +732,7 @@
 			files = (
 				F40000000000000000000022 /* KeychainOnDeviceTests.swift in Sources */,
 				F40000000000000000000024 /* InstallIdentifierOnDeviceTests.swift in Sources */,
+				F4000000000000000000002D /* TelemetryBackgroundOnDeviceTests.swift in Sources */,
 				F40000000000000000000026 /* LiveEnvironment.swift in Sources */,
 				F40000000000000000000028 /* TapToPayOnDeviceTests.swift in Sources */,
 				F4000000000000000000002A /* CardNotPresentOnDeviceTests.swift in Sources */,

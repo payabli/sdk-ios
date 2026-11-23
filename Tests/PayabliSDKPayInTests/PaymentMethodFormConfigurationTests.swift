@@ -334,8 +334,17 @@ final class PaymentMethodFormConfigurationTests: XCTestCase {
 
         component.configure(config: config, theme: .default)
 
-        XCTAssertEqual(component.entryPoint, "new-entry")
-        XCTAssertEqual(component.environment, .production)
+        // The flow stays on the session it was built on, so a configuration it does not run on refuses what follows.
+        XCTAssertEqual(component.entryPoint, "old-entry")
+        do {
+            _ = try await component.capture(PayabliPayInRequest(
+                paymentMethod: .cash,
+                options: PayabliPayInRequestConfiguration(paymentDetails: PayabliPayInPaymentDetails(totalAmount: 10))
+            ))
+            XCTFail("a configuration the flow does not run on was applied")
+        } catch {
+            XCTAssertEqual((error as? PayabliGenericError)?.type, .invalidConfiguration)
+        }
     }
 
     @MainActor

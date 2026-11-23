@@ -68,10 +68,11 @@ package actor TelemetryClient {
 
     private let transport: TelemetryTransport
     private let sleep: Sleep
-    private let lifecycle: any AppLifecycle
     private let logger: PayabliLogger
     private let deviceId: @Sendable () -> String?
-    private var queue: TelemetryQueue
+    private let queue: TelemetryQueue
+    private let flushSignals = FlushSignals()
+    private let backgroundings: BackgroundSubscription
 
     /// The last drain scheduled. Drains run one after another, so this is also the one that finishes last.
     private var tail: Task<Void, Never>?
@@ -89,11 +90,13 @@ package actor TelemetryClient {
     /// - Parameter lifecycle: the app's movement to the background.
     /// - Parameter deviceId: the device's identity, read as each batch leaves; `nil` while it cannot be read.
     /// - Parameter queued: events queued before anything else can record, oldest first, held to the catalog as
-    ///   `emit` holds them.
+    ///   `record` holds them.
     /// - Parameter sessionId: the identifier every event from this client carries.
     /// - Parameter logger: where the client's own log lines go.
     /// - Parameter predecessor: the replaced session's client, whose queue this one takes before its first send, ahead
     ///   of what this one queues; `nil` when nothing is taken over.
+    /// - Parameter predecessorReplaced: returns once `predecessor` is no longer the installed channel, which hands over
+    ///   only then.
     package init(
         configuration: Configuration,
         transport: TelemetryTransport,
@@ -103,16 +106,17 @@ package actor TelemetryClient {
         queued: [(name: String, properties: [String: String])],
         sessionId: String = UUID().uuidString,
         logger: PayabliLogger = PayabliLogger(category: .telemetry),
-        predecessor: TelemetryClient? = nil
+        predecessor: TelemetryClient? = nil,
+        predecessorReplaced: @escaping @Sendable (TelemetryClient) async -> Void = { _ in }
     ) {
         self.configuration = configuration
         self.logger = logger
         self.transport = transport
         self.sleep = sleep
-        self.lifecycle = lifecycle
+        backgroundings = BackgroundSubscription(lifecycle)
         self.deviceId = deviceId
         self.sessionId = sessionId
-        var queue = TelemetryQueue(capacity: configuration.queueCapacity)
+        let queue = TelemetryQueue(capacity: configuration.queueCapacity)
         let now = Date()
         for (name, properties) in queued {
             guard let properties = TelemetryCatalog.scrub(name, properties) else { continue }
@@ -131,6 +135,7 @@ package actor TelemetryClient {
         // The first drain, so every later one and `settled()` wait for what the predecessor hands over.
         if let predecessor {
             tail = Task { [weak self] in
+                await predecessorReplaced(predecessor)
                 let handed = await predecessor.handOff()
                 await self?.adopt(handed.events, dropped: handed.dropped)
             }
@@ -151,6 +156,8 @@ package actor TelemetryClient {
     package func stop() {
         guard !stopped else { return }
         stopped = true
+        queue.close()
+        backgroundings.close()
         timer?.cancel()
         watcher?.cancel()
         let previous = tail
@@ -171,6 +178,8 @@ package actor TelemetryClient {
     /// - Returns: the events left, oldest first, and how many the queue evicted that no batch has reported.
     package func handOff() async -> (events: [TelemetryEvent], dropped: Int) {
         stopped = true
+        queue.close()
+        backgroundings.close()
         handingOff = true
         timer?.cancel()
         watcher?.cancel()
@@ -198,52 +207,57 @@ package actor TelemetryClient {
         await drainWhatWasWaiting()
     }
 
-    /// Enqueue an event.
-    ///
-    /// - Parameter name: the event's catalog name.
-    /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
-    ///   dropped, and an event the catalog does not name is dropped whole.
-    package func emit(_ name: String, properties: [String: String] = [:]) async {
-        await emit(name, properties: properties, occurredAt: Date())
-    }
-
-    /// Enqueue an event stamped with when it happened.
+    /// Appends an event to the queue on the caller's thread; nothing here waits on a send.
     ///
     /// - Parameter name: the event's catalog name.
     /// - Parameter properties: the string values the event carries. A pair the catalog does not allow the event is
     ///   dropped, and an event the catalog does not name is dropped whole.
     /// - Parameter occurredAt: when the reported thing happened.
     /// - Parameter waitsForBatch: holds even a failure for its batch, for a report the send-at-once rule must not move.
-    package func emit(
+    /// - Parameter session: the session the reported work began under, which the event carries; `nil` for this client's
+    ///   own. One for another entry point or environment is dropped, since this channel cannot deliver it.
+    package nonisolated func record(
         _ name: String,
         properties: [String: String] = [:],
-        occurredAt: Date,
-        waitsForBatch: Bool = false
-    ) async {
-        enqueue(name, properties: properties, occurredAt: occurredAt, waitsForBatch: waitsForBatch)
+        occurredAt: Date = Date(),
+        waitsForBatch: Bool = false,
+        session: TelemetrySessionContext? = nil
+    ) {
+        if let session, session.entry != configuration.entry || session.environment != configuration.environment {
+            logger.debug("telemetry_event_foreign_session: the session this event belongs to is not this channel's; dropped")
+            return
+        }
+        guard let event = event(name, properties, occurredAt, sessionId: session?.sessionId ?? sessionId) else { return }
+        offer([event], sendsAtOnce: !waitsForBatch && Self.sendsAtOnce(name, event.properties))
     }
 
-    /// Enqueue events in order, with nothing another caller records between them.
+    /// Appends events in order, with nothing another caller records between them.
     ///
     /// - Parameter records: each event's catalog name and properties, in the order they happened.
-    package func emit(_ records: [(name: String, properties: [String: String])]) async {
+    package nonisolated func record(_ records: [(name: String, properties: [String: String])]) {
         let now = Date()
-        for record in records {
-            enqueue(record.name, properties: record.properties, occurredAt: now, waitsForBatch: false)
-        }
+        let events = records.compactMap { event($0.name, $0.properties, now, sessionId: sessionId) }
+        offer(events, sendsAtOnce: events.contains { Self.sendsAtOnce($0.event, $0.properties) })
     }
 
-    private func enqueue(_ name: String, properties: [String: String], occurredAt: Date, waitsForBatch: Bool) {
+    /// The event as this channel sends it, or `nil` when the catalog does not name it.
+    ///
+    /// - Parameter name: the event's catalog name.
+    /// - Parameter properties: the values recorded, held to the catalog.
+    /// - Parameter occurredAt: when the reported thing happened.
+    /// - Parameter sessionId: the session the event belongs to.
+    /// - Returns: the event, or `nil` when it is dropped.
+    private nonisolated func event(
+        _ name: String,
+        _ properties: [String: String],
+        _ occurredAt: Date,
+        sessionId: String
+    ) -> TelemetryEvent? {
         guard let properties = TelemetryCatalog.scrub(name, properties) else {
             logger.warning("telemetry_event_unknown: event not in the catalog; dropped")
-            return
+            return nil
         }
-        guard !stopped else {
-            logger.debug("telemetry_event_after_stop: this channel was stopped; dropped")
-            return
-        }
-        startIfNeeded()
-        let event = TelemetryEvent(
+        return TelemetryEvent(
             sdkVersion: configuration.sdkVersion,
             sessionId: sessionId,
             deviceIdHash: nil,
@@ -253,10 +267,33 @@ package actor TelemetryClient {
             properties: properties,
             timestamp: occurredAt
         )
+    }
+
+    /// Appends `events` and asks the client to send when the batch is full or one of them leaves at once, and to start
+    /// its timer when they are the first since the last send.
+    ///
+    /// - Parameter events: the events to append, oldest first.
+    /// - Parameter sendsAtOnce: whether one of them leaves without waiting for its batch.
+    private nonisolated func offer(_ events: [TelemetryEvent], sendsAtOnce: Bool) {
+        guard !events.isEmpty else { return }
+        guard let offered = queue.offer(contentsOf: events) else {
+            logger.debug("telemetry_event_after_stop: this channel was stopped; dropped")
+            return
+        }
         // Counts what was offered since the last send attempt, so a refused batch back on the queue does not
         // make every later event a full batch.
-        let offered = queue.offer(event)
-        if offered >= configuration.batchSize || (!waitsForBatch && Self.sendsAtOnce(name, properties)) {
+        let flushes = sendsAtOnce || offered >= configuration.batchSize
+        guard flushes || offered == events.count else { return }
+        backgroundings.subscribe()
+        flushSignals.send(flushes: flushes) { await self.recorded(flushes: $0) }
+    }
+
+    /// Starts the timer once, and sends what is queued when a record asked for it.
+    ///
+    /// - Parameter flushes: whether the record asked for a send.
+    private func recorded(flushes: Bool) {
+        startIfNeeded()
+        if flushes {
             requestFlush()
         }
     }
@@ -267,8 +304,9 @@ package actor TelemetryClient {
         await requestFlush().value
     }
 
-    /// Returns once every flush requested so far has finished.
+    /// Returns once every flush requested so far, by a record or otherwise, has finished.
     package func settled() async {
+        await flushSignals.sent()
         while let current = tail {
             await current.value
             if tail == current {
@@ -277,12 +315,12 @@ package actor TelemetryClient {
         }
     }
 
-    package var bufferedCount: Int {
+    package nonisolated var bufferedCount: Int {
         queue.count
     }
 
     /// The events waiting to be sent, oldest first.
-    var queuedEvents: [TelemetryEvent] {
+    nonisolated var queuedEvents: [TelemetryEvent] {
         queue.events
     }
 
@@ -332,8 +370,9 @@ package actor TelemetryClient {
                 await self.requestFlush()
             }
         }
-        // Subscribed here rather than in the task, so a backgrounding before the task runs is not missed.
-        let backgroundings = lifecycle.backgroundings()
+        // Subscribed by the first record, or here, rather than in the task, so a backgrounding before the task runs is
+        // not missed.
+        let backgroundings = self.backgroundings.consume()
         watcher = Task { [weak self] in
             for await window in backgroundings {
                 guard let drain = await self?.requestFlush() else {
@@ -447,5 +486,111 @@ package actor TelemetryClient {
             properties: properties,
             timestamp: Date()
         )
+    }
+}
+
+/// The records' requests to the client, each run after the one before it, so `settled()` can wait for the last. A request
+/// sent while another waits to start joins it, so a burst of records leaves at most one request waiting.
+final class FlushSignals: @unchecked Sendable {
+    private let lock = NSLock()
+    private var latest: Task<Void, Never>?
+    /// Whether the request waiting to start sends what is queued; `nil` when none waits.
+    private var waiting: Bool?
+
+    /// Runs `request` on its own task, after every request sent before it, or joins the request waiting to start.
+    ///
+    /// - Parameter flushes: whether the record asked for a send.
+    /// - Parameter request: what the client does for a record, given whether any record it answers asked for a send.
+    func send(flushes: Bool, _ request: @escaping @Sendable (_ flushes: Bool) async -> Void) {
+        lock.withLock {
+            if let waiting {
+                self.waiting = waiting || flushes
+                return
+            }
+            let previous = latest
+            waiting = flushes
+            latest = Task {
+                await previous?.value
+                await request(self.started())
+            }
+        }
+    }
+
+    /// Returns once every request sent so far has run.
+    func sent() async {
+        let last = lock.withLock { latest }
+        await last?.value
+    }
+
+    /// Marks the waiting request started, so a later record queues a new one.
+    ///
+    /// - Returns: whether a record the request answers asked for a send.
+    private func started() -> Bool {
+        lock.withLock {
+            defer { waiting = nil }
+            return waiting ?? false
+        }
+    }
+}
+
+/// The client's one subscription to the app's backgroundings, made by whichever comes first: a record on the caller's
+/// thread, or the client starting its watcher. Once closed it subscribes no more.
+final class BackgroundSubscription: @unchecked Sendable {
+    private let lock = NSLock()
+    private let lifecycle: any AppLifecycle
+    private var made: AsyncStream<BackgroundWindow>?
+    private var consumed = false
+    private var closed = false
+
+    /// - Parameter lifecycle: the app's movement to the background.
+    init(_ lifecycle: any AppLifecycle) {
+        self.lifecycle = lifecycle
+    }
+
+    /// Subscribes once, for the watcher to read later.
+    func subscribe() {
+        lock.withLock { _ = stream() }
+    }
+
+    /// Subscribes once, and hands the stream to its one reader, which ends the subscription by ending its read.
+    ///
+    /// - Returns: the backgroundings, or a finished stream once closed.
+    func consume() -> AsyncStream<BackgroundWindow> {
+        lock.withLock {
+            consumed = true
+            return stream()
+        }
+    }
+
+    /// Ends a subscription no watcher reads, closing every window it holds, and refuses any later one. A subscription
+    /// the watcher reads ends when the watcher is cancelled.
+    func close() {
+        let unread: AsyncStream<BackgroundWindow>? = lock.withLock {
+            closed = true
+            return consumed ? nil : made
+        }
+        guard let unread else { return }
+        // A cancelled read ends the stream and still yields what it holds.
+        let reader = Task {
+            for await window in unread {
+                window.close()
+            }
+        }
+        reader.cancel()
+    }
+
+    /// The subscription, made on the first call. Called with the lock held.
+    ///
+    /// - Returns: the backgroundings, or a finished stream once closed.
+    private func stream() -> AsyncStream<BackgroundWindow> {
+        if let made {
+            return made
+        }
+        guard !closed else {
+            return AsyncStream { $0.finish() }
+        }
+        let stream = lifecycle.backgroundings()
+        made = stream
+        return stream
     }
 }

@@ -259,8 +259,8 @@ Two forms, and the first is the one to reach for:
 - **A suite that needs hardware is its own test target.** That is `PayabliDemoDeviceTests` and
   `PayabliDemoUITests`, both hosted by the sample app. `Example/PayabliDemo/Config/DeviceTests.xcconfig`
   records why the device bundle is a target rather than a setting: a tool-hosted bundle has no entitlement,
-  so every Keychain call returns `errSecMissingEntitlement`. Automated runs simply never name those
-  schemes.
+  so every Keychain call returns `errSecMissingEntitlement`. Automated runs never name those schemes, except
+  the nightly's run of `TelemetryBackgroundOnDeviceTests`, which needs only the app as its host.
 - **A single class or method inside a target that otherwise runs** takes an `OnDevice`, `Live` or
   `IfAvailable` name suffix and goes in `.github/hardware-only-tests.txt`. Identifiers are `Target/Class`
   or `Target/Class/method`, without parentheses.
@@ -342,8 +342,8 @@ successful run of an opted-out tier looks like, so read the skip count rather th
   reviewed pull request, never bypassed.
 - **`nightly.yml`** runs on a schedule and reports to Slack. It adds what the gate cannot reach: the sample
   app itself, which no pull request can build because `Secrets.swift` is gitignored and is a member of the
-  app target; a device-slice compile; both live test bundles compiled but not run; and the release
-  XCFrameworks. It is not a required check.
+  app target; a device-slice compile; both live test bundles compiled, with only
+  `TelemetryBackgroundOnDeviceTests` run; and the release XCFrameworks. It is not a required check.
 - **The nightly's reporter is covered by its own tests**, `.github/scripts/tests/`, run by `scripts.yml` on
   any pull request that touches them. Change either script and run both halves:
 
