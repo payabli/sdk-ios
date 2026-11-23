@@ -34,6 +34,11 @@ package extension AppAttestService {
                 logger.error("[activate] the refused binding could not be dropped")
             }
             throw refusal
+        } catch let refusal as DeviceRouteRefusal {
+            // An envelope naming another code than its status: no status names one activation refusal, so the
+            // binding is kept and the code is still owed.
+            guard let status = refusal.httpStatus, [400, 403, 404].contains(status) else { throw refusal }
+            throw ActivationRefusals.readByStatus(status)
         }
     }
 

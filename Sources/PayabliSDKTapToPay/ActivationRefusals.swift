@@ -12,6 +12,20 @@ enum ActivationRefusals {
         )
     }
 
+    /// A refusal at 400, 403 or 404 whose envelope named another code. Its words say nothing reliable, so it is
+    /// classified without them and leaves the session waiting for its code.
+    ///
+    /// - Parameter status: the HTTP status the refusal came with.
+    /// - Returns: `SDK_INTERNAL_ERROR` at 400 and `UNKNOWN` otherwise, carrying `status` and moving nothing.
+    static func readByStatus(_ status: Int) -> any Error {
+        let type: PayabliErrorType = status == 400 ? .sdkInternalError : .unknown
+        let refusal = ActivationRefusal(
+            hostError: TapToPayError(type: type, reason: type.message, detail: nil),
+            movesSession: false
+        )
+        return DeviceRefusalStatus.carrying(status, on: refusal)
+    }
+
     static func hostError(resultCode: Int?, reason: String) -> TapToPayError {
         let type = catalogType(resultCode: resultCode, reason: reason)
         return TapToPayError(type: type, reason: type.message, detail: reason.isEmpty ? nil : reason)
