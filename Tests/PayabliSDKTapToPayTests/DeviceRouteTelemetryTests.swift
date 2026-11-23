@@ -93,7 +93,9 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         for answer in answers {
             let (client, telemetry) = makeClient(answering: .status(answer.status, body: answer.body))
 
-            await assertThrows { _ = try await client.measured(.activate) { try await Self.readRefusal(client.get(.activate, Self.request)) } }
+            await assertThrows {
+                _ = try await client.measured(.activate) { try await Self.readRefusal(client.get(.activate, Self.request)) }
+            }
 
             let properties = try await onlyEvent(of: telemetry)
             XCTAssertEqual(properties["outcome"], "refused")
