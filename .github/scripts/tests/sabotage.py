@@ -418,8 +418,8 @@ MUTATIONS = [
     Mutation(
         "the gate stops reading one of the outcomes",
         NIGHTLY,
-        '"${{ steps.bundles.outcome }}" "${{ steps.xcframework.outcome }}"',
-        '"${{ steps.xcframework.outcome }}"',
+        '"${{ steps.bundles.outcome }}" "${{ steps.background.outcome }}"',
+        '"${{ steps.bundles.outcome }}"',
         "W8b", "workflows",
     ),
     Mutation(
@@ -541,7 +541,7 @@ MUTATIONS = [
     ),
     Mutation(
         "the job may run longer than the liveness window allows for",
-        NIGHTLY, "    timeout-minutes: 220", "    timeout-minutes: 400", "W14", "workflows",
+        NIGHTLY, "    timeout-minutes: 240", "    timeout-minutes: 400", "W14", "workflows",
     ),
     Mutation(
         "a tier runs on with no exclusions when the list cannot be read",

@@ -135,6 +135,23 @@ extension TelemetryClientTests {
         XCTAssertEqual(left, 0)
     }
 
+    func testAPredecessorTakesRecordsUntilItIsUnreachableAndThenHandsThemOver() async {
+        let old = makeClient(batchSize: 100)
+        let gate = Gate()
+        let successor = makeClient(batchSize: 100, predecessor: old, predecessorReplaced: { _ in await gate.wait() })
+
+        try? await Task.sleep(for: .milliseconds(100))
+        await record(old, "late")
+        let queuedBeforeTheGate = await old.bufferedCount
+        await gate.open()
+        await successor.flush()
+
+        XCTAssertEqual(queuedBeforeTheGate, 1, "the predecessor is not retired while a record can still reach it")
+        let events = await transport.batches.flatMap { $0 }
+        XCTAssertEqual(events.map(\.label), ["late"])
+        XCTAssertEqual(Set(events.map(\.sessionId)), [old.sessionId])
+    }
+
     func testDiscardingDropsWhatIsQueuedAndLogsTheCount() async {
         let sink = RecordingLogSink()
         let client = makeClient(batchSize: 100, logger: PayabliLogger(category: .telemetry, sink: sink))
@@ -173,7 +190,7 @@ extension TelemetryClientTests {
         let client = makeClient(logger: PayabliLogger(category: .telemetry, sink: sink))
 
         await client.stop()
-        await client.emit(TelemetryEventName.sdkInitialized)
+        client.record(TelemetryEventName.sdkInitialized)
         await client.flush()
 
         let buffered = await client.bufferedCount
@@ -183,5 +200,22 @@ extension TelemetryClientTests {
         let dropped = sink.records.filter { $0.message.hasPrefix("telemetry_event_after_stop") }
         XCTAssertEqual(dropped.map(\.level), [.debug])
         XCTAssertEqual(dropped.map(\.category), [.telemetry])
+    }
+}
+
+/// Holds a waiter until opened.
+private actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        waiting.forEach { $0.resume() }
+        waiting = []
     }
 }
