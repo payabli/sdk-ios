@@ -157,6 +157,7 @@ package actor TelemetryClient {
         guard !stopped else { return }
         stopped = true
         queue.close()
+        backgroundings.close()
         timer?.cancel()
         watcher?.cancel()
         let previous = tail
@@ -178,6 +179,7 @@ package actor TelemetryClient {
     package func handOff() async -> (events: [TelemetryEvent], dropped: Int) {
         stopped = true
         queue.close()
+        backgroundings.close()
         handingOff = true
         timer?.cancel()
         watcher?.cancel()
@@ -370,7 +372,7 @@ package actor TelemetryClient {
         }
         // Subscribed by the first record, or here, rather than in the task, so a backgrounding before the task runs is
         // not missed.
-        let backgroundings = self.backgroundings.subscribe()
+        let backgroundings = self.backgroundings.consume()
         watcher = Task { [weak self] in
             for await window in backgroundings {
                 guard let drain = await self?.requestFlush() else {
@@ -488,7 +490,7 @@ package actor TelemetryClient {
 }
 
 /// The records' requests to the client, each run after the one before it, so `settled()` can wait for the last.
-private final class FlushSignals: @unchecked Sendable {
+final class FlushSignals: @unchecked Sendable {
     private let lock = NSLock()
     private var latest: Task<Void, Never>?
 
@@ -513,29 +515,63 @@ private final class FlushSignals: @unchecked Sendable {
 }
 
 /// The client's one subscription to the app's backgroundings, made by whichever comes first: a record on the caller's
-/// thread, or the client starting its timer.
-private final class BackgroundSubscription: @unchecked Sendable {
+/// thread, or the client starting its watcher. Once closed it subscribes no more.
+final class BackgroundSubscription: @unchecked Sendable {
     private let lock = NSLock()
     private let lifecycle: any AppLifecycle
     private var made: AsyncStream<BackgroundWindow>?
+    private var consumed = false
+    private var closed = false
 
     /// - Parameter lifecycle: the app's movement to the background.
     init(_ lifecycle: any AppLifecycle) {
         self.lifecycle = lifecycle
     }
 
-    /// Subscribes once, and answers the same stream every time after.
+    /// Subscribes once, for the watcher to read later.
+    func subscribe() {
+        lock.withLock { _ = stream() }
+    }
+
+    /// Subscribes once, and hands the stream to its one reader, which ends the subscription by ending its read.
     ///
-    /// - Returns: the backgroundings.
-    @discardableResult
-    func subscribe() -> AsyncStream<BackgroundWindow> {
+    /// - Returns: the backgroundings, or a finished stream once closed.
+    func consume() -> AsyncStream<BackgroundWindow> {
         lock.withLock {
-            if let made {
-                return made
-            }
-            let stream = lifecycle.backgroundings()
-            made = stream
-            return stream
+            consumed = true
+            return stream()
         }
+    }
+
+    /// Ends a subscription no watcher reads, closing every window it holds, and refuses any later one. A subscription
+    /// the watcher reads ends when the watcher is cancelled.
+    func close() {
+        let unread: AsyncStream<BackgroundWindow>? = lock.withLock {
+            closed = true
+            return consumed ? nil : made
+        }
+        guard let unread else { return }
+        // A cancelled read ends the stream and still yields what it holds.
+        let reader = Task {
+            for await window in unread {
+                window.close()
+            }
+        }
+        reader.cancel()
+    }
+
+    /// The subscription, made on the first call. Called with the lock held.
+    ///
+    /// - Returns: the backgroundings, or a finished stream once closed.
+    private func stream() -> AsyncStream<BackgroundWindow> {
+        if let made {
+            return made
+        }
+        guard !closed else {
+            return AsyncStream { $0.finish() }
+        }
+        let stream = lifecycle.backgroundings()
+        made = stream
+        return stream
     }
 }
