@@ -294,6 +294,12 @@ extension PayabliTTP {
                 throw failure
             }
             throw PayabliTTPError.devicePendingActivation()
+        } catch let refusal as any PayabliError where refusal.type == .devicePendingActivation {
+            // A route's refusal asking for a code, which only a held registration can take.
+            if let failure = landPendingActivation() {
+                throw failure
+            }
+            throw refusal
         } catch {
             markError(error)
             syncPublished()

@@ -4,7 +4,8 @@ import PayabliSDKTestUtils
 import XCTest
 
 /// A refusal whose envelope names another code than its HTTP status, through the whole path a host's takes. On
-/// `/activate` it is an activation refusal with no words, and the session keeps waiting for its code.
+/// `/activate` it is an activation refusal with no words, and the session keeps waiting for its code. On the cold
+/// routes, a 403 lands pending activation only when a registration is held.
 @available(iOS 16.7, *)
 @MainActor
 final class DeviceRouteMismatchLandingTests: XCTestCase {
@@ -35,6 +36,21 @@ final class DeviceRouteMismatchLandingTests: XCTestCase {
             XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_1"), label)
             XCTAssertEqual(try attestation.binding(for: "myEntry")?.deviceId, "dev_1", "\(label): the binding is kept")
         }
+    }
+
+    // MARK: - Cold routes
+
+    func testAChallengeDeclineNaming403WithNoRegistrationLandsOnTheConfigurationAndAsksForNoCode() async throws {
+        StubURLProtocol.handler = { request in
+            Self.refusal(request, status: 200, resultCode: 403, reason: "Forbidden")
+        }
+        let (ttp, attestation) = try makeWiredTTP()
+
+        let thrown = await failure { try await ttp.initialize() }
+
+        XCTAssertEqual((thrown as? TapToPayError)?.type, .unknown, "no code can activate an unbound device: \(thrown)")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .configurationRejected))
+        XCTAssertNil(try attestation.binding(for: "myEntry"), "nothing was bound")
     }
 
     // MARK: - Fixtures
