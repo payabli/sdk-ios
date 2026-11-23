@@ -10,6 +10,9 @@ import XCTest
 @available(iOS 16.7, *)
 @MainActor
 final class SessionTokenRenewalTests: XCTestCase {
+    /// The service's words for a binding it no longer holds.
+    private static let revocationText = "Device not attested or attestation revoked"
+
     private var stub = RenewalStub()
     private var tokens = TokenCalls()
 
@@ -112,7 +115,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         let (ttp, _, attestation, _) = try makeTTP()
         attestation.isAlreadyAttested = true
         stub.configStatuses = [401]
-        stub.configRefusalText = BindingRefusal.text
+        stub.configRefusalText = Self.revocationText
 
         let failure = await failure { try await ttp.initialize() }
 

@@ -362,7 +362,7 @@ final class AppAttestServiceTests: XCTestCase {
         do {
             _ = try await sut.generateAssertion(for: "myEntry")
             XCTFail("expected throw")
-        } catch PayabliTTPError.attestationFailed {
+        } catch PayabliTTPError.deviceSetupRequired {
             // ok
         } catch {
             XCTFail("wrong error: \(error)")

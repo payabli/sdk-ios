@@ -74,18 +74,26 @@ final class DeviceServiceClient: Sendable {
     /// - Parameter error: what the call threw.
     /// - Parameter route: the route the call sent.
     /// - Parameter answer: the response the call read, or `nil` when none arrived.
-    /// - Returns: `refused` and the service's code when the service answered no, `failed` and no code otherwise.
+    /// - Returns: `refused` and the code the host's error is read by when the service answered no under a code below
+    ///   500, `failed` and no code otherwise. An error status is that code, whatever the envelope says.
     static func outcome(
         of error: Error,
         on route: DeviceRoute,
         answer: PayabliResponse?
     ) -> (outcome: String, code: Int?) {
-        // A refused token, a timeout and a rate limit are the transport's, not the route's answer.
+        // Otherwise a refused token, a timeout and a rate limit are the transport's, not the route's answer.
+        if let refusal = error as? DeviceRouteRefusal {
+            return refusal.isRefusal ? ("refused", refusal.resultCode) : ("failed", nil)
+        }
         guard !(error is PinnedTokenRefusal), let answer, answer.statusCode < 500,
               ![408, 429].contains(answer.statusCode)
         else { return ("failed", nil) }
         if let (code, _) = PayabliEnvelope.declineOutcome(from: answer.body) {
-            return ("refused", code)
+            let told: Int? = answer.statusCode >= 400 ? answer.statusCode : code
+            if let told, told >= 500 {
+                return ("failed", nil)
+            }
+            return ("refused", told)
         }
         // The gateway refuses `/config` with a bare 403 when the device owes its activation code.
         if route == .config, answer.statusCode == 403 {
@@ -137,11 +145,11 @@ final class DeviceServiceClient: Sendable {
     /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
-    /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding is
-    ///   gone, before the status mapping.
+    /// - Parameter readsRefusalBeforeStatus: reads a 400, 401, 403 or 404's refusal envelope whose code is that status
+    ///   before the status mapping.
     /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
-    ///   service sent, or `nil` where the words name nothing the route classifies, so the status mapping answers.
+    ///   service sent, or `nil` where the words name nothing the route classifies, so the code decides.
     /// - Returns: the raw response, for the caller to decode.
     func post(
         _ route: DeviceRoute,
@@ -185,23 +193,25 @@ final class DeviceServiceClient: Sendable {
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let (_, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
+        if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
+           code == response.statusCode,
            let unregistered = AppRegistrationRefusals.hostError(status: response.statusCode, reason: reason)
         {
             logger.error("[\(route.rawValue)] refused: the app is not registered on the paypoint")
             throw unregistered
         }
-        // Only the statuses a refusal is sent with. Every other status keeps the transport's own
-        // classification, a rate limit's wait among them. A classifier that knows the words throws its own
-        // failure; one that does not leaves the status mapping to answer.
+        // At the statuses a refusal is sent with, an envelope naming a code is the route's refusal, read by its words only
+        // when the code is the status it came with and classified by the status otherwise. Every other answer keeps the
+        // transport's classification, a rate limit's wait and a refused token among them.
         if readsRefusalBeforeStatus,
            let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body, decoder: decoder),
-           [400, 403, 404].contains(response.statusCode)
-           || BindingRefusal.isBindingGone(code: response.statusCode, reason: reason),
-           let decline = makeDeclineError(code ?? response.statusCode, reason)
+           let code, [400, 401, 403, 404].contains(response.statusCode)
         {
-            logger.error("[\(route.rawValue)] refused (code=\(code.map(String.init) ?? "nil"))")
-            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            logger.error("[\(route.rawValue)] refused (code=\(code))")
+            if code == response.statusCode, let decline = makeDeclineError(code, reason) {
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            }
+            throw DeviceRouteRefusal.of(code: response.statusCode, reason: reason, httpStatus: response.statusCode)
         }
         if pinsCredential, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
@@ -220,8 +230,10 @@ final class DeviceServiceClient: Sendable {
             // sent. The code says which decline this was, and a classifier that
             // knows the words answers with its own failure.
             logger.error("[\(route.rawValue)] declined (code=\(code.map(String.init) ?? "nil"))")
-            let decline = makeDeclineError(code, reason) ?? PayabliTTPError.attestationFailed(reason: reason)
-            throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            if let decline = makeDeclineError(code, reason) {
+                throw DeviceRefusalStatus.carrying(response.statusCode, on: decline)
+            }
+            throw DeviceRouteRefusal.of(code: code, reason: reason, httpStatus: response.statusCode)
         }
 
         return response

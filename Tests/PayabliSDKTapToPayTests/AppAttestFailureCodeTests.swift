@@ -319,9 +319,9 @@ final class AppAttestFailureCodeTests: XCTestCase {
         await assertAttestThrows(sut, .deviceSetupRefused)
     }
 
-    /// The root-unavailable sentence is ruled to keep the validation answer, so the
-    /// verification match above must be the whole sentence, not a prefix.
-    func testAnAttestationRootUnavailableFailureKeepsTheValidationError() async throws {
+    /// The service cannot load Apple's root, so it is the service failing, matched on the whole sentence before
+    /// the verification prefix.
+    func testAnAttestationRootUnavailableFailureIsTheServiceFailing() async throws {
         stubColdRoutes(
             refusing: "/api/v2/device/taptopay/attest",
             status: 400,
@@ -329,7 +329,7 @@ final class AppAttestFailureCodeTests: XCTestCase {
         )
         let (sut, _, _) = try AttestFixture.makeService()
 
-        await assertAttestThrows(sut, .validation)
+        await assertAttestThrows(sut, .serverError)
     }
 
     /// A device the service no longer holds is set up again, whichever words told
@@ -347,12 +347,12 @@ final class AppAttestFailureCodeTests: XCTestCase {
         }
     }
 
-    /// A refusal none of the tables knows keeps the status's own answer.
-    func testAnUnmatchedRefusalKeepsItsStatusAnswer() async throws {
+    /// A refusal none of the tables knows is read by its code: a 403 is an activation owed.
+    func testAnUnmatchedRefusalIsReadByItsCode() async throws {
         stubColdRoutes(refusing: "/api/v2/device/taptopay/attest", status: 403, text: "Some other refusal.")
         let (sut, _, _) = try AttestFixture.makeService()
 
-        await assertAttestThrows(sut, .permissionDenied)
+        await assertAttestThrows(sut, .devicePendingActivation)
     }
 
     // MARK: - The activation code itself

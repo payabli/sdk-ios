@@ -45,8 +45,8 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["code"], "409")
     }
 
-    func testADeclineNamingNoCodeIsRefusedWithoutOne() async throws {
-        let (client, telemetry) = makeClient(answering: .status(400, body: Data(#"{"isSuccess":false}"#.utf8)))
+    func testADeclineNamingNoCodeInsideASuccessfulStatusIsRefusedWithoutOne() async throws {
+        let (client, telemetry) = makeClient(answering: .status(200, body: Data(#"{"isSuccess":false}"#.utf8)))
 
         await assertThrows { _ = try await client.measured(.register) { try await Self.readRefusal(client.get(.register, Self.request)) } }
 
@@ -73,6 +73,34 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         let properties = try await onlyEvent(of: telemetry)
         XCTAssertEqual(properties["outcome"], "failed")
         XCTAssertNil(properties["code"])
+    }
+
+    func testAServerFailureInsideASuccessfulStatusIsFailedWithoutACode() async throws {
+        for route in [DeviceRoute.activate, .config] {
+            let (client, telemetry) = makeClient(answering: .status(200, body: Self.decline(code: 503)))
+
+            await assertThrows { _ = try await client.measured(route) { try await Self.readRefusal(client.get(route, Self.request)) } }
+
+            let events = try await sent(by: telemetry)
+            XCTAssertEqual(events.map(\.event), ["ttp.device.\(route.rawValue).completed"])
+            XCTAssertEqual(events.first?.properties["outcome"], "failed", route.rawValue)
+            XCTAssertNil(events.first?.properties["code"], route.rawValue)
+        }
+    }
+
+    func testADeclineWhoseCodeIsNotItsStatusIsRefusedWithTheStatus() async throws {
+        let answers: [(status: Int, body: Data)] = [(403, Self.decline(code: 400)), (400, Data(#"{"isSuccess":false}"#.utf8))]
+        for answer in answers {
+            let (client, telemetry) = makeClient(answering: .status(answer.status, body: answer.body))
+
+            await assertThrows {
+                _ = try await client.measured(.activate) { try await Self.readRefusal(client.get(.activate, Self.request)) }
+            }
+
+            let properties = try await onlyEvent(of: telemetry)
+            XCTAssertEqual(properties["outcome"], "refused")
+            XCTAssertEqual(properties["code"], String(answer.status))
+        }
     }
 
     func testAnAnswerThatCannotBeReadIsFailed() async throws {
@@ -123,6 +151,21 @@ final class DeviceRouteTelemetryTests: XCTestCase {
 
         let events = await telemetryTransport.drainBatches().flatMap { $0 }
         XCTAssertEqual(events.map(\.event), ["ttp.device.challenge.completed"], "a failure does not wait for its batch")
+    }
+
+    func testAConfigRefusalWith401InsideASuccessfulStatusIsRefusedWithItsCode() async throws {
+        let (client, telemetry) = makeClient(answering: .status(200, body: Self.decline(code: 401)))
+
+        await assertThrows {
+            _ = try await client.measured(.config) {
+                let response = try await client.get(.config, Self.request)
+                throw DeviceRouteRefusal.of(code: 401, reason: "Unauthorized", httpStatus: response.statusCode)
+            }
+        }
+
+        let properties = try await onlyEvent(of: telemetry)
+        XCTAssertEqual(properties["outcome"], "refused", "the device was refused, not the token")
+        XCTAssertEqual(properties["code"], "401")
     }
 
     func testACancelledCallReportsNothing() async throws {
@@ -210,6 +253,32 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(events.last?.properties["outcome"], "failed")
     }
 
+    func testAnActivationServerFailureInsideASuccessfulStatusIsFailedWithoutACode() async throws {
+        let telemetry = makeTelemetry()
+        StubURLProtocol.handler = { request in
+            if request.url!.path == "/api/v2/device/taptopay/activate" {
+                return (
+                    HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!,
+                    Self.decline(code: 503)
+                )
+            }
+            return AttestFixture.ok(request, ["challengeId": "c_1", "challenge": "Y2hhbGxlbmdl"])
+        }
+        defer { StubURLProtocol.handler = nil }
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev", keyId: "key", in: storage)
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage)
+
+        await assertThrows {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev")
+        }
+
+        let events = try await sent(by: telemetry)
+        XCTAssertEqual(events.last?.event, "ttp.device.activate.completed")
+        XCTAssertEqual(events.last?.properties["outcome"], "failed")
+        XCTAssertNil(events.last?.properties["code"])
+    }
+
     func testARouteRefusalReadByTheRealClientIsRefusedWithItsCode() async throws {
         let telemetry = makeTelemetry()
         StubURLProtocol.handler = { request in
@@ -228,7 +297,7 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         XCTAssertEqual(properties["code"], "404")
     }
 
-    func testARefusedTokenWithADeclineBodyIsFailed() async throws {
+    func testA401WhoseEnvelopeSays401IsRefusedWithItsCode() async throws {
         let telemetry = makeTelemetry()
         StubURLProtocol.handler = { request in
             (
@@ -242,8 +311,8 @@ final class DeviceRouteTelemetryTests: XCTestCase {
         await assertThrows { _ = try await sut.attest(entry: "myEntry") }
 
         let properties = try await onlyEvent(of: telemetry)
-        XCTAssertEqual(properties["outcome"], "failed", "the token was refused, not the route")
-        XCTAssertNil(properties["code"])
+        XCTAssertEqual(properties["outcome"], "refused", "the service refused the device, not the token")
+        XCTAssertEqual(properties["code"], "401")
     }
 
     func testARateLimitIsFailed() async throws {
