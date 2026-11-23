@@ -27,9 +27,10 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry` on a pinned credential. Only a 401 saying the binding is gone drops it, throwing
-    /// `attestationRevoked`; another HTTP 401 throws ``PinnedTokenRefusal``, and an envelope 401 `deviceSetupRequired`. A 403
-    /// naming the entry point throws `entryPointRefused`; one naming nothing classified is the device owing its code.
+    /// Fetches the TTP config for `entry` on a pinned credential. A refusal envelope naming 401, or a 401 whose envelope
+    /// names any code, drops the binding presented and throws `attestationRevoked`, which a host receives as 3005
+    /// `DEVICE_SETUP_REQUIRED`; only a 401 with no envelope code throws ``PinnedTokenRefusal``. A 403 naming the entry point
+    /// throws `entryPointRefused`; one naming nothing classified is the device owing its code.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.
@@ -49,6 +50,10 @@ final class TTPConfigClient: Sendable {
 
             try throwRefusalToldByItsText(response, entry: entry, presented: headers)
             if response.statusCode == 401 {
+                // An envelope naming a code is the route's refusal, read by its status; only a bare 401 is the token.
+                if let (code, reason) = PayabliEnvelope.declineOutcome(from: response.body), code != nil {
+                    throw refusedBinding(reason: reason, httpStatus: 401, entry: entry, presented: headers)
+                }
                 throw PinnedTokenRefusal()
             }
 
@@ -77,13 +82,7 @@ final class TTPConfigClient: Sendable {
                 // A 401 in the body is the service holding no live attestation for the binding, whatever its text. It is
                 // dropped here, where which handle the request presented is known, so the next setup attests again.
                 if code == 401 {
-                    guard dropRefusedBinding(entry: entry, presented: headers) else {
-                        throw PayabliTTPError.attestationRevoked(
-                            reason: "\(reason) — the stored binding could not be dropped",
-                            httpStatus: response.statusCode
-                        )
-                    }
-                    throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
+                    throw refusedBinding(reason: reason, httpStatus: response.statusCode, entry: entry, presented: headers)
                 }
                 if let refused = ColdRouteRefusals.decline(code: code, reason: reason) {
                     throw DeviceRefusalStatus.carrying(response.statusCode, on: refused)
@@ -135,13 +134,26 @@ final class TTPConfigClient: Sendable {
         // A 401 naming 401 is the service holding no live attestation for this binding, whatever its words.
         guard code == 401 else { return }
         logger.error("[config] the service holds no live attestation for this binding")
+        throw refusedBinding(reason: reason, httpStatus: response.statusCode, entry: entry, presented: headers)
+    }
+
+    /// Drops the binding a refused request presented and builds the failure that says so.
+    ///
+    /// - Parameter reason: the service's words, kept as the failure's reason.
+    /// - Parameter httpStatus: the status the refusal came with.
+    /// - Parameter entry: the entry point the refused binding names.
+    /// - Parameter headers: the assertion headers the request presented.
+    /// - Returns: `attestationRevoked`, whose reason says when the stored binding could not be dropped.
+    private func refusedBinding(
+        reason: String,
+        httpStatus: Int,
+        entry: String,
+        presented headers: AssertionHeaders
+    ) -> PayabliTTPError {
         guard dropRefusedBinding(entry: entry, presented: headers) else {
-            throw PayabliTTPError.attestationRevoked(
-                reason: "\(reason) — the stored binding could not be dropped",
-                httpStatus: response.statusCode
-            )
+            return .attestationRevoked(reason: "\(reason) — the stored binding could not be dropped", httpStatus: httpStatus)
         }
-        throw PayabliTTPError.attestationRevoked(reason: reason, httpStatus: response.statusCode)
+        return .attestationRevoked(reason: reason, httpStatus: httpStatus)
     }
 
     private func assertionHeaders(entry: String) async throws -> AssertionHeaders {

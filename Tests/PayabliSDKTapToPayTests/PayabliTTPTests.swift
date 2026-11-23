@@ -469,6 +469,18 @@ final class PayabliTTPTests: XCTestCase {
         XCTAssertEqual((try XCTUnwrap(thrown) as? TapToPayError)?.type, .deviceSetupRequired)
     }
 
+    func testAConfig401NamingAnotherCodeDiscardsTheBindingAndRenewsNothing() async throws {
+        let (ttp, _, attestation) = try makeTTP()
+        attestation.isAlreadyAttested = true
+        StubURLProtocol.handler = Self.configAnswer(status: 401, code: 403)
+
+        let thrown = await failure { try await ttp.initialize() }
+
+        XCTAssertFalse(attestation.isAlreadyAttested, "a refused binding must not be presented again")
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .deviceSetupRequired), "a renewed token meets the same refusal")
+        XCTAssertEqual((thrown as? TapToPayError)?.type, .deviceSetupRequired)
+    }
+
     func testAConfig401NamingA401WithAnyOtherTextDiscardsTheBindingAndRenewsNothing() async throws {
         let (ttp, _, attestation) = try makeTTP()
         attestation.isAlreadyAttested = true
