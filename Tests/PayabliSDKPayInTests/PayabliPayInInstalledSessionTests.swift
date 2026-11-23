@@ -109,11 +109,15 @@ final class PayabliPayInInstalledSessionTests: XCTestCase {
         let events = InMemoryTelemetryTransport()
         PayabliSession.resetForTesting(telemetryTransport: events)
         let minting = ProviderGate()
-        let first = try await PayabliSession.initialize(config: PayabliConfig(
-            entryPoint: "first",
-            environment: .sandbox,
-            tokenProvider: { try await minting.held() }
-        ))
+        let first = try PayabliSession.install(
+            config: PayabliConfig(
+                entryPoint: "first",
+                environment: .sandbox,
+                tokenProvider: { try await minting.held() }
+            ),
+            urlSession: RefusingURLProtocol.makeSession(),
+            telemetryTransport: events
+        )
         let component = PayabliPayIn(session: first)
         let capture = Task {
             try await component.capture(PayabliPayInRequest(
@@ -213,4 +217,22 @@ private actor ProviderGate {
         waiting.forEach { $0.resume() }
         waiting.removeAll()
     }
+}
+
+/// Fails every request at once, so a test reaches no network and waits on no timeout.
+private final class RefusingURLProtocol: URLProtocol {
+    static func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RefusingURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+    }
+
+    override func stopLoading() {}
 }
