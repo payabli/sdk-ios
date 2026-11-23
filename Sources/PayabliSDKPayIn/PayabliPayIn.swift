@@ -40,14 +40,14 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
     /// Reads the clock a held key ages against. One that keeps counting while the device sleeps.
     var now: @Sendable () -> ContinuousClock.Instant = { ContinuousClock.now }
 
-    private(set) var session: PayabliSession?
+    let session: PayabliSession?
     private let injectedTransport: (any PayabliTransport)?
     private var client: PayInPaymentFlowClient
     private var tokenStorageClient: PayInPaymentFlowTokenStorageClient
     private var activeSubmissionCount = 0
     private let heldKeys = PayInKeyStore.process
     private let logger = PayabliLogger(category: .tokenization)
-    private(set) var reports: PayInReports
+    let reports: PayInReports
 
     /// Builds the flow on a session, which carries the credential and the transport that sends it.
     ///
@@ -89,26 +89,22 @@ public final class PayabliPayIn: NSObject, ObservableObject, PayabliComponent {
         super.init()
     }
 
-    /// Points the flow at a configuration, which has to be the one the installed session runs on.
+    /// Points the flow at a configuration, which has to be the one its own session runs on.
     ///
-    /// The process has one session, so a different configuration, or none installed, is not applied:
-    /// the flow keeps its entry point and environment, and every submission after it fails with
-    /// `invalidConfiguration`.
+    /// A flow stays on the session it was built on. A different configuration, or one the flow's session no
+    /// longer runs as the installed session, is not applied: every submission after it fails with
+    /// `invalidConfiguration`, and a flow for a newly installed session is built on that session.
     ///
-    /// - Parameter config: the configuration to run on, applied only when it is the one the installed
-    ///   session runs on.
+    /// - Parameter config: the configuration to run on, applied only when the flow's session is installed
+    ///   and runs on it.
     public func configure(config: PayabliConfig) {
         let transport: any PayabliTransport
         if let injectedTransport {
             entryPoint = config.entryPoint
             environment = config.environment
             transport = injectedTransport
-        } else if let installed = PayabliSession.current, installed.matches(config) {
-            entryPoint = config.entryPoint
-            environment = config.environment
-            session = installed
-            reports = PayInReports(session: installed.telemetry.context)
-            transport = installed.transport
+        } else if let session, PayabliSession.current === session, session.matches(config) {
+            transport = session.transport
         } else {
             transport = RefusedTransport(refusal: PayabliGenericError(
                 type: .invalidConfiguration,
