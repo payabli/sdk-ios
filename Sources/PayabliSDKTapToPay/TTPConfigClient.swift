@@ -27,10 +27,9 @@ final class TTPConfigClient: Sendable {
         self.attestation = attestation
     }
 
-    /// Fetches the TTP config for `entry` on a pinned credential. A refusal envelope naming 401, or a 401 whose envelope
-    /// names any code, drops the binding presented and throws `attestationRevoked`, which a host receives as 3005
-    /// `DEVICE_SETUP_REQUIRED`; only a 401 with no envelope code throws ``PinnedTokenRefusal``. A 403 naming the entry point
-    /// throws `entryPointRefused`; one naming nothing classified is the device owing its code.
+    /// Fetches the TTP config for `entry` on a pinned credential. An envelope naming 401, or any coded envelope at status 401,
+    /// drops the binding presented and throws `attestationRevoked` (3005 to a host); only a bare 401 is ``PinnedTokenRefusal``.
+    /// A 403 naming the entry point throws `entryPointRefused`; one naming nothing classified is the device owing its code.
     ///
     /// - Parameter entry: the entry point whose configuration is fetched.
     /// - Returns: the route's configuration, carrying the reader credentials.
