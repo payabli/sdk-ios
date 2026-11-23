@@ -203,7 +203,47 @@ final class CloseTelemetryTests: XCTestCase {
         XCTAssertFalse(failed.properties.values.contains { $0.contains("TXN-") }, "\(failed.properties)")
     }
 
+    func testACloseEndingAfterItsSessionIsReplacedReportsOnTheNewChannelUnderItsOwnSession() async {
+        let (first, _) = Self.client()
+        let (second, secondTransport) = Self.client()
+        TelemetryRecorders.install(first)
+        addTeardownBlock { TelemetryRecorders.clear() }
+        let reports = TapToPayReports(session: first.context)
+
+        reports.closeStarted(.charge)
+        TelemetryRecorders.install(second)
+        reports.closeSucceeded(.charge, after: .milliseconds(5))
+        reports.closeFailed(
+            PayabliTTPError.readerCredentialsUnusable,
+            origin: .retry,
+            capture: .unknown,
+            processorHasNoRecord: false,
+            type: .paymentNotClosed,
+            after: .milliseconds(5)
+        )
+        await TelemetryRecorders.settled()
+        await second.flush()
+
+        let ends = await secondTransport.batches.flatMap { $0 }.filter { $0.event.hasPrefix("ttp.close.") }
+        XCTAssertEqual(ends.map(\.event), ["ttp.close.succeeded", "ttp.close.failed"])
+        XCTAssertTrue(ends.allSatisfy { $0.sessionId == first.sessionId }, "\(ends.map(\.sessionId))")
+    }
+
     // MARK: - Helpers
+
+    /// - Returns: a client for this suite's entry point and environment, and the transport it sends to.
+    private static func client() -> (TelemetryClient, InMemoryTelemetryTransport) {
+        let transport = InMemoryTelemetryTransport()
+        let client = TelemetryClient(
+            configuration: .init(entry: "e", environment: "sandbox"),
+            transport: transport,
+            sleep: ManualTelemetryClock().sleep,
+            lifecycle: ManualAppLifecycle(),
+            deviceId: { nil },
+            queued: []
+        )
+        return (client, transport)
+    }
 
     /// The close events the terminal reported, in the order they reached the transport, after every report was sent.
     private func reported(_ terminal: PayabliTTP, _ transport: InMemoryTelemetryTransport) async -> [TelemetryEvent] {
