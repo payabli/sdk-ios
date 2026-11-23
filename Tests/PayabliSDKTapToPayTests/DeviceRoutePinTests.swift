@@ -124,6 +124,24 @@ final class DeviceRoutePinTests: XCTestCase {
         XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service no longer holds was kept")
     }
 
+    func testAnActivation401WhoseEnvelopeNamesAnotherCodeDropsTheBindingAndRenewsNothing() async throws {
+        let storage = InMemorySecureStorage()
+        try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
+        StubURLProtocol.handler = Self.refusingActivation(reason: "Forbidden", code: 403)
+        let provider = Counter()
+        let (sut, _, _) = try AttestFixture.makeService(storage: storage, tokenProvider: Self.rotating(provider))
+
+        let failure = await failure {
+            try await sut.activateDevice(activationCode: "123456", entry: "myEntry", activationId: "dev_1")
+        }
+
+        XCTAssertFalse(failure is PinnedTokenRefusal, "an envelope 401 was read as a refused token")
+        XCTAssertEqual((TapToPayErrorTranslation.hostError(for: failure) as? any PayabliError)?.code, 3005, "got \(failure)")
+        XCTAssertNil(try sut.binding(for: "myEntry"), "a binding the service refused was kept")
+        let calls = await provider.count
+        XCTAssertEqual(calls, 1, "the first token only: nothing was renewed")
+    }
+
     func testAnActivation401WhoseEnvelopeSays401WithAnyOtherTextDropsTheBindingAndRenewsNothing() async throws {
         let storage = InMemorySecureStorage()
         try AttestFixture.seedBinding(entry: "myEntry", deviceId: "dev_1", keyId: "key_1", in: storage)
@@ -244,8 +262,8 @@ final class DeviceRoutePinTests: XCTestCase {
         }
     }
 
-    private static func refusingActivation(reason: String) -> StubURLProtocol.Handler {
-        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":401,"resultText":"\#(reason)"}}"#
+    private static func refusingActivation(reason: String, code: Int = 401) -> StubURLProtocol.Handler {
+        let body = #"{"isSuccess":false,"responseText":"Declined","responseData":{"resultCode":\#(code),"resultText":"\#(reason)"}}"#
         return { request in
             if request.url!.path == activate {
                 return (

@@ -23,6 +23,26 @@ package extension AppAttestService {
             throw ActivationRegistrationChanged()
         }
 
+        do {
+            try await postActivate(activationCode: activationCode, entry: entry, assertion: assertion)
+        } catch let refusal as DeviceRouteRefusal where refusal.type == .deviceSetupRequired {
+            // A 401 whose envelope names another code is read by its status: the service holds no attestation for this
+            // key. A store that refuses the drop leaves the refusal unchanged.
+            do {
+                try forgetRefused(AttestedDevice(entry: entry, deviceId: assertion.deviceId, keyId: assertion.keyId))
+            } catch {
+                logger.error("[activate] the refused binding could not be dropped")
+            }
+            throw refusal
+        }
+    }
+
+    /// Sends `/activate` signed by `assertion`, and classifies its refusal.
+    ///
+    /// - Parameter activationCode: the code the payer entered.
+    /// - Parameter entry: the entry point being activated.
+    /// - Parameter assertion: the assertion the activation is signed with.
+    private func postActivate(activationCode: String, entry: String, assertion: AssertionHeaders) async throws {
         // The assertion's handle, so the body and the headers come from one
         // binding. Read separately they can name two devices.
         try await postAttestationRequestExpectingNoBody(
