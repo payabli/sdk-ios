@@ -119,7 +119,7 @@ final class PaymentFormRefusalTests: XCTestCase {
         let http = UnauthorizedTransport()
         let tokens = TokenSequence()
         let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { await tokens.next() })
-        let auth = PayabliAuth(config: config)
+        let auth = PayabliAuth(config: config, telemetrySession: .of(config))
         let transport = AuthenticatedTransport(base: http, auth: auth, logger: PayabliLogger(category: .network))
         let viewModel = PayabliPayInViewModel(
             component: PayabliPayIn(

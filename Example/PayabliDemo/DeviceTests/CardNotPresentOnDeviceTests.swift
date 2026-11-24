@@ -36,7 +36,7 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
     /// still be valid.
     func testEARejectedTokenIsReplacedOnceAndReused() async throws {
         let calls = ProviderCalls()
-        let auth = PayabliAuth(config: try PayabliConfig(
+        let config = try PayabliConfig(
             entryPoint: named.entry,
             environment: named.environment,
 
@@ -44,7 +44,15 @@ final class CardNotPresentOnDeviceTests: XCTestCase {
                 await calls.increment()
                 return try await Secrets.fetchAccessToken()
             }
-        ))
+        )
+        let auth = PayabliAuth(
+            config: config,
+            telemetrySession: TelemetrySessionContext(
+                sessionId: UUID().uuidString,
+                entry: config.entryPoint,
+                environment: config.environment.name
+            )
+        )
 
         let fresh = try await auth.invalidateAndRefresh(rejectedToken: "refused-by-the-service")
         XCTAssertFalse(fresh.isEmpty)

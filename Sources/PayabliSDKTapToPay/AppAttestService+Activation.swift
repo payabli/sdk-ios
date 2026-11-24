@@ -56,7 +56,7 @@ package extension AppAttestService {
             body: ActivateRequest(entry: entry, deviceId: assertion.deviceId, activationCode: activationCode),
             assertion: assertion,
             readsRefusalBeforeStatus: true,
-            pinsCredential: true,
+            isCredentialPinned: true,
             makeDeclineError: { code, reason in
                 // The service holds no attestation for this key, so the binding names a key that buys nothing. Drop
                 // it and let the next `initialize()` enrol.

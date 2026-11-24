@@ -9,7 +9,7 @@ final class PayabliAuthTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(tokenProvider: {
             _ = await counter.increment()
             return "first_from_partner"
-        }))
+        }), telemetrySession: .sandbox(entry: "test_entry"))
 
         let token = try await auth.currentAccessToken()
         XCTAssertEqual(token, "first_from_partner")
@@ -32,7 +32,7 @@ final class PayabliAuthTests: XCTestCase {
             _ = await counter.increment()
             try await Task.sleep(nanoseconds: 20_000_000)
             return "shared_first"
-        }))
+        }), telemetrySession: .sandbox(entry: "test_entry"))
 
         let tokens = try await withThrowingTaskGroup(of: String.self) { group in
             for _ in 0 ..< 5 {
@@ -55,7 +55,7 @@ final class PayabliAuthTests: XCTestCase {
     /// on the first mint as well as on a replacement.
     func testABlankFirstTokenIsNotInstalled() async throws {
         for blank in ["", " ", "   ", "\t", "\n", " \t\n "] {
-            let auth = PayabliAuth(config: try makeConfig(tokenProvider: { blank }))
+            let auth = PayabliAuth(config: try makeConfig(tokenProvider: { blank }), telemetrySession: .sandbox(entry: "test_entry"))
             do {
                 _ = try await auth.currentAccessToken()
                 XCTFail("expected throw for \(blank.debugDescription)")
@@ -71,7 +71,7 @@ final class PayabliAuthTests: XCTestCase {
     /// rather than reporting it, so the request would go out unauthenticated.
     func testAFirstTokenThatCannotBeAHeaderValueIsNotInstalled() async throws {
         for unusable in ["tok\r\nX-Injected: true", "tok\ten", "tok\u{0000}en", "tokén"] {
-            let auth = PayabliAuth(config: try makeConfig(tokenProvider: { unusable }))
+            let auth = PayabliAuth(config: try makeConfig(tokenProvider: { unusable }), telemetrySession: .sandbox(entry: "test_entry"))
             do {
                 _ = try await auth.currentAccessToken()
                 XCTFail("expected throw for \(unusable.debugDescription)")
@@ -96,7 +96,7 @@ final class PayabliAuthTests: XCTestCase {
                 nested.set("threw:" + err.type.rawValue)
             }
             return "first_from_partner"
-        }))
+        }), telemetrySession: .sandbox(entry: "test_entry"))
         holder.set(auth)
 
         let outcome = await outcomeWithinCeiling {

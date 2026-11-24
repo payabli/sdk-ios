@@ -348,10 +348,11 @@ final class TapToPayErrorTranslationTests: XCTestCase {
     /// A transaction client on a stubbed network, the way the facade holds one.
     private func makeClient() throws -> TTPTransactionClient {
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: { "seed" })
-        let auth = PayabliAuth(config: config)
+        let auth = PayabliAuth(config: config, telemetrySession: .of(config))
         let service = PayabliService(
             environment: .sandbox,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

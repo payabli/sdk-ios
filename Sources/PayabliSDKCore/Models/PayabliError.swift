@@ -378,6 +378,9 @@ public struct PayabliGenericError: PayabliError {
     public let underlying: Error?
     public let httpStatus: Int?
     public let rawCode: String?
+    /// The token-provider call this SDK raised the error into, which a copy built with the public initializer does not
+    /// carry.
+    package let raisedInto: UUID?
 
     /// A failure no response was read for, so it carries no status and no code.
     ///
@@ -416,6 +419,23 @@ public struct PayabliGenericError: PayabliError {
         self.underlying = underlying
         self.httpStatus = httpStatus
         self.rawCode = rawCode
+        raisedInto = nil
+    }
+
+    /// The refusal of a token read made from inside the provider call `mintID`.
+    ///
+    /// - Parameter type: the catalog entry.
+    /// - Parameter reason: short human-readable summary.
+    /// - Parameter detail: longer explanation.
+    /// - Parameter mintID: the provider call the refusal is raised into.
+    package init(type: PayabliErrorType, reason: String, detail: String, raisedInto mintID: UUID) {
+        self.type = type
+        self.reason = reason
+        self.detail = detail
+        underlying = nil
+        httpStatus = nil
+        rawCode = nil
+        raisedInto = mintID
     }
 }
 

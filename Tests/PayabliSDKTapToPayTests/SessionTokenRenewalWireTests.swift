@@ -48,7 +48,7 @@ final class SessionTokenRenewalWireTests: XCTestCase {
     func testAnActivationWhoseRenewalFailsRecordsTheProvidersFailureAndStaysWaiting() async throws {
         let wire = Wire(refusing: "activate", registersPending: true)
         StubURLProtocol.handler = wire.handle
-        let (ttp, _) = try makeTTP(beforeRenewal: { throw URLError(.notConnectedToInternet) })
+        let (ttp, _) = try makeTTP(renewalFails: true)
         do {
             try await ttp.initialize()
             XCTFail("a pending registration reported ready")
@@ -121,18 +121,17 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
-    /// The renewal waits until a batch on the refused token has been refused, so that batch goes back to the queue and
-    /// both failures leave on the renewed token.
-    func testABatchRefusedOnTheRefusedTokenLeavesWithBothFailuresUnderTheRenewedToken() async throws {
+    /// A batch is sent only on a token already held, so the route's failures leave on the renewed token and none on
+    /// the refused one, which refuses any batch that reaches it.
+    func testBothFailuresOfARefusedRouteLeaveUnderTheRenewedTokenAndNoneUnderTheRefusedOne() async throws {
         let wire = Wire(refusing: "attest", refusesTelemetryOn: "seed")
         StubURLProtocol.handler = wire.handle
-        let (ttp, tokens) = try makeTTP(beforeRenewal: { await wire.waitForRefusedTelemetry() })
+        let (ttp, tokens) = try makeTTP()
 
         try await ttp.initialize()
         await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
-        XCTAssertTrue(wire.refusedTelemetry, "no batch was sent on the refused token before the renewal")
         let delivered = wire.deliveredEvents(under: "renewed-2")
         XCTAssertTrue(
             delivered.contains { $0.event == TelemetryEventName.ttpDeviceAttestCompleted && $0.outcome == "failed" },
@@ -206,14 +205,15 @@ final class SessionTokenRenewalWireTests: XCTestCase {
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
     ///
-    /// - Parameter beforeRenewal: awaited inside every provider call after the first, before it returns; what it
-    ///   throws is the provider's failure.
-    private func makeTTP(beforeRenewal: (@Sendable () async throws -> Void)? = nil) throws -> (PayabliTTP, Tokens) {
+    /// - Parameter renewalFails: whether every provider call after the first throws instead of renewing.
+    private func makeTTP(renewalFails: Bool = false) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
             guard call > 1 else { return "seed" }
-            try await beforeRenewal?()
+            if renewalFails {
+                throw URLError(.notConnectedToInternet)
+            }
             return "renewed-\(call)"
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())
@@ -276,7 +276,6 @@ private final class Wire: @unchecked Sendable {
     private var refusalsLeft: Int
     private var seen: [String: [String]] = [:]
     private var delivered: [String: [DeliveredEvent]] = [:]
-    private var telemetryRefusals = 0
 
     /// - Parameter telemetryRefusedOn: a bearer every telemetry batch carrying it is refused with a bare 401.
     init(refusing route: String, times: Int = 1, registersPending: Bool = false, refusesTelemetryOn: String? = nil) {
@@ -286,20 +285,9 @@ private final class Wire: @unchecked Sendable {
         telemetryRefusedOn = refusesTelemetryOn
     }
 
-    var refusedTelemetry: Bool {
-        lock.withLock { telemetryRefusals > 0 }
-    }
-
     /// The events of every telemetry batch answered with success under `bearer`, in the order they arrived.
     func deliveredEvents(under bearer: String) -> [DeliveredEvent] {
         lock.withLock { delivered[bearer] ?? [] }
-    }
-
-    /// Returns once a telemetry batch has been refused, or after five seconds.
-    func waitForRefusedTelemetry() async {
-        for _ in 0 ..< 500 where !refusedTelemetry {
-            try? await Task.sleep(for: .milliseconds(10))
-        }
     }
 
     /// The bearer each request to `route` carried, in order.
@@ -317,10 +305,7 @@ private final class Wire: @unchecked Sendable {
         let refuses: Bool = lock.withLock {
             seen[route, default: []].append(bearer ?? "")
             if route == "telemetry" {
-                guard bearer != telemetryRefusedOn else {
-                    telemetryRefusals += 1
-                    return true
-                }
+                guard bearer != telemetryRefusedOn else { return true }
                 delivered[bearer ?? "", default: []] += Self.events(in: request)
                 return false
             }
