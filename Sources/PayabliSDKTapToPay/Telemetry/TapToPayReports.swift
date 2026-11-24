@@ -71,6 +71,19 @@ final class TapToPayReports {
         record(TelemetryEventName.ttpReinitializeSucceeded, properties: properties, occurredAt: now)
     }
 
+    /// Reports a move of the session, saying why only when it moved to failed.
+    ///
+    /// - Parameter from: the state the session left.
+    /// - Parameter to: the state it entered.
+    func sessionStateChanged(from: PayabliTTPSessionState, to: PayabliTTPSessionState) {
+        let now = Date()
+        var properties = [TelemetryProperty.from.rawValue: from.diagnosticName, TelemetryProperty.to.rawValue: to.diagnosticName]
+        if case let .failed(reason) = to {
+            properties[TelemetryProperty.reason.rawValue] = reason.diagnosticName
+        }
+        record(TelemetryEventName.ttpStateChanged, properties: properties, occurredAt: now)
+    }
+
     func attestationStarted() {
         let now = Date()
         record(TelemetryEventName.ttpAttestationStarted, occurredAt: now)

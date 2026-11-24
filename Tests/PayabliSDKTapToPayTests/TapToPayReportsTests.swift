@@ -29,7 +29,7 @@ final class TapToPayReportsTests: XCTestCase {
         await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
-        let events = await sent(transport).filter { $0.event.hasPrefix("ttp.") }
+        let events = await sent(transport).filter { $0.event.hasPrefix("ttp.") && $0.event != "ttp.session.stateChanged" }
         XCTAssertEqual(
             events.map(\.event),
             [
@@ -182,8 +182,8 @@ final class TapToPayReportsTests: XCTestCase {
     func testWorkFinishingAfterASessionOnTheSameEntryPointIsInstalledKeepsTheSessionItStartedUnder() async throws {
         let run = try await initializeWhileAnotherSessionIsInstalled(entryPoint: "first")
 
-        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
-        let after = await sent(run.secondTransport).filter { $0.event.hasPrefix("ttp.") }
+        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") && $0.event != "ttp.session.stateChanged" }
+        let after = await sent(run.secondTransport).filter { $0.event.hasPrefix("ttp.") && $0.event != "ttp.session.stateChanged" }
         XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
         XCTAssertEqual(
             after.map(\.event),
@@ -191,12 +191,18 @@ final class TapToPayReportsTests: XCTestCase {
             "the end leaves on the installed channel"
         )
         XCTAssertTrue((before + after).allSatisfy { $0.sessionId == run.first.telemetry.sessionId })
+        let moves = await sent(run.secondTransport).filter { $0.event == "ttp.session.stateChanged" }
+        XCTAssertFalse(moves.isEmpty, "the run's state moves after the install were not reported")
+        XCTAssertTrue(
+            moves.allSatisfy { $0.sessionId == run.first.telemetry.sessionId },
+            "a state move took the installed session's id"
+        )
     }
 
     func testWorkFinishingAfterASessionOnAnotherEntryPointIsInstalledIsNotReportedThere() async throws {
         let run = try await initializeWhileAnotherSessionIsInstalled(entryPoint: "second")
 
-        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") }
+        let before = await sent(run.firstTransport).filter { $0.event.hasPrefix("ttp.") && $0.event != "ttp.session.stateChanged" }
         XCTAssertEqual(before.map(\.event), ["ttp.initialize.started", "ttp.attestation.started", "ttp.attestation.succeeded"])
         XCTAssertTrue(before.allSatisfy { $0.sessionId == run.first.telemetry.sessionId && $0.entry == "first" })
         let installedSinceGotOnlyItsOwnStart = await sent(run.secondTransport).map(\.event)
