@@ -73,15 +73,27 @@ final class SessionStateReportTests: XCTestCase {
         XCTAssertEqual(manager.sessionState, .failed(reason: .configurationRejected))
     }
 
-    func testAPendingAnswerForAnotherRegistrationIsAMove() {
+    func testAPendingAnswerForAnotherRegistrationLandsFromTheNextRun() {
         let manager = SessionManager()
-        var count = 0
-        manager.onMove = { _, _ in count += 1 }
+        manager.transition(to: .fetchingConfig)
+        var moves: [String] = []
+        manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
 
         manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_a"))
         manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_b"))
+        XCTAssertEqual(manager.sessionState, .pendingActivation(activationId: "dev_a"))
 
-        XCTAssertEqual(count, 2)
+        manager.transition(to: .attestingDevice)
+        manager.transition(to: .fetchingConfig)
+        manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_b"))
+
+        XCTAssertEqual(moves, [
+            "fetching_config -> pending_activation",
+            "pending_activation -> attesting_device",
+            "attesting_device -> fetching_config",
+            "fetching_config -> pending_activation"
+        ])
+        XCTAssertEqual(manager.sessionState, .pendingActivation(activationId: "dev_b"))
     }
 
     func testAMoveToFailedSaysWhyAndNoOtherMoveDoes() async throws {

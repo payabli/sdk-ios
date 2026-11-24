@@ -125,6 +125,35 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertNotNil(sm.lastError)
     }
 
+    func testAFailureLandsOnlyOnAnEdgeTheTableDeclares() {
+        let sm = SessionManager()
+        _ = sm.transition(to: .fetchingConfig)
+        _ = sm.transition(to: .initializingReader(percent: nil))
+        _ = sm.transition(to: .ready)
+        var count = 0
+        sm.onMove = { _, _ in count += 1 }
+
+        sm.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev"))
+
+        XCTAssertEqual(sm.sessionState, .ready)
+        XCTAssertEqual(count, 0)
+        XCTAssertNotNil(sm.lastError)
+    }
+
+    func testEveryStateCanFail() {
+        let states: [PayabliTTPSessionState] = [
+            .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil),
+            .ready, .sessionExpired, .reinitializing, .pendingActivation(activationId: "dev"),
+            .failed(reason: .sdkInternalError), .pendingTerms, .charging(activity: .waitingForCard)
+        ]
+        for state in states {
+            XCTAssertTrue(
+                SessionManager.isValidTransition(from: state, to: .failed(reason: .serviceUnavailable)),
+                "\(state) cannot fail"
+            )
+        }
+    }
+
     /// The terms state is reached from the reader phase and leaves the way `pendingActivation` does:
     /// the host resolves what the session waits on, then initializes again from attestation.
     func testPendingTermsIsEnteredFromTheReaderPhaseAndLeavesToAttestation() {

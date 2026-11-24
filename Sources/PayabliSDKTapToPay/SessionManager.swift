@@ -80,15 +80,15 @@ final class SessionManager: ObservableObject {
         return true
     }
 
-    /// Lands a failure where the map says it lands. A failure that leaves the
-    /// session where it was moves nothing but `lastError`.
+    /// Lands a failure where the map says it lands, through the table. A failure that leaves the session where it
+    /// was, or whose landing the table refuses from the current state, moves nothing but `lastError`.
     ///
     /// - Parameter error: the failure to land, as the caller caught it.
     /// - Parameter registration: the activation registration the store still holds, for the code remedy.
     func markError(_ error: Error, registration: StoredRegistration) {
         lastError = error
         guard let landing = PayabliTTPSessionState.landing(for: error, registration: registration) else { return }
-        move(to: landing)
+        settle(to: landing)
     }
 
     /// Records how far the reader has got, without leaving the state it belongs
@@ -133,7 +133,7 @@ final class SessionManager: ObservableObject {
     func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
         runningCharge = nil
-        move(to: .failed(reason: reason))
+        settle(to: .failed(reason: reason))
     }
 
     /// Returns to ready only while `charge` still holds the session, so a move
@@ -204,8 +204,8 @@ final class SessionManager: ObservableObject {
         switch (current, target) {
         // Starting over is always reachable. `initialize()` is the documented
         // way back to a known state, and it has to work from wherever the
-        // session was left.
-        case (_, .idle):
+        // session was left. Failing is always reachable too.
+        case (_, .idle), (_, .failed):
             return true
 
         case (.idle, .attestingDevice),
@@ -213,30 +213,25 @@ final class SessionManager: ObservableObject {
             return true
 
         case (.attestingDevice, .fetchingConfig),
-             (.attestingDevice, .pendingActivation),
-             (.attestingDevice, .failed):
+             (.attestingDevice, .pendingActivation):
             return true
 
         case (.fetchingConfig, .initializingReader),
-             (.fetchingConfig, .pendingActivation),
-             (.fetchingConfig, .failed):
+             (.fetchingConfig, .pendingActivation):
             return true
 
         case (.initializingReader, .ready),
-             (.initializingReader, .pendingTerms),
-             (.initializingReader, .failed):
+             (.initializingReader, .pendingTerms):
             return true
 
         case (.ready, .sessionExpired),
-             (.ready, .failed),
              (.ready, .charging(.opening)):
             return true
 
         case (.sessionExpired, .reinitializing):
             return true
 
-        case (.reinitializing, .fetchingConfig),
-             (.reinitializing, .failed):
+        case (.reinitializing, .fetchingConfig):
             return true
 
         // Both wait on a person rather than on the SDK, and both leave the same way: the host resolves
@@ -255,14 +250,14 @@ final class SessionManager: ObservableObject {
     }
 
     /// A charge ends back at ready whatever it ended in, or expired when the
-    /// read found the reader session spent, and starting over is always reachable.
+    /// read found the reader session spent. Starting over and failing are always reachable.
     ///
     /// - Parameter activity: the activity the charge is in now.
     /// - Parameter target: the state the charge would move to.
     /// - Returns: whether the charge may make the move.
     private static func chargeMayMove(from activity: TapToPayChargeActivity, to target: PayabliTTPSessionState) -> Bool {
         switch target {
-        case .idle, .ready, .sessionExpired:
+        case .idle, .ready, .sessionExpired, .failed:
             return true
         case let .charging(next):
             return next == activity || advances(activity, next)
