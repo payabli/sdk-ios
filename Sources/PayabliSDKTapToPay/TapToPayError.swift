@@ -100,10 +100,10 @@ extension TapToPayError: CustomNSError {
         case nil:
             break
         }
+        info.merge(answerUserInfo) { _, answer in answer }
         if let cause = underlying as? RedactedCause {
             info[NSUnderlyingErrorKey] = cause as NSError
         }
-        info.merge(answerUserInfo) { _, answer in answer }
         return info
     }
 }
