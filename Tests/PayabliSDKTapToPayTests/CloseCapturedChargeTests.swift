@@ -210,7 +210,8 @@ final class CloseCapturedChargeTests: XCTestCase {
             session: first,
             provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService(),
-            chargeKeys: keys
+            chargeKeys: keys,
+            heldPayments: HeldPayments()
         )
         _ = try? await first.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
         _ = try PayabliSession.install(

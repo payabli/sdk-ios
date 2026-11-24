@@ -204,7 +204,7 @@ package final class TTPTransactionClient: Sendable {
         try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
     }
 
-    /// Closes a transaction this SDK holds no reader answer for, with a body that claims no outcome.
+    /// Closes a transaction outside its charge, with a body that claims no outcome.
     ///
     /// - Parameter paymentTransId: the transaction to close.
     /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
