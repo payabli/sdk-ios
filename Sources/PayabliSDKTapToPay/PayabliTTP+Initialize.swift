@@ -16,7 +16,8 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider, which holds them at runtime only.
     ///   4. Prepare reader, transition to `.ready`.
     ///
-    /// A call made during a charge waits for the charge to end, then runs.
+    /// A call made while setup is running joins it and gets its outcome. A call made during a charge waits for the
+    /// charge to end, then runs.
     public func initialize() async throws {
         try await reportingToHost {
             try await runSessionSetup(.initialize) { try await self.runInitialize() }
@@ -131,7 +132,7 @@ extension PayabliTTP {
 
         // 4. Prepare reader and mark ready.
         try await runPrepareReaderPhase()
-        _ = sessionManager.transition(to: .ready)
+        try sessionManager.advance(to: .ready)
         syncPublished()
     }
 
@@ -173,17 +174,20 @@ extension PayabliTTP {
         }
         let startedAt = ContinuousClock.now
         reports.reinitializeStarted()
-        enterRepair()
+        try enterRepair()
         try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
         reports.reinitializeSucceeded(after: ContinuousClock.now - startedAt)
     }
 
     /// Moves the session into the repair once, before the run a refused token may repeat, so the rerun starts from
-    /// the state the refusal arrived in.
-    private func enterRepair() {
-        _ = sessionManager.transition(to: .reinitializing)
-        syncPublished()
-        _ = sessionManager.transition(to: .fetchingConfig)
+    /// the state the refusal arrived in. Only an expired session passes through `.reinitializing`; an idle or
+    /// failed one goes straight to the configuration.
+    private func enterRepair() throws {
+        if sessionState == .sessionExpired {
+            try sessionManager.advance(to: .reinitializing)
+            syncPublished()
+        }
+        try sessionManager.advance(to: .fetchingConfig)
         syncPublished()
     }
 
@@ -197,7 +201,7 @@ extension PayabliTTP {
 
         // 4. Re-prepare reader and mark ready.
         try await runPrepareReaderPhase()
-        _ = sessionManager.transition(to: .ready)
+        try sessionManager.advance(to: .ready)
         syncPublished()
     }
 
@@ -286,16 +290,16 @@ extension PayabliTTP {
             // published state stayed where `reset()` left it. The
             // caller and the observable state would then describe different things.
             if try await attestation.isAttested(for: entryPoint) {
-                _ = sessionManager.transition(to: .fetchingConfig)
+                try sessionManager.advance(to: .fetchingConfig)
                 syncPublished()
                 return
             }
 
-            _ = sessionManager.transition(to: .attestingDevice)
+            try sessionManager.advance(to: .attestingDevice)
             syncPublished()
 
             _ = try await attestation.attest(entry: entryPoint)
-            _ = sessionManager.transition(to: .fetchingConfig)
+            try sessionManager.advance(to: .fetchingConfig)
             syncPublished()
         } catch PayabliTTPError.devicePendingActivation {
             if let failure = landPendingActivation() {
@@ -368,7 +372,7 @@ extension PayabliTTP {
             }
         }
 
-        _ = sessionManager.transition(to: .initializingReader(percent: nil))
+        try sessionManager.advance(to: .initializingReader(percent: nil))
         syncPublished()
         do {
             try await provider.prepareReader { [weak self] event in
@@ -416,14 +420,14 @@ extension PayabliTTP {
         switch storedRegistration() {
         case let .held(activationId):
             // The registration held when the answer is settled is the truth, even one replaced while it was in flight.
-            _ = sessionManager.transition(to: .pendingActivation(activationId: activationId))
+            sessionManager.settle(to: .pendingActivation(activationId: activationId))
             syncPublished()
             return nil
         case .none where presented != nil:
             let removed = PayabliTTPError.configFailed(
                 reason: "The registration changed while the configuration was fetched; initialize again"
             )
-            _ = sessionManager.transition(to: .failed(reason: .serviceUnavailable))
+            sessionManager.settle(to: .failed(reason: .serviceUnavailable))
             syncPublished()
             return removed
         case .none:
@@ -468,7 +472,7 @@ extension PayabliTTP {
     }
 
     private func markPendingTerms() {
-        _ = sessionManager.transition(to: .pendingTerms)
+        sessionManager.settle(to: .pendingTerms)
         syncPublished()
     }
 }

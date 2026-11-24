@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import PayabliSDKCore
 
 /// Which setup a call runs, so a later call of an equal kind on the same `PayabliTTP` joins it until a charge
 /// claims the gate.
@@ -32,6 +33,8 @@ final class SessionManager: ObservableObject {
     /// not one.
     var onMove: ((_ from: PayabliTTPSessionState, _ to: PayabliTTPSessionState) -> Void)?
 
+    private let logger = PayabliLogger(category: .taptopay)
+
     init() {}
 
     /// Attempt to transition to a new state. Rejects invalid transitions.
@@ -40,22 +43,41 @@ final class SessionManager: ObservableObject {
     /// - Returns: whether the matrix allowed the move.
     @discardableResult
     func transition(to target: PayabliTTPSessionState) -> Bool {
+        write(to: target)
+    }
+
+    /// Moves to `target` for the phase that follows, which runs only once the move is made.
+    ///
+    /// - Parameter target: the state the phase runs in.
+    /// - Throws: ``RefusedSessionMove`` when the table refuses the move, a defect in this SDK's own sequence.
+    func advance(to target: PayabliTTPSessionState) throws {
+        let from = sessionState
+        guard write(to: target) else {
+            throw RefusedSessionMove(from: from.diagnosticName, to: target.diagnosticName)
+        }
+    }
+
+    /// Moves to `target` where a run ends without getting where it was going. A refusal is logged and dropped, since
+    /// a throw here would replace the failure the caller is about to be given.
+    ///
+    /// - Parameter target: the state the run ends on.
+    func settle(to target: PayabliTTPSessionState) {
+        let from = sessionState
+        if !write(to: target) {
+            logger.warning("refused a session state change from \(from.diagnosticName) to \(target.diagnosticName)")
+        }
+    }
+
+    /// Moves to `target` when the table allows it.
+    ///
+    /// - Parameter target: the state to move the session to.
+    /// - Returns: whether the table allowed the move.
+    private func write(to target: PayabliTTPSessionState) -> Bool {
         guard Self.isValidTransition(from: sessionState, to: target) else {
             return false
         }
         move(to: target)
         return true
-    }
-
-    /// Forces `.sessionExpired`, bypassing the transition matrix.
-    ///
-    /// Nothing calls this, and its doc claimed "called on 401s", which no code
-    /// did. Scheduled for deletion; use `transition(to:)`, which the matrix
-    /// still governs.
-    private func forceSessionExpiry() {
-        if sessionState != .sessionExpired {
-            move(to: .sessionExpired)
-        }
     }
 
     /// Lands a failure where the map says it lands. A failure that leaves the
@@ -89,7 +111,7 @@ final class SessionManager: ObservableObject {
     ///
     /// - Returns: the charge's name, or `nil` where the session is not ready.
     func beginCharge() -> Int? {
-        guard sessionState == .ready, transition(to: .charging(activity: .opening)) else { return nil }
+        guard sessionState == .ready, write(to: .charging(activity: .opening)) else { return nil }
         nextCharge += 1
         runningCharge = nextCharge
         return nextCharge
@@ -101,7 +123,7 @@ final class SessionManager: ObservableObject {
     /// - Parameter charge: the charge the activity belongs to.
     func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
-        transition(to: .charging(activity: activity))
+        settle(to: .charging(activity: activity))
     }
 
     /// Ends `charge` on `failed(reason)`, only while it still holds the session.
@@ -122,13 +144,13 @@ final class SessionManager: ObservableObject {
         guard charge == runningCharge else { return }
         runningCharge = nil
         guard case .charging = sessionState else { return }
-        transition(to: .ready)
+        settle(to: .ready)
     }
 
     /// Returns the session to its starting point. Internal: a host reaches this
     /// only through `initialize()`, never as an operation of its own.
     func reset() {
-        transition(to: .idle)
+        settle(to: .idle)
         lastError = nil
     }
 
@@ -294,4 +316,10 @@ extension PayabliTTPFailureReason {
             name += character.isUppercase ? "_" + character.lowercased() : String(character)
         }
     }
+}
+
+/// A move the transition table refuses, named by the two states' telemetry names.
+struct RefusedSessionMove: Error {
+    let from: String
+    let to: String
 }
