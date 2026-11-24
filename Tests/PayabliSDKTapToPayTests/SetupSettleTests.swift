@@ -110,6 +110,31 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertEqual(Set(events.last?.properties.keys ?? [:].keys), ["duration_ms"])
     }
 
+    func testAFailedRearmReportsItsStartAndNoSuccess() async throws {
+        let (ttp, provider, _, transport) = try makeTTP()
+        provider.prepareReaderResult = .failure(PayabliTTPError.readerUnavailable(reason: "busy"))
+        _ = try? await ttp.initialize()
+
+        _ = try? await ttp.reinitialize()
+        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.flush()
+
+        let events = await transport.batches.flatMap { $0 }.filter { $0.event.hasPrefix("ttp.reinitialize.") }
+        XCTAssertEqual(events.map(\.event), ["ttp.reinitialize.started"])
+    }
+
+    func testARearmOfAReadyReaderReportsNothing() async throws {
+        let (ttp, _, _, transport) = try makeTTP()
+        try await ttp.initialize()
+
+        try await ttp.reinitialize()
+        await TelemetryRecorders.settled()
+        await ttp.session.telemetry.flush()
+
+        let events = await transport.batches.flatMap { $0 }.filter { $0.event.hasPrefix("ttp.reinitialize.") }
+        XCTAssertEqual(events.map(\.event), [])
+    }
+
     func testAFailedInitializeCarriesTheServicesCodeOnlyWhenItNamesACondition() async throws {
         let refused = try makeTTP()
         StubURLProtocol.handler = { request in
