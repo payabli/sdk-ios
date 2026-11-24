@@ -13,6 +13,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -45,7 +46,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         await TelemetryEndpointTransport(transport: transport).send([event()])
 
         let request = try XCTUnwrap(recording.observed.first)
-        XCTAssertFalse(request.pinsCredential, "a refusal is not recorded for the device setup to renew")
+        XCTAssertFalse(request.isCredentialPinned, "a refusal is not recorded for the device setup to renew")
         XCTAssertTrue(request.isCallerRefusal(answered(401)), "a 401 refuses the caller")
         XCTAssertFalse(request.isCallerRefusal(answered(200)), "an accepted batch does not")
     }
@@ -58,6 +59,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -76,6 +78,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -96,6 +99,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw NoToken() },
+            readHeldToken: { nil },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -130,6 +134,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             _ = await provider.increment()
             return "telemetry-token"
         })
+        _ = try await session.auth.currentAccessToken()
 
         session.telemetry.record(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
@@ -151,6 +156,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
             _ = await provider.increment()
             return "telemetry-token"
         })
+        _ = try await session.auth.currentAccessToken()
 
         session.telemetry.record(TelemetryEventName.sdkInitialized)
         await session.telemetry.flush()
@@ -189,20 +195,23 @@ final class TelemetryEndpointTransportTests: XCTestCase {
 
     /// A send that never reaches an answer is kept too: the next flush tries the batch again.
     func testATransportFailureIsKeptForTheNextFlush() async {
-        struct NoAnswer: Error {}
-
-        let stub = RecordingStub()
-        stub.install()
-        defer { stub.uninstall() }
+        let reached = expectation(description: "the request reached the transport")
+        StubURLProtocol.handler = { _ in
+            reached.fulfill()
+            throw URLError(.notConnectedToInternet)
+        }
+        defer { StubURLProtocol.handler = nil }
         let service = PayabliService(
             environment: .sandbox,
-            readToken: { throw NoAnswer() },
+            readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
 
         let outcome = await TelemetryEndpointTransport(transport: service).send([event()])
 
+        await fulfillment(of: [reached], timeout: 1)
         XCTAssertEqual(outcome, .kept)
     }
 
@@ -220,6 +229,7 @@ final class TelemetryEndpointTransportTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

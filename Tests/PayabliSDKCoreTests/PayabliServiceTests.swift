@@ -16,6 +16,7 @@ final class PayabliServiceTests: XCTestCase {
         PayabliService(
             environment: .sandbox,
             readToken: { testToken },
+            readHeldToken: { testToken },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -64,6 +65,7 @@ final class PayabliServiceTests: XCTestCase {
                 withUnsafeCurrentTask { $0?.cancel() }
                 return testToken
             },
+            readHeldToken: { nil },
             client: .none,
             session: StubURLProtocol.makeSession()
         )
@@ -79,6 +81,7 @@ final class PayabliServiceTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { throw PayabliGenericError(type: .tokenProviderFailed, reason: "No token") },
+            readHeldToken: { nil },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

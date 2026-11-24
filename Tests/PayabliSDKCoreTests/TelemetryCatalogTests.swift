@@ -20,6 +20,13 @@ final class TelemetryCatalogTests: XCTestCase {
         }
     }
 
+    func testTheRetiredEventsAreNotInTheCatalog() {
+        for retired in ["ttp.attestation.quotaExhausted", "sdk.initialize.started"] {
+            XCTAssertNil(TelemetryCatalog.events[retired], retired)
+            XCTAssertNil(TelemetryCatalog.scrub(retired, [:]), "\(retired) is dropped whole")
+        }
+    }
+
     func testNoEventDeclaresMoreKeysThanOneEventMayCarry() {
         for (name, keys) in TelemetryCatalog.events {
             XCTAssertLessThanOrEqual(keys.count, TelemetryCatalog.maxProperties, name)

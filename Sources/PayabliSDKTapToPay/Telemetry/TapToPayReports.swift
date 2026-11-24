@@ -51,8 +51,37 @@ final class TapToPayReports {
             if let told {
                 properties[TelemetryProperty.errorNumber.rawValue] = String(told.code)
             }
+            properties[TelemetryProperty.failureType.rawValue] = Self.failureType(of: error)
+            if let code = told?.rawCode {
+                properties[TelemetryProperty.code.rawValue] = code
+            }
         }
         record(name, properties: properties, occurredAt: now)
+    }
+
+    func reinitializeStarted() {
+        let now = Date()
+        record(TelemetryEventName.ttpReinitializeStarted, occurredAt: now)
+    }
+
+    /// - Parameter duration: how long the re-arm took.
+    func reinitializeSucceeded(after duration: Duration) {
+        let now = Date()
+        let properties = [TelemetryProperty.durationMs.rawValue: Self.milliseconds(duration)]
+        record(TelemetryEventName.ttpReinitializeSucceeded, properties: properties, occurredAt: now)
+    }
+
+    /// Reports a move of the session, saying why only when it moved to failed.
+    ///
+    /// - Parameter from: the state the session left.
+    /// - Parameter to: the state it entered.
+    func sessionStateChanged(from: PayabliTTPSessionState, to: PayabliTTPSessionState) {
+        let now = Date()
+        var properties = [TelemetryProperty.from.rawValue: from.diagnosticName, TelemetryProperty.to.rawValue: to.diagnosticName]
+        if case let .failed(reason) = to {
+            properties[TelemetryProperty.reason.rawValue] = reason.diagnosticName
+        }
+        record(TelemetryEventName.ttpStateChanged, properties: properties, occurredAt: now)
     }
 
     func attestationStarted() {
@@ -144,9 +173,14 @@ final class TapToPayReports {
         TelemetryRecorders.recordFor(session, name, properties: properties, occurredAt: occurredAt)
     }
 
-    /// - Parameter error: what an operation threw.
-    /// - Returns: the simple name of the type a redaction stands in for, or of `error` itself. Never a message.
-    private static func failureType(of error: Error) -> String {
+    /// The simple name of the type an operation raised, read through a redaction to the type it stands in for; never a message.
+    ///
+    /// - Parameter error: what the operation threw, before it was translated for the host.
+    /// - Returns: the redacted type's name, or the thrown type's otherwise.
+    static func failureType(of error: any Error) -> String {
+        if let redacted = (error as? TapToPayError)?.underlying as? RedactedCause {
+            return redacted.simpleTypeName
+        }
         if let redacted = (error as? PayabliGenericError)?.underlying as? RedactedCause {
             return redacted.simpleTypeName
         }

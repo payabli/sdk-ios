@@ -26,17 +26,19 @@ package final class PayabliService: PayabliTransport, Sendable {
     ///
     /// - Parameter environment: the environment whose base URL every request resolves against.
     /// - Parameter readToken: reads the bearer for the chain, once per request so a rotation needs no cache invalidated.
+    /// - Parameter readHeldToken: reads the bearer already held, without minting, for a request that requires one.
     /// - Parameter client: the facts the client header carries.
     /// - Parameter session: the `URLSession` to send on, or the SDK's own when nil.
     convenience init(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
+        readHeldToken: @escaping @Sendable () async -> String?,
         client: ClientFacts,
         session: URLSession? = nil
     ) {
         self.init(
             environment: environment,
-            decorations: RequestDecorationFactory.chain(readToken: readToken, client: client),
+            decorations: RequestDecorationFactory.chain(readToken: readToken, readHeldToken: readHeldToken, client: client),
             session: session,
             logger: PayabliLogger(category: .network)
         )
@@ -59,6 +61,7 @@ package final class PayabliService: PayabliTransport, Sendable {
     ///
     /// - Parameter environment: the environment whose base URL every request resolves against.
     /// - Parameter readToken: reads the bearer for the chain, once per request.
+    /// - Parameter readHeldToken: reads the bearer already held, without minting, for a request that requires one.
     /// - Parameter client: the facts the client header carries.
     /// - Parameter session: the `URLSession` to send on, or the SDK's own when nil.
     /// - Parameter logger: where this transport reports its sends, so a test reads what it logged.
@@ -66,13 +69,14 @@ package final class PayabliService: PayabliTransport, Sendable {
     static func makeWithChain(
         environment: PayabliEnvironment,
         readToken: @escaping @Sendable () async throws -> String,
+        readHeldToken: @escaping @Sendable () async -> String?,
         client: ClientFacts = .none,
         session: URLSession? = nil,
         logger: PayabliLogger
     ) -> PayabliService {
         PayabliService(
             environment: environment,
-            decorations: RequestDecorationFactory.chain(readToken: readToken, client: client),
+            decorations: RequestDecorationFactory.chain(readToken: readToken, readHeldToken: readHeldToken, client: client),
             session: session,
             logger: logger
         )
