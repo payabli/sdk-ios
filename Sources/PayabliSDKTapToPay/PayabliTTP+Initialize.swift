@@ -99,7 +99,9 @@ extension PayabliTTP {
         let start = clock.now
         reports.initializeStarted()
         do {
-            try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runInitializePhases() }
+            try await settlingRefusedMoves {
+                try await self.renewingRefusedToken(landsSecondRefusal: true) { try await self.runInitializePhases() }
+            }
         } catch let withdrawn as CancellationError {
             throw withdrawn
         } catch {
@@ -174,8 +176,10 @@ extension PayabliTTP {
         }
         let startedAt = ContinuousClock.now
         reports.reinitializeStarted()
-        try enterRepair()
-        try await renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
+        try await settlingRefusedMoves {
+            try self.enterRepair()
+            try await self.renewingRefusedToken(landsSecondRefusal: true) { try await self.runRepair() }
+        }
         reports.reinitializeSucceeded(after: ContinuousClock.now - startedAt)
     }
 
@@ -240,6 +244,18 @@ extension PayabliTTP {
         }
         // Any other failure of the second run was landed by the phase that threw it, which may have chosen a state
         // its error alone would not name.
+    }
+
+    /// Runs `sequence`, and lands a move the transition table refused as this SDK's internal error, since no phase
+    /// catches a refusal raised before it starts.
+    ///
+    /// - Parameter sequence: the session work, from its first move.
+    private func settlingRefusedMoves(_ sequence: @MainActor () async throws -> Void) async throws {
+        do {
+            try await sequence()
+        } catch let refused as RefusedSessionMove {
+            throw settled(refused)
+        }
     }
 
     private func landIfAsked(_ failure: Error, _ lands: Bool) {

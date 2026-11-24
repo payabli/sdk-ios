@@ -8,23 +8,23 @@ import XCTest
 @available(iOS 16.7, *)
 @MainActor
 final class SessionStateReportTests: XCTestCase {
-    func testEachMoveIsReportedWithBothEnds() {
+    func testEachMoveIsReportedWithBothEnds() throws {
         let manager = SessionManager()
         var moves: [(String, String)] = []
         manager.onMove = { from, to in moves.append((from.diagnosticName, to.diagnosticName)) }
 
-        manager.transition(to: .attestingDevice)
-        manager.transition(to: .fetchingConfig)
+        try manager.advance(to: .attestingDevice)
+        try manager.advance(to: .fetchingConfig)
 
         XCTAssertEqual(moves.map(\.0), ["idle", "attesting_device"])
         XCTAssertEqual(moves.map(\.1), ["attesting_device", "fetching_config"])
     }
 
-    func testProgressWithinOneStateIsNotAMove() {
+    func testProgressWithinOneStateIsNotAMove() throws {
         let manager = SessionManager()
-        manager.transition(to: .attestingDevice)
-        manager.transition(to: .fetchingConfig)
-        manager.transition(to: .initializingReader(percent: nil))
+        try manager.advance(to: .attestingDevice)
+        try manager.advance(to: .fetchingConfig)
+        try manager.advance(to: .initializingReader(percent: nil))
         var count = 0
         manager.onMove = { _, _ in count += 1 }
 
@@ -35,7 +35,7 @@ final class SessionStateReportTests: XCTestCase {
     }
 
     func testAChargeReportsItsStartAndItsEndAndNotItsActivities() throws {
-        let manager = Self.readyManager()
+        let manager = try Self.readyManager()
         var moves: [String] = []
         manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
 
@@ -49,7 +49,7 @@ final class SessionStateReportTests: XCTestCase {
     }
 
     func testAFailedChargeReportsItsMoveToFailed() throws {
-        let manager = Self.readyManager()
+        let manager = try Self.readyManager()
         var moves: [String] = []
         manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
 
@@ -73,9 +73,9 @@ final class SessionStateReportTests: XCTestCase {
         XCTAssertEqual(manager.sessionState, .failed(reason: .configurationRejected))
     }
 
-    func testAPendingAnswerForAnotherRegistrationLandsFromTheNextRun() {
+    func testAPendingAnswerForAnotherRegistrationLandsFromTheNextRun() throws {
         let manager = SessionManager()
-        manager.transition(to: .fetchingConfig)
+        try manager.advance(to: .fetchingConfig)
         var moves: [String] = []
         manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
 
@@ -83,8 +83,8 @@ final class SessionStateReportTests: XCTestCase {
         manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_b"))
         XCTAssertEqual(manager.sessionState, .pendingActivation(activationId: "dev_a"))
 
-        manager.transition(to: .attestingDevice)
-        manager.transition(to: .fetchingConfig)
+        try manager.advance(to: .attestingDevice)
+        try manager.advance(to: .fetchingConfig)
         manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_b"))
 
         XCTAssertEqual(moves, [
@@ -124,10 +124,10 @@ final class SessionStateReportTests: XCTestCase {
         XCTAssertFalse(moves.dropLast().isEmpty)
     }
 
-    private static func readyManager() -> SessionManager {
+    private static func readyManager() throws -> SessionManager {
         let manager = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
-            manager.transition(to: state)
+            try manager.advance(to: state)
         }
         return manager
     }

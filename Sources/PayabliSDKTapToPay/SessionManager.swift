@@ -37,15 +37,6 @@ final class SessionManager: ObservableObject {
 
     init() {}
 
-    /// Attempt to transition to a new state. Rejects invalid transitions.
-    ///
-    /// - Parameter target: the state to move the session to.
-    /// - Returns: whether the matrix allowed the move.
-    @discardableResult
-    func transition(to target: PayabliTTPSessionState) -> Bool {
-        write(to: target)
-    }
-
     /// Moves to `target` for the phase that follows, which runs only once the move is made.
     ///
     /// - Parameter target: the state the phase runs in.
@@ -57,10 +48,10 @@ final class SessionManager: ObservableObject {
         }
     }
 
-    /// Moves to `target` where a run ends without getting where it was going. A refusal is logged and dropped, since
-    /// a throw here would replace the failure the caller is about to be given.
+    /// Moves to `target`, logging and dropping a refusal: a landing, a charge's progress or end, or a reset, where a
+    /// throw would replace the outcome the caller is about to report.
     ///
-    /// - Parameter target: the state the run ends on.
+    /// - Parameter target: the state to move the session to.
     func settle(to target: PayabliTTPSessionState) {
         let from = sessionState
         if !write(to: target) {

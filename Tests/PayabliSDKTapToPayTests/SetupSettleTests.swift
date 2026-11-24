@@ -48,6 +48,26 @@ final class SetupSettleTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
     }
 
+    func testARefusedMoveDuringSetupNeverRunsTheNextPhaseAndIsTheSDKsInternalError() async throws {
+        let (ttp, provider, _, _) = try makeTTP()
+        let config = TapToPayReportsTests.configHandler(status: 200)
+        StubURLProtocol.handler = { request in
+            // Moved elsewhere while the configuration is fetched, so the reader phase's move is refused.
+            DispatchQueue.main.sync { MainActor.assumeIsolated { ttp.sessionManager.reset() } }
+            return try config(request)
+        }
+
+        do {
+            try await ttp.initialize()
+            XCTFail("expected the call to fail")
+        } catch let error as TapToPayError {
+            XCTAssertEqual(error.code, 1018)
+            XCTAssertEqual((error.underlying as? RedactedCause)?.simpleTypeName, "RefusedSessionMove")
+        }
+        XCTAssertEqual(provider.prepareReaderCalls, 0)
+        XCTAssertEqual(ttp.sessionState, .failed(reason: .sdkInternalError))
+    }
+
     func testACancellationWhileConfiguringTheReaderStaysACancellation() async throws {
         let (ttp, provider, _, _) = try makeTTP()
         provider.configureResult = .failure(CancellationError())

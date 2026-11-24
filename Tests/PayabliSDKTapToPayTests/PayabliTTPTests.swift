@@ -567,9 +567,9 @@ final class PayabliTTPTests: XCTestCase {
         try await ttp.initialize()
         XCTAssertNil(ttp.chargeActivity)
 
-        ttp.sessionManager.transition(to: .charging(activity: .opening))
+        try ttp.sessionManager.advance(to: .charging(activity: .opening))
         ttp.syncPublished()
-        ttp.sessionManager.transition(to: .charging(activity: .waitingForCard))
+        try ttp.sessionManager.advance(to: .charging(activity: .waitingForCard))
         ttp.syncPublished()
 
         XCTAssertEqual(ttp.chargeActivity, NSNumber(value: TapToPayChargeActivity.waitingForCard.rawValue))
