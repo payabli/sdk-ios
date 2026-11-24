@@ -198,7 +198,7 @@ extension PayabliTTP {
         // Again here, because a replacement can land while the payment opens, and by then the reader may be armed
         // for another merchant.
         if !isLive() {
-            try await refuseRetiredCharge(paymentTransId: paymentTransId, charge: charge)
+            try await refuseRetiredCharge(paymentTransId: paymentTransId, charge: charge, resentKey: reservation.reused)
         }
 
         // Step 2 — NFC tap.
@@ -439,11 +439,13 @@ extension PayabliTTP {
     ///
     /// - Parameter paymentTransId: the payment the charge opened.
     /// - Parameter charge: the charge holding the session.
+    /// - Parameter resentKey: whether the charge resent a key held for an earlier one, whose outcome is then unknown.
     /// - Throws: `sessionNotInitialized`, carrying the opened payment and `capture: .notCharged`.
-    private func refuseRetiredCharge(paymentTransId: String, charge: Int) async throws -> Never {
+    private func refuseRetiredCharge(paymentTransId: String, charge: Int, resentKey: Bool) async throws -> Never {
         recordChargeActivity(.closing, for: charge)
         let reason = Self.retiredReason
-        _ = await tryUpdate(capture: { _ in .notCharged }) { [transactionClient] in
+        let capture: PayabliTTPCapture = resentKey ? .unknown : .notCharged
+        _ = await tryUpdate(capture: { _ in capture }) { [transactionClient] in
             try await transactionClient.updateAfterFailedRead(paymentTransId: paymentTransId, description: reason)
         }
         sessionManager.failCharge(.sessionEnded, for: charge)

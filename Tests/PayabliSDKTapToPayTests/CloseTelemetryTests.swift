@@ -138,6 +138,25 @@ final class CloseTelemetryTests: XCTestCase {
         XCTAssertEqual(failed.properties["capture"], "not_charged")
     }
 
+    func testARetryResendingItsKeyRefusedAsRetiredReportsItsCloseUnknown() async throws {
+        let (terminal, transport) = try await makeReadyTerminal(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
+        _ = await Self.failure { _ = try await terminal.charge(paymentDetails: Self.sale) }
+        StubURLProtocol.handler = { [live] request in
+            if request.url?.path.contains("/MoneyIn/initiate") == true {
+                live.value = false
+            }
+            return try Self.wire.handle(request)
+        }
+        Self.wire.script(updates: [500])
+
+        let told = await Self.failure { _ = try await terminal.charge(paymentDetails: Self.sale, attempt: .retry) }
+
+        let failed = try await oneFailure(terminal, transport)
+        XCTAssertEqual(told?.type, .sessionNotInitialized, "the fixture itself is broken if this fails")
+        XCTAssertEqual(told?.capture, .unknown, "the fixture itself is broken if this fails")
+        XCTAssertEqual(failed.properties["capture"], "unknown")
+    }
+
     // MARK: - closeCapturedCharge
 
     func testACloseThatLandsReportsItsCloseAsARetry() async throws {
