@@ -3,9 +3,9 @@
 import PayabliSDKTestUtils
 import XCTest
 
-/// Every public card-present call hands a host an error the SDK did not expect as `UNKNOWN`, naming the failing type
-/// in `underlying` and never its message. A cancellation and an error the SDK already classified pass through as they
-/// were.
+/// Every public card-present call hands a host an error the SDK did not expect as `UNKNOWN`, or as the SDK's internal
+/// error when a setup run converts it, naming the failing type in `underlying` and never its message. A cancellation
+/// and an error the SDK already classified pass through as they were.
 @available(iOS 16.7, *)
 @MainActor
 final class TapToPayUnexpectedFailureTests: XCTestCase {
@@ -35,9 +35,19 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         try await assertConverted { try await ttp.initialize() }
     }
 
+    /// A setup stage converts a foreign error itself to the SDK's internal error. It still names the type and never the
+    /// message.
     func testInitializeConvertsAForeignErrorFromEachSetupStage() async throws {
         for ttp in try terminalsFailingEachSetupStage(with: HostThrew()) {
-            try await assertConverted { try await ttp.initialize() }
+            do {
+                try await ttp.initialize()
+                XCTFail("expected the setup to fail")
+            } catch let error as TapToPayError {
+                XCTAssertEqual(error.type, .sdkInternalError)
+                XCTAssertEqual((error.underlying as? RedactedCause)?.simpleTypeName, "HostThrew")
+                XCTAssertFalse("\(error)".contains("MESSAGE-SENTINEL"))
+                XCTAssertFalse(error.localizedDescription.contains("MESSAGE-SENTINEL"))
+            }
         }
     }
 
