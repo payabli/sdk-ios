@@ -45,10 +45,16 @@ enum TapToPayErrorTranslation {
                 detail: displayedDetail(of: error),
                 retryAfter: (error as? PayabliRetryAfter)?.retryAfter,
                 httpStatus: answer.httpStatus,
-                rawCode: answer.rawCode
+                rawCode: answer.rawCode,
+                underlying: (error as? PayabliGenericError)?.underlying as? RedactedCause
             )
         default:
-            return TapToPayError(type: .unknown, reason: PayabliErrorType.unknown.message, detail: nil)
+            return TapToPayError(
+                type: .unknown,
+                reason: PayabliErrorType.unknown.message,
+                detail: nil,
+                underlying: RedactedCause(error)
+            )
         }
     }
 
@@ -95,7 +101,8 @@ enum TapToPayErrorTranslation {
             retryAfter: failure.retryAfter,
             refusal: failure.refusal,
             httpStatus: failure.httpStatus,
-            rawCode: failure.rawCode
+            rawCode: failure.rawCode,
+            underlying: failure.underlying as? RedactedCause
         )
     }
 

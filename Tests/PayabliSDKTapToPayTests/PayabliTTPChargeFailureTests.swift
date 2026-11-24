@@ -76,7 +76,8 @@ final class PayabliTTPChargeFailureTests: XCTestCase {
 
         let failure = try await chargeFailure(ttp)
 
-        XCTAssertEqual(failure.type, .tapNotCompleted)
+        XCTAssertEqual(failure.type, .unknown, "an error outside the reader's own failures is one the SDK did not expect")
+        XCTAssertEqual((failure.underlying as? RedactedCause)?.simpleTypeName, "URLError")
         XCTAssertEqual(failure.paymentTransId, Self.paymentTransId)
         XCTAssertEqual(failure.capture, .unknown)
     }
