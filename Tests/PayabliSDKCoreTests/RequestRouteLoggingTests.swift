@@ -24,7 +24,14 @@ final class RequestRouteLoggingTests: XCTestCase {
     }
 
     func testANetworkFailureIsLoggedByTheTemplateAndNeverByThePath() async throws {
-        StubURLProtocol.handler = { _ in throw URLError(.notConnectedToInternet) }
+        // Shaped as URLSession sends it: the failing URL, and with it the resolved path, rides in `userInfo`.
+        StubURLProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            throw URLError(.cannotFindHost, userInfo: [
+                NSURLErrorFailingURLErrorKey: url,
+                NSURLErrorFailingURLStringErrorKey: url.absoluteString
+            ])
+        }
         defer { StubURLProtocol.handler = nil }
         let sink = RecordingLogSink()
 
@@ -49,6 +56,31 @@ final class RequestRouteLoggingTests: XCTestCase {
 
         assertLogged("→ PATCH [REDACTED]", in: sink, category: .network)
         assertNeverLogged([Self.identifier], in: [sink])
+    }
+
+    func testATelemetrySendIsLoggedByItsRoute() async throws {
+        let stub = RecordingStub(status: 200)
+        stub.install()
+        defer { stub.uninstall() }
+        let sink = RecordingLogSink()
+
+        let auth = try makeTestAuth()
+        _ = try await auth.currentAccessToken()
+
+        _ = await TelemetryEndpointTransport(transport: makeAuthenticatedStack(auth: auth, sink: sink)).send([
+            TelemetryEvent(
+                sdkVersion: "0.1.0",
+                sessionId: "session-1",
+                deviceIdHash: nil,
+                entry: "entry",
+                environment: "sandbox",
+                event: "sdk_initialized",
+                properties: [:]
+            )
+        ])
+
+        assertLogged("→ POST \(TelemetryEndpointTransport.defaultPath)", in: sink, category: .network)
+        assertNotLogged("[REDACTED]", in: sink, category: .network)
     }
 
     // MARK: - Helpers

@@ -13,10 +13,13 @@ final class ReaderCredentialLoggingTests: XCTestCase {
 
     func testAConfigurationThatCarriesTheCredentialsLogsNoneOfThem() async throws {
         let sink = LogLineSink()
+        let transport = RecordingRouteTransport(answer: .status(200, body: Self.configuration))
 
-        let config = try await fetchConfig(answering: .status(200, body: Self.configuration), sink: sink)
+        let config = try await fetchConfig(over: transport, sink: sink, entry: "entry/1")
 
         XCTAssertEqual(config.providerCredentials["secretKey"], "SENTINEL-SECRETKEY", "the credentials reached the caller")
+        XCTAssertEqual(transport.sent.map(\.path), ["/api/v2/device/taptopay/config/entry%2F1"])
+        XCTAssertEqual(transport.sent.map(\.route), ["/api/v2/device/taptopay/config/{entry}"])
         assertLineLogged("[config] → GET /api/v2/device/taptopay/config/{entry}", in: sink)
         assertLineLogged("[config] ← [200]", in: sink)
         assertNoneLogged(Self.secrets, in: sink)
@@ -111,12 +114,13 @@ final class ReaderCredentialLoggingTests: XCTestCase {
     """#.utf8)
 
     private func fetchConfig(answering answer: RecordingRouteTransport.Answer, sink: LogLineSink) async throws -> TTPConfig {
+        try await fetchConfig(over: RecordingRouteTransport(answer: answer), sink: sink, entry: Self.entry)
+    }
+
+    private func fetchConfig(over transport: RecordingRouteTransport, sink: LogLineSink, entry: String) async throws -> TTPConfig {
         let attestation = MockDeviceAttestationService()
-        attestation.bindings = [Self.entry: "device-1"]
-        return try await TTPConfigClient(
-            transport: RecordingRouteTransport(answer: answer),
-            attestation: attestation,
-            logger: sink.logger
-        ).fetchConfig(entry: Self.entry)
+        attestation.bindings = [entry: "device-1"]
+        return try await TTPConfigClient(transport: transport, attestation: attestation, logger: sink.logger)
+            .fetchConfig(entry: entry)
     }
 }

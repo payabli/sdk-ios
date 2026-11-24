@@ -63,11 +63,14 @@ func assertLineLogged(_ needle: String, in sink: LogLineSink, file: StaticString
     )
 }
 
-/// Asserts that something was written and that none of `values` appears in any line.
+/// Asserts that something was written and that none of `values` appears in any line, whole or as the four-character
+/// tail `PayabliLogger.redact` keeps.
 func assertNoneLogged(_ values: [String], in sink: LogLineSink, file: StaticString = #filePath, line: UInt = #line) {
     let lines = sink.lines
     XCTAssertFalse(lines.isEmpty, "nothing was logged, so absence proves nothing", file: file, line: line)
     for value in values {
-        XCTAssertFalse(lines.contains { $0.contains(value) }, "\"\(value)\" reached the log: \(lines)", file: file, line: line)
+        for needle in [value, String(value.suffix(4))] {
+            XCTAssertFalse(lines.contains { $0.contains(needle) }, "\"\(needle)\" reached the log: \(lines)", file: file, line: line)
+        }
     }
 }
