@@ -89,7 +89,8 @@ extension AppAttestService {
         } catch let error as TapToPayError {
             throw error
         } catch {
-            logger.error("[\(route.rawValue)] payload decode failed: \(error.localizedDescription)")
+            let failure = error as NSError
+            logger.error("[\(route.rawValue)] payload decode failed: \(failure.domain) \(failure.code)")
             throw undecodable(reason: "Failed to decode \(route.rawValue) response", statusCode: response.statusCode)
         }
     }

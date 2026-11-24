@@ -157,7 +157,9 @@ package final class PayabliService: PayabliTransport, Sendable {
             // network failed. Cancellation is not a failure of the request.
             throw CancellationError()
         } catch {
-            logger.error("Network error on \(route): \(error.localizedDescription)")
+            // The domain and code only: a description is system wording and can quote the failing URL.
+            let failure = error as NSError
+            logger.error("Network error on \(route): \(failure.domain) \(failure.code)")
             throw PayabliGenericError(
                 type: .networkError,
                 reason: "Network request failed",

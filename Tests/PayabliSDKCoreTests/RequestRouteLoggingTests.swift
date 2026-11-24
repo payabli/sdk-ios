@@ -24,12 +24,13 @@ final class RequestRouteLoggingTests: XCTestCase {
     }
 
     func testANetworkFailureIsLoggedByTheTemplateAndNeverByThePath() async throws {
-        // Shaped as URLSession sends it: the failing URL, and with it the resolved path, rides in `userInfo`.
+        // The failing URL rides in `userInfo`, and the description quotes it too: its wording is the system's.
         StubURLProtocol.handler = { request in
             let url = try XCTUnwrap(request.url)
             throw URLError(.cannotFindHost, userInfo: [
                 NSURLErrorFailingURLErrorKey: url,
-                NSURLErrorFailingURLStringErrorKey: url.absoluteString
+                NSURLErrorFailingURLStringErrorKey: url.absoluteString,
+                NSLocalizedDescriptionKey: "Could not reach \(url.absoluteString)"
             ])
         }
         defer { StubURLProtocol.handler = nil }
@@ -42,7 +43,7 @@ final class RequestRouteLoggingTests: XCTestCase {
             XCTAssertEqual(error.type, .networkError)
         }
 
-        assertLogged("Network error on \(Self.template)", in: sink, category: .network)
+        assertLogged("Network error on \(Self.template): NSURLErrorDomain -1003", in: sink, category: .network)
         assertNeverLogged([Self.identifier], in: [sink])
     }
 
