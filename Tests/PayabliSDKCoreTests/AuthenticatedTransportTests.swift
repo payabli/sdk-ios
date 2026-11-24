@@ -121,7 +121,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         let auth = try makeTestAuth(tokenProvider: { "refreshed-token" })
         let transport = makeAuthenticatedStack(auth: auth)
         let mark = PayabliSendMark()
-        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", pinsCredential: true)
+        let pinned = PayabliRequest(method: .get, path: "/api/v2/ping", isCredentialPinned: true)
 
         _ = try await PayabliSendMark.$current.withValue(mark) { try await transport.perform(pinned) }
 
@@ -289,7 +289,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         _ = try await auth.currentAccessToken()
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() })],
+            [gate, BearerDecoration(readToken: { try await auth.currentAccessToken() }, readHeldToken: { await auth.heldToken() })],
             auth: auth
         )
 
@@ -331,7 +331,7 @@ final class AuthenticatedTransportTests: XCTestCase {
         // refused. Without it the count below depends on which caller the scheduler runs first.
         let gate = GateDecoration()
         let transport = makeStackWithChain(
-            [BearerDecoration(readToken: { try await auth.currentAccessToken() }), gate],
+            [BearerDecoration(readToken: { try await auth.currentAccessToken() }, readHeldToken: { await auth.heldToken() }), gate],
             auth: auth
         )
 
@@ -533,7 +533,7 @@ final class AuthenticatedTransportTests: XCTestCase {
             tokenProvider: { await "minted-\(provider.increment())" }
         )
         let auth = PayabliAuth(
-            config: config,
+            config: config, telemetrySession: .of(config),
             logger: PayabliLogger(category: .auth, sink: RecordingLogSink())
         )
         // An empty chain, so no decoration stamps the sent token.
@@ -623,7 +623,7 @@ final class AuthenticatedTransportTests: XCTestCase {
     /// A holder whose every token, the first included, comes from `provider`.
     private func authOver(_ provider: @escaping PayabliTokenRefresh) throws -> PayabliAuth {
         let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: provider)
-        return PayabliAuth(config: config, logger: PayabliLogger(category: .auth, sink: RecordingLogSink()))
+        return PayabliAuth(config: config, telemetrySession: .of(config), logger: PayabliLogger(category: .auth, sink: RecordingLogSink()))
     }
 
     /// One call the way a capability makes it: through `Retry`, which would repeat any code it retries.

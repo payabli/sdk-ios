@@ -73,11 +73,17 @@ public final class PayabliSession: @unchecked Sendable {
         identity = ConfigIdentity(config)
         let machine = SessionStateMachine(sink: sink)
         self.machine = machine
-        let auth = PayabliAuth(config: config)
+        let telemetrySession = TelemetrySessionContext(
+            sessionId: UUID().uuidString,
+            entry: config.entryPoint,
+            environment: config.environment.name
+        )
+        let auth = PayabliAuth(config: config, telemetrySession: telemetrySession)
         self.auth = auth
         let service = PayabliService(
             environment: config.environment,
             readToken: { try await auth.currentAccessToken() },
+            readHeldToken: { await auth.heldToken() },
             client: ClientFacts(
                 sdkVersion: PayabliCore.version,
                 osVersion: DeviceModel.osVersion(),
@@ -104,6 +110,7 @@ public final class PayabliSession: @unchecked Sendable {
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
             queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])],
+            sessionId: telemetrySession.sessionId,
             predecessor: predecessor,
             predecessorReplaced: { await TelemetryRecorders.replaced($0) }
         )
@@ -155,7 +162,7 @@ public final class PayabliSession: @unchecked Sendable {
         }
     }
 
-    /// Reports a refused call as a start and its failure on this session's channel, so the start is answered.
+    /// Reports a refused call's failure on this session's channel.
     ///
     /// - Parameter refusal: what the call is about to throw.
     /// - Parameter duration: how long the call took.
@@ -163,7 +170,6 @@ public final class PayabliSession: @unchecked Sendable {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
         telemetry.record([
-            (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
                 TelemetryProperty.outcome.rawValue: "refused",
                 TelemetryProperty.code.rawValue: refusal.type.rawValue,
@@ -174,8 +180,7 @@ public final class PayabliSession: @unchecked Sendable {
         ])
     }
 
-    /// Reports an initialize that failed outside the refusals the SDK names, as a start and its
-    /// failure on this session's channel, so the start is answered.
+    /// Reports an initialize that failed outside the refusals the SDK names, on this session's channel.
     ///
     /// - Parameter failure: what the call is about to throw, converted.
     /// - Parameter original: the error as it was thrown, before conversion, whose type the report names.
@@ -184,7 +189,6 @@ public final class PayabliSession: @unchecked Sendable {
         let (seconds, attoseconds) = duration.components
         let milliseconds = seconds * 1000 + attoseconds / 1_000_000_000_000_000
         telemetry.record([
-            (TelemetryEventName.sdkInitializeStarted, [TelemetryProperty.state.rawValue: Self.reportedState]),
             (TelemetryEventName.sdkInitializeFailed, [
                 TelemetryProperty.outcome.rawValue: "failed",
                 TelemetryProperty.code.rawValue: failure.type.rawValue,

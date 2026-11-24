@@ -179,7 +179,7 @@ final class PayInFraudBlockTests: XCTestCase {
 
     private static func client(over http: AnsweringTransport, tokens: CountingTokens) throws -> PayInPaymentFlowClient {
         let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { await tokens.next() })
-        let auth = PayabliAuth(config: config)
+        let auth = PayabliAuth(config: config, telemetrySession: .of(config))
         return PayInPaymentFlowClient(
             transport: AuthenticatedTransport(base: http, auth: auth, logger: PayabliLogger(category: .network))
         )

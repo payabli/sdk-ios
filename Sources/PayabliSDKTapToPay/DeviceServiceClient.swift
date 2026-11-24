@@ -147,7 +147,7 @@ final class DeviceServiceClient: Sendable {
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 401, 403 or 404's refusal envelope whose code is that status
     ///   before the status mapping.
-    /// - Parameter pinsCredential: sends a refused token once and throws ``PinnedTokenRefusal``.
+    /// - Parameter isCredentialPinned: sends a refused token once and throws ``PinnedTokenRefusal``.
     /// - Parameter makeDeclineError: builds the error a refusal or decline throws, from the code and reason the
     ///   service sent, or `nil` where the words name nothing the route classifies, so the code decides.
     /// - Returns: the raw response, for the caller to decode.
@@ -157,7 +157,7 @@ final class DeviceServiceClient: Sendable {
         body: some Encodable,
         assertion: AssertionHeaders?,
         readsRefusalBeforeStatus: Bool = false,
-        pinsCredential: Bool = false,
+        isCredentialPinned: Bool = false,
         makeDeclineError: (_ code: Int?, _ reason: String) -> (any Error)?
     ) async throws -> PayabliResponse {
         var headers: [String: String] = [:]
@@ -169,7 +169,7 @@ final class DeviceServiceClient: Sendable {
             path: path,
             headers: headers,
             jsonBody: body,
-            pinsCredential: pinsCredential
+            isCredentialPinned: isCredentialPinned
         )
 
         // These bodies and headers are authentication material: `/activate`
@@ -213,7 +213,7 @@ final class DeviceServiceClient: Sendable {
             }
             throw DeviceRouteRefusal.of(code: response.statusCode, reason: reason, httpStatus: response.statusCode)
         }
-        if pinsCredential, response.statusCode == 401 {
+        if isCredentialPinned, response.statusCode == 401 {
             logger.error("[\(route.rawValue)] the token was refused")
             throw PinnedTokenRefusal()
         }

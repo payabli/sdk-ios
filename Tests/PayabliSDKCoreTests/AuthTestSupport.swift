@@ -51,7 +51,7 @@ func makeRacingAuth(_ race: RefreshRace) async throws -> PayabliAuth {
                     return "fourth"
                 }
             }
-        ),
+        ), telemetrySession: .sandbox(entry: "test_entry"),
         logger: PayabliLogger(category: .auth, sink: race.sink)
     )
     _ = try await auth.currentAccessToken()
@@ -90,7 +90,8 @@ func makeWarmAuth(
     tokenProvider: PayabliTokenRefresh? = nil
 ) async throws -> PayabliAuth {
     let auth = PayabliAuth(
-        config: try makeConfig(accessToken: accessToken, tokenProvider: tokenProvider)
+        config: try makeConfig(accessToken: accessToken, tokenProvider: tokenProvider),
+        telemetrySession: .sandbox(entry: "test_entry")
     )
     _ = try await auth.currentAccessToken()
     return auth

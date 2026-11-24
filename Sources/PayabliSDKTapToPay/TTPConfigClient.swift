@@ -41,7 +41,7 @@ final class TTPConfigClient: Sendable {
             method: .get,
             path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
             headers: headers.asDictionary,
-            pinsCredential: true
+            isCredentialPinned: true
         )
 
         return try await routes.measured(.config) {

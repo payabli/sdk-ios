@@ -325,7 +325,7 @@ package actor TelemetryClient {
     }
 
     /// The catalog's send-at-once rule: an event whose name means failure, or whose outcome is not a
-    /// success, including an outcome nobody classified.
+    /// success, including an outcome nobody classified, unless its name waits whatever its outcome.
     ///
     /// - Parameter name: the event's name.
     /// - Parameter properties: the event's properties.
@@ -333,6 +333,9 @@ package actor TelemetryClient {
     static func sendsAtOnce(_ name: String, _ properties: [String: String]) -> Bool {
         if sentAtOnce.contains(name) {
             return true
+        }
+        if waitsWhateverItsOutcome.contains(name) {
+            return false
         }
         guard let outcome = properties[TelemetryProperty.outcome.rawValue] else { return false }
         return !successfulOutcomes.contains(outcome)
@@ -345,10 +348,11 @@ package actor TelemetryClient {
         TelemetryEventName.ttpChargeFailed,
         TelemetryEventName.ttpCloseFailed,
         TelemetryEventName.ttpNfcFailed,
-        TelemetryEventName.ttpAttestationQuotaExhausted,
-        TelemetryEventName.authTokenFailed,
         TelemetryEventName.sdkInitializeFailed
     ]
+
+    /// A send forced by a token failure cannot deliver: the upload goes out only on a token already held.
+    private static let waitsWhateverItsOutcome: Set<String> = [TelemetryEventName.authTokenFailed]
 
     private static let successfulOutcomes: Set<String> = ["succeeded", "approved"]
 
