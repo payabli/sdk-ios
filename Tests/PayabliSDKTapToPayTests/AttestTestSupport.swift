@@ -26,7 +26,7 @@ enum AttestFixture {
         )
         // The holder comes first: the service's chain reads the token from it, so the same instance
         // has to serve the chain and the recovery layer above it.
-        let auth = PayabliAuth(config: config)
+        let auth = PayabliAuth(config: config, telemetrySession: .of(config))
         let service = PayabliService(
             environment: .sandbox,
             readToken: { try await auth.currentAccessToken() },

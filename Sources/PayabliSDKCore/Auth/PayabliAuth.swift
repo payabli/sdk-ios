@@ -2,6 +2,7 @@ import Foundation
 
 actor PayabliAuth {
     private let config: PayabliConfig
+    private let telemetrySession: TelemetrySessionContext
     private let logger: PayabliLogger
 
     /// Nil until the first request asks for one. The provider is the only source, so there is no
@@ -33,24 +34,29 @@ actor PayabliAuth {
         finished.failure
     }
 
-    init(config: PayabliConfig) {
-        self.init(config: config, logger: PayabliLogger(category: .auth))
+    /// - Parameter config: the configuration whose `tokenProvider` mints every token.
+    /// - Parameter telemetrySession: the session this holder belongs to, which every report it records carries.
+    init(config: PayabliConfig, telemetrySession: TelemetrySessionContext) {
+        self.init(config: config, telemetrySession: telemetrySession, logger: PayabliLogger(category: .auth))
     }
 
     /// The logger is required rather than defaulted: a holder that built its own would leave a
     /// caller's substitution reaching nothing, and nothing would report it.
     ///
     /// - Parameter config: the configuration whose `tokenProvider` mints every token.
+    /// - Parameter telemetrySession: the session this holder belongs to, which every report it records carries.
     /// - Parameter logger: where the holder reports its provider calls, so a substitution reaches them.
     /// - Parameter clock: what times the provider bound; a test injects one to race the deadline.
     /// - Parameter onJoinedInFlightMint: fired after a caller joined an in-flight mint; nil in production.
     init(
         config: PayabliConfig,
+        telemetrySession: TelemetrySessionContext,
         logger: PayabliLogger,
         clock: any RetryClock = SystemRetryClock(),
         onJoinedInFlightMint: (@Sendable () -> Void)? = nil
     ) {
         self.config = config
+        self.telemetrySession = telemetrySession
         self.logger = logger
         self.clock = clock
         self.onJoinedInFlightMint = onJoinedInFlightMint
@@ -379,7 +385,8 @@ actor PayabliAuth {
         (error as? PayabliGenericError)?.raisedInto == mintID
     }
 
-    /// Records `auth.tokenFailed` for the provider call this mint ran. Callers that joined the mint record nothing.
+    /// Records `auth.tokenFailed` for the provider call this mint ran, as this holder's session. Callers that joined the
+    /// mint record nothing.
     ///
     /// - Parameter reason: which of the six refusals it was.
     /// - Parameter thrown: what the provider threw, named as `failure_type`, only when `reason` is `threw`.
@@ -387,7 +394,8 @@ actor PayabliAuth {
     private nonisolated func reportFailure(_ reason: TokenFailureReason, thrown: Error? = nil, since startedAt: ContinuousClock.Instant) {
         let (seconds, attoseconds) = (ContinuousClock.now - startedAt).components
         // A token failure waits for its batch instead of forcing a send.
-        TelemetryRecorders.record(
+        TelemetryRecorders.recordFor(
+            telemetrySession,
             TelemetryEventName.authTokenFailed,
             properties: Self.failureProperties(reason, thrown: thrown, milliseconds: seconds * 1000 + attoseconds / 1_000_000_000_000_000),
             waitsForBatch: true

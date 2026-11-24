@@ -210,29 +210,77 @@ final class TokenFailureReportingTests: XCTestCase {
         XCTAssertEqual(buffered, 1)
     }
 
+    // MARK: - The session a report belongs to
+
+    func testAReportAfterTheSessionWasReplacedCarriesTheHoldersOwnSession() async throws {
+        let (auth, _) = try makeAuth(sessionId: "holder-session") { throw HostBrokerDown() }
+        let replacement = makeTelemetry(entry: "test_entry", sessionId: "replacement-session")
+        TelemetryRecorders.install(replacement)
+
+        await assertThrows { _ = try await auth.currentAccessToken() }
+
+        await TelemetryRecorders.settled()
+        await replacement.flush()
+        let reports = await transport.drainBatches().flatMap { $0 }.filter { $0.event == TelemetryEventName.authTokenFailed }
+        XCTAssertEqual(reports.map(\.sessionId), ["holder-session"])
+    }
+
+    func testAReportIsDroppedWhenTheInstalledChannelBelongsToAnotherEntryPoint() async throws {
+        let (auth, _) = try makeAuth { throw HostBrokerDown() }
+        let other = makeTelemetry(entry: "other_entry", sessionId: "other-session")
+        TelemetryRecorders.install(other)
+
+        await assertThrows { _ = try await auth.currentAccessToken() }
+
+        await TelemetryRecorders.settled()
+        await other.flush()
+        let reports = await transport.drainBatches().flatMap { $0 }.filter { $0.event == TelemetryEventName.authTokenFailed }
+        XCTAssertEqual(reports.count, 0)
+    }
+
+    func testASessionsHolderReportsUnderTheSessionsOwnIdentifier() async throws {
+        let config = try PayabliConfig(entryPoint: "test_entry", environment: .sandbox, tokenProvider: { throw HostBrokerDown() })
+        let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession(), telemetryTransport: transport)
+        TelemetryRecorders.install(session.telemetry)
+
+        await assertThrows { _ = try await session.auth.currentAccessToken() }
+
+        await TelemetryRecorders.settled()
+        await session.telemetry.flush()
+        let reports = await transport.drainBatches().flatMap { $0 }.filter { $0.event == TelemetryEventName.authTokenFailed }
+        XCTAssertEqual(reports.map(\.sessionId), [session.telemetry.sessionId])
+    }
+
     // MARK: - Fixtures
 
     private struct HostBrokerDown: Error {}
 
-    private func makeAuth(
-        clock retryClock: any RetryClock = SystemRetryClock(),
-        onJoinedInFlightMint: (@Sendable () -> Void)? = nil,
-        provider: @escaping PayabliTokenRefresh
-    ) throws -> (PayabliAuth, TelemetryClient) {
-        let auth = PayabliAuth(
-            config: try PayabliConfig(entryPoint: "test_entry", environment: .sandbox, tokenProvider: provider),
-            logger: PayabliLogger(category: .auth),
-            clock: retryClock,
-            onJoinedInFlightMint: onJoinedInFlightMint
-        )
-        let telemetry = TelemetryClient(
-            configuration: .init(entry: "test_entry", environment: "sandbox"),
+    private func makeTelemetry(entry: String, sessionId: String) -> TelemetryClient {
+        TelemetryClient(
+            configuration: .init(entry: entry, environment: "sandbox"),
             transport: transport,
             sleep: clock.sleep,
             lifecycle: lifecycle,
             deviceId: { nil },
-            queued: []
+            queued: [],
+            sessionId: sessionId
         )
+    }
+
+    private func makeAuth(
+        clock retryClock: any RetryClock = SystemRetryClock(),
+        onJoinedInFlightMint: (@Sendable () -> Void)? = nil,
+        sessionId: String = "test-session",
+        provider: @escaping PayabliTokenRefresh
+    ) throws -> (PayabliAuth, TelemetryClient) {
+        let auth = PayabliAuth(
+            config: try PayabliConfig(entryPoint: "test_entry", environment: .sandbox, tokenProvider: provider),
+            telemetrySession: TelemetrySessionContext(sessionId: sessionId, entry: "test_entry", environment: "sandbox"),
+            logger: PayabliLogger(category: .auth),
+            clock: retryClock,
+            onJoinedInFlightMint: onJoinedInFlightMint
+        )
+        let telemetry = makeTelemetry(entry: "test_entry", sessionId: sessionId)
         TelemetryRecorders.install(telemetry)
         return (auth, telemetry)
     }

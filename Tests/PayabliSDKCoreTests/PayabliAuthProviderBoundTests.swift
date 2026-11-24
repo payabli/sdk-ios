@@ -14,7 +14,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
             config: try makeConfig(tokenProvider: {
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
-            }),
+            }), telemetrySession: .sandbox(entry: "test_entry"),
             logger: PayabliLogger(category: .auth),
             clock: clock
         )
@@ -49,7 +49,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                     // Never resumed, with no cancellation handling to resume it either — the loser
                     // `racedMint`'s own doc says keeps running unawaited.
                 }
-            }),
+            }), telemetrySession: .sandbox(entry: "test_entry"),
             logger: PayabliLogger(category: .auth),
             clock: FiresOnceRetryClock()
         )
@@ -77,7 +77,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
             config: try makeConfig(tokenProvider: {
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
-            }),
+            }), telemetrySession: .sandbox(entry: "test_entry"),
             logger: PayabliLogger(category: .auth),
             clock: GatedFiresOnceRetryClock(admittedAfter: admitted),
             onJoinedInFlightMint: { joiners.admit() }
@@ -124,7 +124,7 @@ final class PayabliAuthProviderBoundTests: XCTestCase {
                 guard call == 1 else { return "recovered" }
                 try await Task.sleep(nanoseconds: .max)
                 return "never"
-            }),
+            }), telemetrySession: .sandbox(entry: "test_entry"),
             logger: PayabliLogger(category: .auth),
             clock: FiresOnceRetryClock()
         )

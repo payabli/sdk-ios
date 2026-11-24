@@ -31,7 +31,7 @@ func makeTestAuth(
         }
     )
     return PayabliAuth(
-        config: config,
+        config: config, telemetrySession: .of(config),
         logger: PayabliLogger(category: .auth, sink: sink ?? RecordingLogSink())
     )
 }

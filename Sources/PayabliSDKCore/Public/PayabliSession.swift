@@ -73,7 +73,12 @@ public final class PayabliSession: @unchecked Sendable {
         identity = ConfigIdentity(config)
         let machine = SessionStateMachine(sink: sink)
         self.machine = machine
-        let auth = PayabliAuth(config: config)
+        let telemetrySession = TelemetrySessionContext(
+            sessionId: UUID().uuidString,
+            entry: config.entryPoint,
+            environment: config.environment.name
+        )
+        let auth = PayabliAuth(config: config, telemetrySession: telemetrySession)
         self.auth = auth
         let service = PayabliService(
             environment: config.environment,
@@ -105,6 +110,7 @@ public final class PayabliSession: @unchecked Sendable {
             lifecycle: UIKitAppLifecycle(),
             deviceId: { try? deviceIdentity.value() },
             queued: [(TelemetryEventName.sdkInitialized, [TelemetryProperty.state.rawValue: Self.reportedState])],
+            sessionId: telemetrySession.sessionId,
             predecessor: predecessor,
             predecessorReplaced: { await TelemetryRecorders.replaced($0) }
         )

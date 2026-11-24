@@ -189,7 +189,7 @@ final class SendsOnHeldCredentialOnlyTests: XCTestCase {
                 return "rotated"
             }
             return "first"
-        }))
+        }), telemetrySession: .sandbox(entry: "entry"))
 
         let beforeAnyMint = await auth.heldToken()
         XCTAssertNil(beforeAnyMint)
@@ -243,7 +243,7 @@ final class SendsOnHeldCredentialOnlyTests: XCTestCase {
         PayabliAuth(
             config: try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: {
                 await "host-token-\(provider.increment())"
-            }),
+            }), telemetrySession: .sandbox(entry: "entry"),
             logger: PayabliLogger(category: .auth, sink: RecordingLogSink())
         )
     }

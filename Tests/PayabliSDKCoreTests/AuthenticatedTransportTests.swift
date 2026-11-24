@@ -533,7 +533,7 @@ final class AuthenticatedTransportTests: XCTestCase {
             tokenProvider: { await "minted-\(provider.increment())" }
         )
         let auth = PayabliAuth(
-            config: config,
+            config: config, telemetrySession: .of(config),
             logger: PayabliLogger(category: .auth, sink: RecordingLogSink())
         )
         // An empty chain, so no decoration stamps the sent token.
@@ -623,7 +623,7 @@ final class AuthenticatedTransportTests: XCTestCase {
     /// A holder whose every token, the first included, comes from `provider`.
     private func authOver(_ provider: @escaping PayabliTokenRefresh) throws -> PayabliAuth {
         let config = try PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: provider)
-        return PayabliAuth(config: config, logger: PayabliLogger(category: .auth, sink: RecordingLogSink()))
+        return PayabliAuth(config: config, telemetrySession: .of(config), logger: PayabliLogger(category: .auth, sink: RecordingLogSink()))
     }
 
     /// One call the way a capability makes it: through `Retry`, which would repeat any code it retries.
