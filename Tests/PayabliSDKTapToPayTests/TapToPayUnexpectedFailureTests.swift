@@ -195,7 +195,7 @@ final class TapToPayUnexpectedFailureTests: XCTestCase {
         attestation.attestResult = .failure(HostThrew())
 
         _ = try? await ttp.initialize()
-        await ttp.reports.sent()
+        await TelemetryRecorders.settled()
         await ttp.session.telemetry.flush()
 
         let failed = await transport.batches.flatMap { $0 }.filter { $0.event == "ttp.initialize.failed" }
