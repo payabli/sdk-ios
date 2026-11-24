@@ -435,9 +435,8 @@ extension PayabliTTP {
         syncPublished()
     }
 
-    /// The case the reader raised, with the payment it opened. A failure the reader already classified is
-    /// kept, and the charge adds its payment at the edge. Any other failure with no case of its own that can
-    /// carry the payment is reported as `nfcFailed`.
+    /// The case the reader raised, with the payment it opened. Any other SDK failure, a core one or a cancellation
+    /// included, is reported as `nfcFailed`; an error the SDK did not expect is returned unchanged.
     ///
     /// - Parameter error: what the reader threw, before the charge attached its payment.
     /// - Parameter paymentTransId: the payment the failure is attached to, minted at initiate.
@@ -463,8 +462,10 @@ extension PayabliTTP {
             return PayabliTTPError.readerSessionExpired(paymentTransId: paymentTransId, capture: capture)
         case let .some(ttpError):
             return PayabliTTPError.nfcFailed(reason: ttpError.localizedDescription, paymentTransId: paymentTransId)
-        case .none:
+        case .none where error is any PayabliError || error is CancellationError:
             return PayabliTTPError.nfcFailed(reason: String(describing: error), paymentTransId: paymentTransId)
+        case .none:
+            return error
         }
     }
 

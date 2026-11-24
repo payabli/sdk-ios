@@ -5,6 +5,15 @@ package struct TelemetrySessionContext: Sendable, Equatable {
     package let sessionId: String
     package let entry: String
     package let environment: String
+
+    /// - Parameter sessionId: the identifier the session's events carry.
+    /// - Parameter entry: the session's entry point.
+    /// - Parameter environment: the session's environment, by name.
+    package init(sessionId: String, entry: String, environment: String) {
+        self.sessionId = sessionId
+        self.entry = entry
+        self.environment = environment
+    }
 }
 
 /// The process's one installed telemetry channel, and the call every reporter outside the session makes.

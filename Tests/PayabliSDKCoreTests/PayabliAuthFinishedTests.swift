@@ -27,7 +27,7 @@ final class PayabliAuthFinishedTests: XCTestCase {
         let auth = PayabliAuth(config: try makeConfig(tokenProvider: {
             _ = await counter.increment()
             return "would_be_first"
-        }))
+        }), telemetrySession: .sandbox(entry: "test_entry"))
         await auth.finish(with: PayabliGenericError(type: .tokenExpired, reason: "finished"))
 
         do {

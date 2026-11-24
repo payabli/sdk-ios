@@ -315,8 +315,8 @@ extension PayabliTTP {
 
     /// Fetches `/config`, with the session in `.fetchingConfig`.
     ///
-    /// A pending backend lands `.pendingActivation`; a core error, a 401 included, passes through as it
-    /// arrived; anything else wraps as `.configFailed`, with the state classified from the arrival.
+    /// A pending backend lands `.pendingActivation`; any other failure is settled by `settled(_:)`, with the state
+    /// classified from it.
     ///
     /// - Returns: the route's configuration, carrying the reader credentials.
     private func runFetchConfigPhase() async throws -> TTPConfig {

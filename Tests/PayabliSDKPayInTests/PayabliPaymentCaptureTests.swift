@@ -626,7 +626,7 @@ extension PayabliPayInTests {
             entryPoint: "entry",
             environment: .sandbox,
             tokenProvider: { "token-\(minted.next())" }
-        ))
+        ), telemetrySession: .sandbox(entry: "entry"))
         let base = RecoveryScriptTransport(approvedBody: Self.formCaptureResponse)
         let client = PayInPaymentFlowClient(
             transport: AuthenticatedTransport(

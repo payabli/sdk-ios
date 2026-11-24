@@ -1,8 +1,8 @@
 import Foundation
 
-/// Best-effort transport posting telemetry batches through the SDK's own request path, with the same
-/// credential and timeouts as every other route. Failures are swallowed so telemetry never blocks or
-/// degrades a payment, and a batch that did not arrive is dropped, never retried.
+/// Posts telemetry batches through the SDK's own request path, with its credential and timeouts. Failures are
+/// swallowed so telemetry never blocks a payment. A batch that did not arrive is kept for the next flush, except
+/// one the service refused as too large, which is discarded.
 package actor TelemetryEndpointTransport: TelemetryTransport {
     package static let defaultPath = "/api/v2/telemetry/sdk"
 
@@ -11,9 +11,9 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
     private let deviceFacts: TelemetryDeviceFacts
     private let logger: PayabliLogger
 
-    /// Every batch declares a 401 a refusal of its caller, so the answer returns as it arrived, with no
-    /// refresh, no replay and nothing for the device setup to renew. A finished session refuses the
-    /// batch before it is sent.
+    /// A batch goes out only on a token already held, so a flush never calls the token provider. A 401 is
+    /// a refusal of the caller and returns as it arrived: no refresh, no replay, nothing for the device
+    /// setup to renew. A finished session refuses the batch before it is sent.
     ///
     /// - Parameter transport: the session's transport, so a batch takes the same path as every other route.
     /// - Parameter path: the route the batch is posted to.
@@ -56,7 +56,8 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                     method: .post,
                     path: path,
                     jsonBody: body,
-                    isCallerRefusal: { $0.statusCode == 401 }
+                    isCallerRefusal: { $0.statusCode == 401 },
+                    sendsOnHeldCredentialOnly: true
                 )
             )
             guard (200 ..< 300).contains(response.statusCode) else {
@@ -66,6 +67,9 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                 return response.statusCode == 413 ? .discarded : .kept
             }
             return .delivered
+        } catch let refusal as PayabliGenericError where refusal.type == .missingToken {
+            logger.debug("telemetry_batch_waiting: no token ready; the batch waits for the next flush")
+            return .kept
         } catch {
             logger.warning("Telemetry batch send failed (best-effort)")
             return .kept

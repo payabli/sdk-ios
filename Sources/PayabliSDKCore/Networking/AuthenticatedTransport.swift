@@ -42,7 +42,7 @@ struct AuthenticatedTransport: PayabliTransport {
         // Fails without a round trip once the holder is finished. The holder refuses a new mint on its own,
         // so this saves a send rather than guarding one.
         if let failure = auth.terminalFailure {
-            throw failure
+            throw request.sendsOnHeldCredentialOnly ? BearerDecoration.noneHeld() : failure
         }
 
         let stamped = SentToken()
@@ -133,7 +133,7 @@ struct AuthenticatedTransport: PayabliTransport {
     ) async -> Bool {
         // Above the refresh, which is the half that breaks a pinned credential. The caller renews the token
         // once the sequence it belongs to has ended.
-        if request.pinsCredential {
+        if request.isCredentialPinned {
             logger.warning(
                 "recovery declined: the route pins the credential it was sent"
                     + " (\(request.method.rawValue) \(rejection.statusCode))"
@@ -144,6 +144,14 @@ struct AuthenticatedTransport: PayabliTransport {
             return true
         }
 
+        // A refresh calls the host's provider, which this request never does.
+        if request.sendsOnHeldCredentialOnly {
+            logger.warning(
+                "recovery declined: the route sends on the held credential only"
+                    + " (\(request.method.rawValue) \(rejection.statusCode))"
+            )
+            return true
+        }
         // Before the refresh: a fresh credential would be refused for this caller too.
         if request.isCallerRefusal(rejection) {
             logger.warning(

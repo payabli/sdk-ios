@@ -151,6 +151,7 @@ final class TelemetryWireContractTests: XCTestCase {
         let service = PayabliService(
             environment: .sandbox,
             readToken: { "telemetry-token" },
+            readHeldToken: { "telemetry-token" },
             client: .none,
             session: StubURLProtocol.makeSession()
         )

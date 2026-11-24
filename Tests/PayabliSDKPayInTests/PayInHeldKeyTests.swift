@@ -612,7 +612,10 @@ final class PayInHeldKeyTests: XCTestCase {
 
     /// A holder whose provider is never reached: every test here finishes it before a refresh could run.
     private func finishedAuth() throws -> PayabliAuth {
-        try PayabliAuth(config: PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { "token" }))
+        try PayabliAuth(
+            config: PayabliConfig(entryPoint: "entry", environment: .sandbox, tokenProvider: { "token" }),
+            telemetrySession: .sandbox(entry: "entry")
+        )
     }
 
     /// The scripted transport behind the recovery layer, so a finished session refuses before the script runs.
