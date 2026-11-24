@@ -65,9 +65,8 @@ final class PayabliTTPActivationIdTests: XCTestCase {
         XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_e"))
     }
 
-    /// A 403 is about the registration the request presented. One replaced while the request was in
-    /// flight gets no id it was not answered for.
-    /// CFG-24: the registration held when the answer is settled is the truth, so a replaced one lands pending on it.
+    /// A 403 that arrives after the registration was replaced lands pending on the registration held when the answer
+    /// is settled, and hands over that registration's id.
     func testAPendingAnswerAboutAReplacedRegistrationLandsPendingOnTheOneHeld() async throws {
         let (ttp, attestation) = try makeTTP()
         attestation.bindings = ["e": "dev_old"]
