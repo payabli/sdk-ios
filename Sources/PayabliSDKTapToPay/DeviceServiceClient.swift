@@ -9,6 +9,19 @@ enum DeviceRoute: String, Sendable {
     case activate
     case config
 
+    /// The route as the service declares it, and the form a log names it by. The four POSTs embed no identifier, so
+    /// each is also its own path; `config` embeds the entry point, so its path is resolved from the template.
+    var template: String {
+        let base = "/api/v2/device/taptopay"
+        return switch self {
+        case .challenge: "\(base)/challenge"
+        case .register: "\(base)/register"
+        case .attest: "\(base)/attest"
+        case .activate: "\(base)/activate"
+        case .config: "\(base)/config/{entry}"
+        }
+    }
+
     var completedEvent: String {
         switch self {
         case .challenge: TelemetryEventName.ttpDeviceChallengeCompleted
@@ -38,13 +51,19 @@ final class RouteAnswer: @unchecked Sendable {
 final class DeviceServiceClient: Sendable {
     private let transport: any PayabliTransport
     private let telemetrySession: TelemetrySessionContext?
-    private let logger = PayabliLogger(category: .taptopay)
+    private let logger: PayabliLogger
 
     /// - Parameter transport: what every device route is sent over, the session's.
     /// - Parameter telemetrySession: the session each route call's report belongs to; `nil` for the installed one.
-    init(transport: any PayabliTransport, telemetrySession: TelemetrySessionContext? = nil) {
+    /// - Parameter logger: where each route call is logged.
+    init(
+        transport: any PayabliTransport,
+        telemetrySession: TelemetrySessionContext? = nil,
+        logger: PayabliLogger = PayabliLogger(category: .taptopay)
+    ) {
         self.transport = transport
         self.telemetrySession = telemetrySession
+        self.logger = logger
     }
 
     /// Runs one route call and reports how it ended: `succeeded` when it returned, `refused` with the service's code
@@ -126,12 +145,12 @@ final class DeviceServiceClient: Sendable {
 
     /// Sends a device-route GET and answers its raw response, for the caller to classify.
     ///
-    /// - Parameter route: the route sent, which names the request in its logs.
+    /// - Parameter route: the route sent, whose template names the request in its logs.
     /// - Parameter request: the request, carrying its assertion headers.
     /// - Returns: the raw response.
     func get(_ route: DeviceRoute, _ request: PayabliRequest) async throws -> PayabliResponse {
         // The headers carry the App Attest assertion, key id and device id.
-        logger.info("[\(route.rawValue)] → GET \(request.path)")
+        logger.info("[\(route.rawValue)] → GET \(route.template)")
         let response = try await transport.perform(request)
         RouteAnswer.current?.response = response
         // A configuration body carries the card reader's credentials. The log gets its shape.
@@ -141,8 +160,7 @@ final class DeviceServiceClient: Sendable {
 
     /// Sends a device-route POST with its assertion headers and maps the answer; the bearer and refresh are the transport's.
     ///
-    /// - Parameter route: the route sent, which names the request in its logs.
-    /// - Parameter path: the route the request is sent to.
+    /// - Parameter route: the route sent, whose template is the request's path and names it in its logs.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 401, 403 or 404's refusal envelope whose code is that status
@@ -153,7 +171,6 @@ final class DeviceServiceClient: Sendable {
     /// - Returns: the raw response, for the caller to decode.
     func post(
         _ route: DeviceRoute,
-        path: String,
         body: some Encodable,
         assertion: AssertionHeaders?,
         readsRefusalBeforeStatus: Bool = false,
@@ -166,7 +183,8 @@ final class DeviceServiceClient: Sendable {
         }
         let request = try PayabliRequest.json(
             method: .post,
-            path: path,
+            path: route.template,
+            route: route.template,
             headers: headers,
             jsonBody: body,
             isCredentialPinned: isCredentialPinned
@@ -175,7 +193,7 @@ final class DeviceServiceClient: Sendable {
         // These bodies and headers are authentication material: `/activate`
         // carries the activation code, the others carry the App Attest key,
         // attestation and assertion. Endpoint and size only.
-        logger.info("[\(route.rawValue)] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
+        logger.info("[\(route.rawValue)] → POST \(route.template) bytes=\(request.body?.count ?? 0)")
 
         let response: PayabliResponse
         do {

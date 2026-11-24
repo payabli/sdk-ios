@@ -125,7 +125,8 @@ package final class PayabliService: PayabliTransport, Sendable {
         // First statement, so no path through this method skips decoration.
         let decorated = try await PayabliSendMark.$current.withValue(nil) { try await decorations.applyTo(request) }
         let urlRequest = try buildURLRequest(decorated)
-        logger.debug("→ \(decorated.method.rawValue) \(decorated.path)")
+        let route = decorated.route ?? "[REDACTED]"
+        logger.debug("→ \(decorated.method.rawValue) \(route)")
         try Task.checkCancellation()
         PayabliSendMark.current?.set()
 
@@ -139,7 +140,7 @@ package final class PayabliService: PayabliTransport, Sendable {
             }
 
             let headers = (http.allHeaderFields as? [String: String]) ?? [:]
-            logger.debug("← \(decorated.method.rawValue) \(decorated.path) [\(http.statusCode)]")
+            logger.debug("← \(decorated.method.rawValue) \(route) [\(http.statusCode)]")
 
             return PayabliResponse(
                 statusCode: http.statusCode,
@@ -156,7 +157,7 @@ package final class PayabliService: PayabliTransport, Sendable {
             // network failed. Cancellation is not a failure of the request.
             throw CancellationError()
         } catch {
-            logger.error("Network error on \(decorated.path): \(error.localizedDescription)")
+            logger.error("Network error on \(route): \(error.localizedDescription)")
             throw PayabliGenericError(
                 type: .networkError,
                 reason: "Network request failed",

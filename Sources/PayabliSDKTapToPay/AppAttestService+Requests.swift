@@ -12,7 +12,6 @@ extension AppAttestService {
     func postChallenge(entry: String) async throws -> ChallengeResponse {
         try await postAttestationRequest(
             .challenge,
-            path: "/api/v2/device/taptopay/challenge",
             body: ChallengeRequest(entry: entry),
             readsRefusalBeforeStatus: true,
             isCredentialPinned: true,
@@ -23,7 +22,6 @@ extension AppAttestService {
     func postRegister(_ body: RegisterRequest) async throws -> RegisterResponse {
         try await postAttestationRequest(
             .register,
-            path: "/api/v2/device/taptopay/register",
             body: body,
             readsRefusalBeforeStatus: true,
             isCredentialPinned: true,
@@ -34,7 +32,6 @@ extension AppAttestService {
     func postAttest(_ body: AttestRequest) async throws {
         try await postAttestationRequestExpectingNoBody(
             .attest,
-            path: "/api/v2/device/taptopay/attest",
             body: body,
             readsRefusalBeforeStatus: true,
             isCredentialPinned: true,
@@ -45,7 +42,6 @@ extension AppAttestService {
     /// Authenticated POST that expects a non-empty `responseData` of type `Payload`, and throws where the envelope holds none.
     ///
     /// - Parameter route: the route sent, which names the request in its logs and decode errors.
-    /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: reads a 400, 403 or 404's refusal envelope, or a 401 saying the binding
@@ -56,7 +52,6 @@ extension AppAttestService {
     /// - Returns: the envelope's `responseData`, decoded as `Payload`.
     func postAttestationRequest<Payload: Decodable>(
         _ route: DeviceRoute,
-        path: String,
         body: some Encodable,
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
@@ -66,7 +61,6 @@ extension AppAttestService {
         try await routes.measured(route) {
             let response = try await routes.post(
                 route,
-                path: path,
                 body: body,
                 assertion: assertion,
                 readsRefusalBeforeStatus: readsRefusalBeforeStatus,
@@ -103,7 +97,6 @@ extension AppAttestService {
     /// Authenticated POST for endpoints that answer with an `isSuccess` acknowledgement and no `responseData`.
     ///
     /// - Parameter route: the route sent, which names the request in its logs and errors.
-    /// - Parameter path: the route the request is sent to.
     /// - Parameter body: the request's body, encoded as JSON.
     /// - Parameter assertion: the assertion headers to append, or `nil` where the route needs none.
     /// - Parameter readsRefusalBeforeStatus: hands a refusal envelope on a 400, 403 or 404, or a 401 saying the binding is
@@ -113,7 +106,6 @@ extension AppAttestService {
     ///   service sent, or `nil` where the words name nothing the route classifies.
     func postAttestationRequestExpectingNoBody(
         _ route: DeviceRoute,
-        path: String,
         body: some Encodable,
         assertion: AssertionHeaders? = nil,
         readsRefusalBeforeStatus: Bool = false,
@@ -123,7 +115,6 @@ extension AppAttestService {
         try await routes.measured(route) {
             let response = try await routes.post(
                 route,
-                path: path,
                 body: body,
                 assertion: assertion,
                 readsRefusalBeforeStatus: readsRefusalBeforeStatus,
