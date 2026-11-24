@@ -60,6 +60,30 @@ final class SessionStateReportTests: XCTestCase {
         XCTAssertEqual(moves, ["ready -> charging", "charging -> failed"])
     }
 
+    func testAFailureOnAFailedSessionForAnotherReasonIsAMove() {
+        let manager = SessionManager()
+        var moves: [String] = []
+        manager.onMove = { from, to in moves.append("\(from.diagnosticName) -> \(to.diagnosticName)") }
+
+        manager.markError(PayabliTTPError.readerUnavailable(reason: "busy"), registration: .none)
+        manager.markError(PayabliTTPError.readerUnavailable(reason: "busy"), registration: .none)
+        manager.markError(PayabliTTPError.configFailed(reason: "x"), registration: .none)
+
+        XCTAssertEqual(moves, ["idle -> failed", "failed -> failed"])
+        XCTAssertEqual(manager.sessionState, .failed(reason: .configurationRejected))
+    }
+
+    func testAPendingAnswerForAnotherRegistrationIsAMove() {
+        let manager = SessionManager()
+        var count = 0
+        manager.onMove = { _, _ in count += 1 }
+
+        manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_a"))
+        manager.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev_b"))
+
+        XCTAssertEqual(count, 2)
+    }
+
     func testAMoveToFailedSaysWhyAndNoOtherMoveDoes() async throws {
         let transport = InMemoryTelemetryTransport()
         let provider = MockTapToPayProvider()

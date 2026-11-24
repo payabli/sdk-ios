@@ -139,8 +139,22 @@ final class SessionManager: ObservableObject {
         let from = sessionState
         sessionState = target
         isReady = (target == .ready)
-        if from.diagnosticName != target.diagnosticName {
+        if from != target, !Self.isProgress(from: from, to: target) {
             onMove?(from, target)
+        }
+    }
+
+    /// Whether a move only advances within one state: a charge's reader activity, or the reader's setup percentage.
+    ///
+    /// - Parameter from: the state the session left.
+    /// - Parameter target: the state the session moved to.
+    /// - Returns: `true` when both ends are the same state at another point of its progress.
+    private static func isProgress(from: PayabliTTPSessionState, to target: PayabliTTPSessionState) -> Bool {
+        switch (from, target) {
+        case (.charging, .charging), (.initializingReader, .initializingReader):
+            true
+        default:
+            false
         }
     }
 
