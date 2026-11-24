@@ -7,6 +7,7 @@ import XCTest
 /// The card reader's processor credentials arrive in the configuration answer and go to the reader. Neither the
 /// configuration call nor the reader's intake of them writes a credential value to a log line, whatever the answer.
 /// Each case anchors on the record it expects before asserting every credential is absent.
+@available(iOS 16.7, *)
 final class ReaderCredentialLoggingTests: XCTestCase {
     private static let secrets = ["SENTINEL-SECRETKEY", "SENTINEL-APIKEY"]
     private static let entry = "entry-1"
