@@ -210,7 +210,8 @@ final class CloseCapturedChargeTests: XCTestCase {
             session: first,
             provider: MockTapToPayProvider(),
             attestation: MockDeviceAttestationService(),
-            chargeKeys: keys
+            chargeKeys: keys,
+            heldPayments: HeldPayments()
         )
         _ = try? await first.transport.perform(PayabliRequest(method: .get, path: "/api/v2/ping"))
         _ = try PayabliSession.install(
@@ -569,6 +570,7 @@ final class CloseWire: @unchecked Sendable {
     private let lock = NSLock()
     private var statuses: [Int] = [200]
     private var refusal: String?
+    private var detail: String?
     private var answered = 0
     private var recorded: [Update] = []
     private var opened = 0
@@ -582,6 +584,7 @@ final class CloseWire: @unchecked Sendable {
         lock.withLock {
             statuses = [200]
             refusal = nil
+            detail = nil
             answered = 0
             recorded = []
             opened = 0
@@ -592,10 +595,12 @@ final class CloseWire: @unchecked Sendable {
     /// - Parameters:
     ///   - updates: the status each update is answered with, the last repeating.
     ///   - refusal: the `code` a non-2xx answer carries.
-    func script(updates: [Int], refusal: String? = nil) {
+    ///   - detail: the `detail` a non-2xx answer carries.
+    func script(updates: [Int], refusal: String? = nil, detail: String? = nil) {
         lock.withLock {
             statuses = updates
             self.refusal = refusal
+            self.detail = detail
             answered = 0
         }
     }
@@ -671,8 +676,10 @@ final class CloseWire: @unchecked Sendable {
                 return holding
             }
             _ = held?.wait(timeout: .now() + 5)
-            let refusal = lock.withLock { self.refusal }
-            body = (200 ..< 300).contains(status) ? ["code": "A01"] : ["code": refusal ?? "E0000", "reason": "refused"]
+            let (refusal, detail) = lock.withLock { (self.refusal, self.detail) }
+            var refused: [String: Any] = ["code": refusal ?? "E0000", "reason": "refused"]
+            refused["detail"] = detail
+            body = (200 ..< 300).contains(status) ? ["code": "A01"] : refused
         } else {
             body = [
                 "responseCode": 1,

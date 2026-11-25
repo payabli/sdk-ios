@@ -280,6 +280,36 @@ final class SessionTokenRenewalTests: XCTestCase {
         XCTAssertEqual(names.filter { $0 == "ttp.attestation.failed" }.count, 2, "\(names)")
     }
 
+    // MARK: - Nothing before the outcome
+
+    func testAnActivationRefusedOnceAndRenewedRecordsNoErrorAndMovesOnlyToIdle() async throws {
+        let (ttp, attestation) = try await makePendingTTP()
+        attestation.activationFailuresFirst = [PinnedTokenRefusal()]
+        let pending = ttp.sessionState
+        var seen: [PayabliTTPSessionState] = []
+        let watching = ttp.$sessionState.sink { seen.append($0) }
+
+        try await ttp.activateDevice(activationCode: "123456")
+        watching.cancel()
+
+        XCTAssertNil(ttp.sessionManager.lastError, "\(String(describing: ttp.sessionManager.lastError))")
+        XCTAssertEqual(seen.filter { $0 != pending }, [.idle], "\(seen)")
+        XCTAssertEqual(attestation.activateCalls, 2)
+    }
+
+    func testAnActivationRefusedAgainAfterTheRenewalRecordsTheExpiredTokenAndStaysWaiting() async throws {
+        let (ttp, attestation) = try await makePendingTTP()
+        attestation.activationFailuresFirst = [PinnedTokenRefusal(), PinnedTokenRefusal()]
+
+        let thrown = await failure { try await ttp.activateDevice(activationCode: "123456") }
+
+        let lastError = ttp.sessionManager.lastError
+        let recorded = try XCTUnwrap(lastError as? any PayabliError, "\(String(describing: lastError))")
+        XCTAssertEqual(recorded.code, 1002)
+        XCTAssertEqual(recorded.code, (thrown as? any PayabliError)?.code, "got \(thrown)")
+        XCTAssertEqual(ttp.sessionState, .pendingActivation(activationId: "dev_pending"))
+    }
+
     // MARK: - Fixtures
 
     private func makeTTP(

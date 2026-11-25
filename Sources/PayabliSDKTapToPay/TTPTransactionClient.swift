@@ -10,13 +10,21 @@ import PayabliSDKCore
 package final class TTPTransactionClient: Sendable {
     private let transport: any PayabliTransport
     private let retryPolicy: RetryPolicy
-    private let logger = PayabliLogger(category: .taptopay)
+    private let logger: PayabliLogger
+    private static let initiateRoute = "/api/v2/MoneyIn/initiate"
+    private static let updateRoute = "/api/v2/MoneyIn/update/{transId}"
 
     /// - Parameter transport: the session's authenticated transport.
     /// - Parameter retryPolicy: the policy every close runs under.
-    package init(transport: any PayabliTransport, retryPolicy: RetryPolicy = .default) {
+    /// - Parameter logger: where each request is logged.
+    package init(
+        transport: any PayabliTransport,
+        retryPolicy: RetryPolicy = .default,
+        logger: PayabliLogger = PayabliLogger(category: .taptopay)
+    ) {
         self.transport = transport
         self.retryPolicy = retryPolicy
+        self.logger = logger
     }
 
     /// `POST /api/v2/MoneyIn/initiate`, returning the authoritative `paymentTransId`.
@@ -53,7 +61,8 @@ package final class TTPTransactionClient: Sendable {
         // Bearer header is injected by the transport (AuthenticatedTransport).
         let request = try PayabliRequest.json(
             method: .post,
-            path: "/api/v2/MoneyIn/initiate",
+            path: Self.initiateRoute,
+            route: Self.initiateRoute,
             headers: [payabliIdempotencyKeyHeader: idempotencyKey],
             jsonBody: body,
             isCallerRefusal: isFraudBlockAnswered401
@@ -62,7 +71,7 @@ package final class TTPTransactionClient: Sendable {
         // `customerData` is the caller's whole customer record, so the body is
         // reported by size rather than by content. This route carries no assertion
         // headers; the transport's bearer is what authenticates it.
-        logger.info("[initiate] → POST \(request.path) bytes=\(request.body?.count ?? 0)")
+        logger.info("[initiate] → POST \(Self.initiateRoute) bytes=\(request.body?.count ?? 0)")
 
         let envelope: PayabliV2Envelope<InitiateData>
         let status: Int
@@ -204,7 +213,7 @@ package final class TTPTransactionClient: Sendable {
         try await send(paymentTransId: paymentTransId, body: (try? JSONEncoder().encode(body)) ?? Data())
     }
 
-    /// Closes a transaction this SDK holds no reader answer for, with a body that claims no outcome.
+    /// Closes a transaction outside its charge, with a body that claims no outcome.
     ///
     /// - Parameter paymentTransId: the transaction to close.
     /// - Throws: the last attempt's mapped error; `permissionDenied` at once for a caller that may not act on it.
@@ -221,19 +230,20 @@ package final class TTPTransactionClient: Sendable {
     ///   may not act on the payment.
     private func send(paymentTransId: String, body: Data) async throws {
         let logger = self.logger
-        let path = "/api/v2/MoneyIn/update/\(PercentEncoding.segment(paymentTransId))"
+        let path = PercentEncoding.path(from: Self.updateRoute, segment: PercentEncoding.segment(paymentTransId))
         let transport = self.transport
 
         try await Retry.run(policy: retryPolicy, logger: logger) { attempt in
             let request = PayabliRequest(
                 method: .patch,
                 path: path,
+                route: Self.updateRoute,
                 headers: ["Content-Type": "application/json"],
                 body: body
             )
             // The success body carries the provider's whole response, and with
             // it `paymentTokens.tokenData` and the card's expiry. Size only.
-            logger.info("[update/\(attempt)] → PATCH \(path) bytes=\(body.count)")
+            logger.info("[update/\(attempt)] → PATCH \(Self.updateRoute) bytes=\(body.count)")
             let response = try await transport.perform(request)
             logger.info("[update/\(attempt)] ← [\(response.statusCode)] bytes=\(response.body.count)")
             if let refusal = Self.notPermitted(response) {

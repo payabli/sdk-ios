@@ -248,8 +248,9 @@ app restarts, sends a new key, so past that point read the transaction back inst
 
 Every failure is a `TapToPayError`, apart from a cancellation, which can end the call as
 `CancellationError`. Cancelling the task running `charge` after the transaction has opened doesn't end it
-silently: it throws a `TapToPayError` carrying `paymentTransId` and `capture`. Follow `capture` as for any
-other error.
+silently: the SDK still sends the transaction's close, and the call answers how the sale ended, with its result
+or a `TapToPayError` carrying `paymentTransId` and `capture`. A close that doesn't land answers
+`.paymentNotClosed`, and `closeCapturedCharge` can send it again. Follow `capture` as for any other error.
 
 A `TapToPayError` carries the catalog entry for its cause:
 
@@ -291,10 +292,13 @@ It also carries `capture` and `paymentTransId`:
 
 `closeCapturedCharge(paymentTransId:)` takes any `paymentTransId` this entry point produced in the same environment,
 including one kept from before the app restarted. A close that already succeeded can be sent again. A close that
-isn't confirmed fails with `.paymentNotClosed` (3022) and `capture` `.unknown`, or with `.permissionDenied` (1006)
-when your credentials may not act on that payment. A close waits for a charge running on its entry point, and a
-charge made on that entry point while a close runs fails before anything is sent: with `.terminalNotReady` (3029),
-or with `.paymentReferenceOpen` (1023) for a declared retry whose key a running charge is still sending.
+isn't confirmed fails with `.paymentNotClosed` (3022), or with `.permissionDenied` (1006) when your credentials may
+not act on that payment. Its `capture` is what the reader's answer for that payment shows, until a close of it is
+confirmed, the app restarts, or another charge opens on that entry point in the same environment. After that, when the reader never answered, or
+when it declined a retry that resent an earlier charge's key, it's `.unknown`. A close
+waits for a charge running on its entry point, and a charge made on that entry point while a close runs fails before
+anything is sent: with `.terminalNotReady` (3029), or with `.paymentReferenceOpen` (1023) for a declared retry whose
+key a running charge is still sending.
 
 `PayabliTTP.create()` throws a `TapToPayError` whose `type` is `.sessionNotInitialized` (1019) when no session
 has been started: call `PayabliSession.initialize` first. A `PayabliTTP` whose session was replaced or ended

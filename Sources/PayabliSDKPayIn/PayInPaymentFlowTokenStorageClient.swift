@@ -31,7 +31,8 @@ final class PayInPaymentFlowTokenStorageClient: Sendable {
             // No idempotency key: this route recognises no repeat.
             let request = PayabliRequest(
                 method: .post,
-                path: "/api/TokenStorage/add",
+                path: PayInRoutes.storeMethod,
+                route: PayInRoutes.storeMethod,
                 query: options.queryItems,
                 headers: [PayabliRequest.contentTypeHeader: PayabliRequest.applicationJSON],
                 body: body

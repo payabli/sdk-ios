@@ -81,6 +81,8 @@ package enum TelemetryEventName {
     package static let ttpNfcStarted = "ttp.nfc.started"
     package static let ttpNfcSucceeded = "ttp.nfc.succeeded"
     package static let ttpNfcFailed = "ttp.nfc.failed"
+    package static let ttpCloseStarted = "ttp.close.started"
+    package static let ttpCloseSucceeded = "ttp.close.succeeded"
     package static let ttpCloseFailed = "ttp.close.failed"
     package static let ttpReinitializeStarted = "ttp.reinitialize.started"
     package static let ttpReinitializeSucceeded = "ttp.reinitialize.succeeded"

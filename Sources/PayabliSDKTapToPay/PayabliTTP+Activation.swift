@@ -66,6 +66,8 @@ public extension PayabliTTP {
             markError(err)
             syncPublished()
             throw err
+        } catch let refused as PinnedTokenRefusal {
+            throw refused
         } catch {
             // The reason is the error's parsed description rather than a rendering
             // of its fields.

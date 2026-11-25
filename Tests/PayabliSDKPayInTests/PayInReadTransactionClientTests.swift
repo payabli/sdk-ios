@@ -27,6 +27,7 @@ final class PayInReadTransactionClientTests: XCTestCase {
 
         let request = try await onlyRequest(from: transport)
         XCTAssertEqual(request.path, "/api/MoneyIn/details/a%2Fb%201")
+        XCTAssertEqual(request.route, "/api/MoneyIn/details/{transId}", "a log names the request by its template")
     }
 
     func testABlankOrDotIdentifierIsRefusedBeforeAnythingIsSent() async {

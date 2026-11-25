@@ -13,18 +13,21 @@ struct TTPConfig: Sendable {
 final class TTPConfigClient: Sendable {
     private let routes: DeviceServiceClient
     private let attestation: DeviceAttestationService
-    private let logger = PayabliLogger(category: .taptopay)
+    private let logger: PayabliLogger
 
     /// - Parameter transport: what the request is sent over, the session's.
     /// - Parameter attestation: what signs the request's assertion.
     /// - Parameter telemetrySession: the session the route's report belongs to; `nil` for the installed one.
+    /// - Parameter logger: where the route call and its outcome are logged.
     init(
         transport: any PayabliTransport,
         attestation: DeviceAttestationService,
-        telemetrySession: TelemetrySessionContext? = nil
+        telemetrySession: TelemetrySessionContext? = nil,
+        logger: PayabliLogger = PayabliLogger(category: .taptopay)
     ) {
-        routes = DeviceServiceClient(transport: transport, telemetrySession: telemetrySession)
+        routes = DeviceServiceClient(transport: transport, telemetrySession: telemetrySession, logger: logger)
         self.attestation = attestation
+        self.logger = logger
     }
 
     /// Fetches the TTP config for `entry` on a pinned credential. An envelope naming 401, or any coded envelope at status 401,
@@ -39,7 +42,8 @@ final class TTPConfigClient: Sendable {
         // Attestation headers are component-specific; bearer is added by the transport.
         let request = PayabliRequest(
             method: .get,
-            path: "/api/v2/device/taptopay/config/\(PercentEncoding.segment(entry))",
+            path: PercentEncoding.path(from: DeviceRoute.config.template, segment: PercentEncoding.segment(entry)),
+            route: DeviceRoute.config.template,
             headers: headers.asDictionary,
             isCredentialPinned: true
         )
