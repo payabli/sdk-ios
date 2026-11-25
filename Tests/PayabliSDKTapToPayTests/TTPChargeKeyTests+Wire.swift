@@ -9,6 +9,7 @@ extension TTPChargeKeyTests {
     final class Wire: @unchecked Sendable {
         private let lock = NSLock()
         private var sentKeys: [String] = []
+        private var sentCloses = 0
         private var initiate = 200
         private var refusal: String?
         private var refusalCode: String?
@@ -19,6 +20,10 @@ extension TTPChargeKeyTests {
 
         var keys: [String] {
             lock.withLock { sentKeys }
+        }
+
+        var closes: Int {
+            lock.withLock { sentCloses }
         }
 
         var initiateStatus: Int {
@@ -60,9 +65,14 @@ extension TTPChargeKeyTests {
             lock.withLock { sentKeys.append(key ?? "<none>") }
         }
 
+        func recordClose() {
+            lock.withLock { sentCloses += 1 }
+        }
+
         func reset() {
             lock.withLock {
                 sentKeys = []
+                sentCloses = 0
                 initiate = 200
                 refusal = nil
                 duplicateSale = false
@@ -102,6 +112,7 @@ extension TTPChargeKeyTests {
                 data = try JSONSerialization.data(withJSONObject: ["code": "A01", "data": ["paymentTransId": "TXN-KEY"]])
             }
         } else if path.contains("/MoneyIn/update/") {
+            wire.recordClose()
             if wire.updateFails {
                 status = 500
                 data = try JSONSerialization.data(withJSONObject: ["title": "Server Error", "status": 500])
