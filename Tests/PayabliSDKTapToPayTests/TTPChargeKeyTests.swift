@@ -433,6 +433,60 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the indeterminate read's close settled the key")
     }
 
+    // MARK: - A charge cancelled while the reader waits for a card
+
+    func testACancelledReadWhoseCloseLandsSendsTheCloseAndKeepsTheKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+
+        let cancelled = await cancelledWhileReading(ttp, provider)
+        let closes = Self.wire.closes
+        provider.whileReading = nil
+        provider.readingResult = Self.read(.approved)
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(cancelled?.type, .tapNotCompleted)
+        XCTAssertEqual(cancelled?.code, 3018)
+        XCTAssertEqual(cancelled?.capture, .unknown)
+        XCTAssertEqual(cancelled?.paymentTransId, "TXN-KEY")
+        XCTAssertEqual(closes, 1, "the cancelled charge sent no close")
+        XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the cancelled charge's key was released")
+    }
+
+    func testACancelledReadWhoseCloseFindsNoRecordReportsThePaymentNotTakenAndReleasesTheKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP()
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let notTaken = await cancelledWhileReading(ttp, provider)
+        Self.wire.updateRefusal = nil
+        provider.whileReading = nil
+        provider.readingResult = Self.read(.approved)
+        _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
+
+        XCTAssertEqual(notTaken?.type, .paymentNotTaken)
+        XCTAssertEqual(notTaken?.code, 3035)
+        XCTAssertEqual(notTaken?.capture, .notCharged)
+        XCTAssertEqual(notTaken?.paymentTransId, "TXN-KEY")
+        XCTAssertNotEqual(Self.wire.keys[1], Self.wire.keys[0], "the key outlived a charge that took nothing")
+    }
+
+    func testACancelledReadOnAResentKeyWhoseCloseFindsNoRecordStaysUnknownAndKeepsTheKey() async throws {
+        let (ttp, provider) = try await makeReadyTTP(outcome: .indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
+        Self.wire.updateRefusal = Self.processorHasNoRecord
+
+        let cancelled = await cancelledWhileReading(ttp, provider, attempt: .retry)
+        Self.wire.updateRefusal = nil
+        provider.whileReading = nil
+        provider.readingResult = Self.read(.indeterminate)
+        _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
+
+        XCTAssertEqual(cancelled?.type, .tapNotCompleted)
+        XCTAssertEqual(cancelled?.code, 3018)
+        XCTAssertEqual(cancelled?.capture, .unknown)
+        XCTAssertEqual(cancelled?.paymentTransId, "TXN-KEY")
+        XCTAssertEqual(Set(Self.wire.keys).count, 1, "the resent key was released by a no-record close")
+    }
+
     func testAnOpeningThatFailsHoldsNoKeyAndLeavesTheEarlierOneClaimable() async throws {
         let (ttp, _) = try await makeReadyTTP(outcome: .indeterminate)
         _ = await failure { try await ttp.charge(paymentDetails: Self.details) }
@@ -520,6 +574,29 @@ final class TTPChargeKeyTests: XCTestCase {
         try await ttp.initialize()
         XCTAssertEqual(ttp.sessionState, .ready, "the fixture itself is broken if this fails")
         return (ttp, provider)
+    }
+
+    /// Starts a charge, cancels its task once the reader is waiting for a card, and returns what the caller is told.
+    ///
+    /// - Parameter ttp: the ready terminal.
+    /// - Parameter provider: its reader, which then throws `CancellationError`.
+    /// - Parameter attempt: whether the charge declares itself a retry.
+    /// - Returns: the error the cancelled charge threw.
+    private func cancelledWhileReading(
+        _ ttp: PayabliTTP,
+        _ provider: MockTapToPayProvider,
+        attempt: PayabliAttempt = .newPayment
+    ) async -> TapToPayError? {
+        let asked = expectation(description: "the reader is waiting for a card")
+        provider.readingResult = .failure(CancellationError())
+        provider.whileReading = {
+            asked.fulfill()
+            try? await Task.sleep(for: .seconds(5))
+        }
+        let charging = Task { try await ttp.charge(paymentDetails: Self.details, attempt: attempt) }
+        await fulfillment(of: [asked], timeout: 5)
+        charging.cancel()
+        return await failure { try await charging.value }
     }
 
     func failure(_ work: () async throws -> some Any) async -> TapToPayError? {
