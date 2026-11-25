@@ -102,6 +102,19 @@ final class CloseTelemetryTests: XCTestCase {
         XCTAssertEqual(failed.properties["http_status"], "400")
     }
 
+    func testARetryResendingItsKeyWhoseCloseTheProcessorHasNoRecordOfReportsItUnknown() async throws {
+        let (terminal, transport) = try await makeReadyTerminal(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
+        _ = await Self.failure { _ = try await terminal.charge(paymentDetails: Self.sale) }
+        Self.wire.script(updates: [400], detail: Self.processorHasNoRecord)
+
+        let told = await Self.failure { _ = try await terminal.charge(paymentDetails: Self.sale, attempt: .retry) }
+
+        let failed = try await oneFailure(terminal, transport)
+        XCTAssertEqual(told?.capture, .unknown, "the fixture itself is broken if this fails")
+        XCTAssertEqual(failed.properties["reason"], "processor_no_record")
+        XCTAssertEqual(failed.properties["capture"], "unknown")
+    }
+
     func testAFailedReadsCloseNothingAnsweredCarriesNoStatus() async throws {
         let (terminal, transport) = try await makeReadyTerminal(readFailure: PayabliTTPError.nfcFailed(reason: "tap failed"))
         StubURLProtocol.handler = { request in
