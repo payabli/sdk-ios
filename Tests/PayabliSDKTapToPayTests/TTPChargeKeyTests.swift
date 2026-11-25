@@ -439,6 +439,7 @@ final class TTPChargeKeyTests: XCTestCase {
         let (ttp, provider) = try await makeReadyTTP()
 
         let cancelled = await cancelledWhileReading(ttp, provider)
+        let closes = Self.wire.closes
         provider.whileReading = nil
         provider.readingResult = Self.read(.approved)
         _ = try await ttp.charge(paymentDetails: Self.details, attempt: .retry)
@@ -447,7 +448,7 @@ final class TTPChargeKeyTests: XCTestCase {
         XCTAssertEqual(cancelled?.code, 3018)
         XCTAssertEqual(cancelled?.capture, .unknown)
         XCTAssertEqual(cancelled?.paymentTransId, "TXN-KEY")
-        XCTAssertEqual(Self.wire.closes, 2, "the cancelled charge sent no close")
+        XCTAssertEqual(closes, 1, "the cancelled charge sent no close")
         XCTAssertEqual(Self.wire.keys[1], Self.wire.keys[0], "the cancelled charge's key was released")
     }
 
@@ -476,6 +477,7 @@ final class TTPChargeKeyTests: XCTestCase {
         let cancelled = await cancelledWhileReading(ttp, provider, attempt: .retry)
         Self.wire.updateRefusal = nil
         provider.whileReading = nil
+        provider.readingResult = Self.read(.indeterminate)
         _ = await failure { try await ttp.charge(paymentDetails: Self.details, attempt: .retry) }
 
         XCTAssertEqual(cancelled?.type, .tapNotCompleted)
@@ -577,7 +579,7 @@ final class TTPChargeKeyTests: XCTestCase {
     /// Starts a charge, cancels its task once the reader is waiting for a card, and returns what the caller is told.
     ///
     /// - Parameter ttp: the ready terminal.
-    /// - Parameter provider: its reader, which then throws the cancellation a real reader throws.
+    /// - Parameter provider: its reader, which then throws `CancellationError`.
     /// - Parameter attempt: whether the charge declares itself a retry.
     /// - Returns: the error the cancelled charge threw.
     private func cancelledWhileReading(
