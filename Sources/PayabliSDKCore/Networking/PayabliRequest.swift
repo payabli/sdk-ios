@@ -1,16 +1,15 @@
 import Foundation
 
-/// A pending HTTP request assembled by the SDK.
-///
-/// Consumed by `PayabliService`, which resolves it against the environment base URL, runs the
-/// decoration chain over it, and performs the call. The chain sets the credential, and overrides an
-/// `Authorization` header set here.
+/// A pending HTTP request. `PayabliService` resolves it against the environment's base URL and runs the decoration
+/// chain, which sets the credential over any `Authorization` header set here. A log names the request by its `route`
+/// template, or `[REDACTED]` without one, never by its `path`, which can carry an identifier.
 package struct PayabliRequest: Sendable {
     package static let contentTypeHeader = "Content-Type"
     package static let applicationJSON = "application/json"
 
     package let method: HTTPMethod
     package let path: String
+    package let route: String?
     package let query: [URLQueryItem]
     package let headers: [String: String]
     package let body: Data?
@@ -28,6 +27,7 @@ package struct PayabliRequest: Sendable {
     package init(
         method: HTTPMethod,
         path: String,
+        route: String? = nil,
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
         body: Data? = nil,
@@ -37,6 +37,7 @@ package struct PayabliRequest: Sendable {
     ) {
         self.method = method
         self.path = path
+        self.route = route
         self.query = query
         self.headers = headers
         self.body = body
@@ -49,6 +50,7 @@ package struct PayabliRequest: Sendable {
     ///
     /// - Parameter method: the request's HTTP method, `POST` for the usual JSON send.
     /// - Parameter path: the route path, resolved against the environment's base URL.
+    /// - Parameter route: the route as a template, the form a log names the request by.
     /// - Parameter query: the query items appended to the path.
     /// - Parameter headers: the request's own headers, where a `Content-Type` spelled exactly is replaced by the JSON one.
     /// - Parameter jsonBody: the body value, encoded as JSON with ISO-8601 dates.
@@ -61,6 +63,7 @@ package struct PayabliRequest: Sendable {
     package static func json(
         method: HTTPMethod,
         path: String,
+        route: String? = nil,
         query: [URLQueryItem] = [],
         headers: [String: String] = [:],
         jsonBody: some Encodable,
@@ -76,6 +79,7 @@ package struct PayabliRequest: Sendable {
         return PayabliRequest(
             method: method,
             path: path,
+            route: route,
             query: query,
             headers: mergedHeaders,
             body: body,

@@ -63,6 +63,7 @@ extension PayabliRequest {
         PayabliRequest(
             method: method,
             path: path,
+            route: route,
             query: query,
             headers: headers,
             body: body,

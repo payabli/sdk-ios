@@ -189,6 +189,7 @@ final class PayInPaymentFlowClientTests: XCTestCase {
 
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/capture/auth%2Fid%201")
+        XCTAssertEqual(request.route, "/api/v2/MoneyIn/capture/{transId}", "a log names the request by its template")
     }
 
     func testDeclineEnvelopeThrowsTransactionFailureInsteadOfGenericHTTPError() async throws {

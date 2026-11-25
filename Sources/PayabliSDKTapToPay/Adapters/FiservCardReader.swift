@@ -62,7 +62,7 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
 
     private let lock = NSLock()
     private var credentials: Credentials?
-    private let logger = PayabliLogger(category: .taptopay)
+    private let logger: PayabliLogger
 
     #if canImport(PayabliCardReaderCore)
         private var reader: FiservTTPCardReader?
@@ -121,7 +121,10 @@ package final class FiservCardReader: TapToPayProvider, @unchecked Sendable {
         lock.unlock()
     }
 
-    package init() {}
+    /// - Parameter logger: where the reader's setup and charges are logged.
+    package init(logger: PayabliLogger = PayabliLogger(category: .taptopay)) {
+        self.logger = logger
+    }
 
     /// Injects `Credentials` directly. Facade path uses `configure(credentials:)`.
     ///

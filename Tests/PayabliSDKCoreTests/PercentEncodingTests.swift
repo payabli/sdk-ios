@@ -56,4 +56,9 @@ final class PercentEncodingTests: XCTestCase {
     func testAPercentIsItselfEncoded() {
         XCTAssertEqual(PercentEncoding.segment("a%2Fb"), "a%252Fb")
     }
+
+    func testASegmentTakesThePlaceholdersPlaceWhereverItSits() {
+        XCTAssertEqual(PercentEncoding.path(from: "/a/{id}", segment: "x%2Fy"), "/a/x%2Fy")
+        XCTAssertEqual(PercentEncoding.path(from: "/a/{id}/b", segment: "x"), "/a/x/b")
+    }
 }

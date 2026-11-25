@@ -55,6 +55,7 @@ package actor TelemetryEndpointTransport: TelemetryTransport {
                 PayabliRequest.json(
                     method: .post,
                     path: path,
+                    route: path,
                     jsonBody: body,
                     isCallerRefusal: { $0.statusCode == 401 },
                     sendsOnHeldCredentialOnly: true

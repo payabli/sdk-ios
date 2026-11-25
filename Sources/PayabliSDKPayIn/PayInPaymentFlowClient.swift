@@ -18,7 +18,7 @@ final class PayInPaymentFlowClient: Sendable {
         idempotencyKey: String
     ) async throws -> PayabliPayInResult {
         try await performTransaction(
-            path: "/api/v2/MoneyIn/getpaid",
+            route: PayInRoutes.capture,
             entryPoint: entryPoint,
             request: request,
             idempotencyKey: idempotencyKey,
@@ -35,7 +35,7 @@ final class PayInPaymentFlowClient: Sendable {
             throw PayabliPayInError.InvalidInput(field: PayInFieldPath.paymentMethod, reason: "This payment method cannot be authorized.")
         }
         return try await performTransaction(
-            path: "/api/v2/MoneyIn/authorize",
+            route: PayInRoutes.authorize,
             entryPoint: entryPoint,
             request: request,
             idempotencyKey: idempotencyKey,
@@ -55,7 +55,8 @@ final class PayInPaymentFlowClient: Sendable {
 
         let body = try PayInPaymentFlowJSONBody.encode(AuthorizedCaptureBody(paymentDetails: request.paymentDetails))
         let payabliRequest = try buildRequest(
-            path: "/api/v2/MoneyIn/capture/\(PercentEncoding.segment(transId))",
+            path: PercentEncoding.path(from: PayInRoutes.captureAuthorized, segment: PercentEncoding.segment(transId)),
+            route: PayInRoutes.captureAuthorized,
             query: [],
             idempotencyKey: idempotencyKey,
             body: body
@@ -87,7 +88,8 @@ final class PayInPaymentFlowClient: Sendable {
         }
 
         let payabliRequest = try buildRequest(
-            path: "/api/v2/MoneyIn/void/\(PercentEncoding.segment(transId))",
+            path: PercentEncoding.path(from: PayInRoutes.void, segment: PercentEncoding.segment(transId)),
+            route: PayInRoutes.void,
             query: [],
             idempotencyKey: idempotencyKey
         )
@@ -109,7 +111,8 @@ final class PayInPaymentFlowClient: Sendable {
         }
         let request = PayabliRequest(
             method: .get,
-            path: "/api/MoneyIn/details/\(PercentEncoding.segment(transId))",
+            path: PercentEncoding.path(from: PayInRoutes.read, segment: PercentEncoding.segment(transId)),
+            route: PayInRoutes.read,
             isCallerRefusal: { $0.statusCode == 401 && Self.legacyCode(of: $0) == Self.callerMayNotRead }
         )
         let response = try await transport.perform(request)
@@ -179,7 +182,7 @@ final class PayInPaymentFlowClient: Sendable {
     }
 
     private func performTransaction(
-        path: String,
+        route: String,
         entryPoint: String,
         request: PayabliPayInRequest,
         idempotencyKey: String,
@@ -197,7 +200,8 @@ final class PayInPaymentFlowClient: Sendable {
         do {
             body = try encodedTransactionBody(entry: entry, request: request)
             let payabliRequest = try buildRequest(
-                path: path,
+                path: route,
+                route: route,
                 query: request.queryItems(allowsACHValidation: allowsACHValidation),
                 idempotencyKey: idempotencyKey,
                 body: body,
@@ -246,12 +250,14 @@ final class PayInPaymentFlowClient: Sendable {
     /// there would differ on a replay.
     ///
     /// - Parameter path: the route's path, as `/api/v2/MoneyIn/getpaid`.
+    /// - Parameter route: the route as a template, the form a log names the request by.
     /// - Parameter query: the query items the route reads, such as `achValidation`.
     /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header; nil sends none.
     /// - Parameter body: the request's body, already encoded as the route reads it.
     /// - Returns: the request the transport sends.
     private func buildRequest(
         path: String,
+        route: String,
         query: [URLQueryItem],
         idempotencyKey: String?,
         body: Data,
@@ -260,6 +266,7 @@ final class PayInPaymentFlowClient: Sendable {
         try PayabliRequest(
             method: .post,
             path: path,
+            route: route,
             query: query,
             headers: Self.headers(idempotencyKey: idempotencyKey),
             body: body,
@@ -272,17 +279,20 @@ final class PayInPaymentFlowClient: Sendable {
     /// The request carries no body, not an empty object.
     ///
     /// - Parameter path: the route's path, as `/api/v2/MoneyIn/void/<transId>`.
+    /// - Parameter route: the route as a template, the form a log names the request by.
     /// - Parameter query: the query items the route reads, empty on these routes.
     /// - Parameter idempotencyKey: the key to carry as the `idempotencyKey` header; nil sends none.
     /// - Returns: the request the transport sends, with no body.
     private func buildRequest(
         path: String,
+        route: String,
         query: [URLQueryItem],
         idempotencyKey: String?
     ) throws -> PayabliRequest {
         try PayabliRequest(
             method: .post,
             path: path,
+            route: route,
             query: query,
             headers: Self.headers(idempotencyKey: idempotencyKey)
         )

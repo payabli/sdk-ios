@@ -43,4 +43,18 @@ package enum PercentEncoding {
         }
         return encoded
     }
+
+    /// Places an already-encoded segment into a route template's `{placeholder}`, so a request's path and the template
+    /// its log names have one definition. A template without a placeholder traps: it is a route wired to the wrong
+    /// helper, not a value a caller could correct.
+    ///
+    /// - Parameter template: the route with one `{placeholder}`, as `/api/v2/MoneyIn/void/{transId}`.
+    /// - Parameter segment: the already-encoded value that takes the placeholder's place.
+    /// - Returns: the resolved path.
+    package static func path(from template: String, segment: String) -> String {
+        guard let open = template.firstIndex(of: "{"),
+              let close = template[open...].firstIndex(of: "}")
+        else { preconditionFailure("a resolved route needs a {placeholder}: \(template)") }
+        return String(template[..<open]) + segment + String(template[template.index(after: close)...])
+    }
 }
