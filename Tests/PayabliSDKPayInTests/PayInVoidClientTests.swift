@@ -31,6 +31,7 @@ final class PayInVoidClientTests: XCTestCase {
 
         let request = try await firstRequest(from: transport)
         XCTAssertEqual(request.path, "/api/v2/MoneyIn/void/void%2Fid%201")
+        XCTAssertEqual(request.route, "/api/v2/MoneyIn/void/{transId}", "a log names the request by its template")
     }
 
     func testVoidRefusesABlankTransactionIdBeforeSendingAnything() async throws {
