@@ -116,10 +116,9 @@ extension PayabliTTP {
         // 0. Eligibility.
         try await runEligibility()
 
-        // Start from `.idle`, whatever the caller left behind. The matrix is
-        // narrow — from `.sessionExpired` only `.reinitializing` is reachable —
-        // and transition results are discarded, so without this every phase ran
-        // and the state never moved.
+        // Start from `.idle`, whatever the caller left behind: from
+        // `.sessionExpired` only `.reinitializing` is reachable, so the first
+        // phase's move would be refused and the setup would fail.
         sessionManager.reset()
         syncPublished()
 
