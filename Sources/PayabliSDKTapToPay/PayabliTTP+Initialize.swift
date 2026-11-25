@@ -16,8 +16,9 @@ extension PayabliTTP {
     ///   3. Hand credentials to the provider, which holds them at runtime only.
     ///   4. Prepare reader, transition to `.ready`.
     ///
-    /// A call made while setup is running joins it and gets its outcome. A call made during a charge waits for the
-    /// charge to end, then runs.
+    /// A call made while another `initialize()` on this instance is pending joins it and gets its outcome, unless a
+    /// charge has claimed the session since. A call made during any other setup or a charge waits for it to end, then
+    /// runs.
     public func initialize() async throws {
         try await reportingToHost {
             try await runSessionSetup(.initialize) { try await self.runInitialize() }
