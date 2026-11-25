@@ -45,6 +45,31 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
+    func testAnActivationWhoseRenewalFailsRecordsTheProvidersFailureAndStaysWaiting() async throws {
+        let wire = Wire(refusing: "activate", registersPending: true)
+        StubURLProtocol.handler = wire.handle
+        let (ttp, _) = try makeTTP(renewalFails: true)
+        do {
+            try await ttp.initialize()
+            XCTFail("a pending registration reported ready")
+        } catch {}
+        let pending = ttp.sessionState
+        guard case .pendingActivation = pending else {
+            return XCTFail("the fixture itself is broken: \(pending)")
+        }
+
+        do {
+            try await ttp.activateDevice(activationCode: "123456")
+            XCTFail("an activation whose renewal failed reported success")
+        } catch {}
+
+        let recorded = ttp.sessionManager.lastError as? any PayabliError
+        XCTAssertEqual(recorded?.type, .tokenProviderFailed, "\(String(describing: ttp.sessionManager.lastError))")
+        XCTAssertEqual(ttp.sessionState, pending)
+        XCTAssertEqual(wire.bearers(for: "activate"), ["seed"], "nothing was sent after the failed renewal")
+        await TelemetryRecorders.settled()
+    }
+
     // MARK: - The routes before a binding exists
 
     func testAColdStartWhoseChallengeRefusedItsTokenRenewsItAndAttests() async throws {
@@ -122,6 +147,32 @@ final class SessionTokenRenewalWireTests: XCTestCase {
         XCTAssertEqual(tokens.count, 2, "one renewal")
     }
 
+    // MARK: - What a cold start publishes
+
+    func testAColdStartRefusedOnceAtAttestOrChallengePublishesNoFailedState() async throws {
+        for route in ["attest", "challenge"] {
+            let wire = Wire(refusing: route)
+            StubURLProtocol.handler = wire.handle
+            let (ttp, tokens) = try makeTTP()
+            var seen: [PayabliTTPSessionState] = []
+            let watching = ttp.$sessionState.sink { seen.append($0) }
+
+            try await ttp.initialize()
+            watching.cancel()
+            await TelemetryRecorders.settled()
+
+            XCTAssertFalse(seen.contains {
+                if case .failed = $0 {
+                    true
+                } else {
+                    false
+                }
+            }, "\(route): \(seen)")
+            XCTAssertEqual(seen.last, .ready, route)
+            XCTAssertEqual(tokens.count, 2, "\(route): one renewal")
+        }
+    }
+
     // MARK: - Fixtures
 
     /// A cold `initialize` whose `route` refuses the seed and the renewed token throws 1002, lands `serviceUnavailable`,
@@ -153,11 +204,16 @@ final class SessionTokenRenewalWireTests: XCTestCase {
 
     /// A facade whose attestation service runs on the facade's own session, so a refusal is recorded where the
     /// renewal reads it.
-    private func makeTTP() throws -> (PayabliTTP, Tokens) {
+    ///
+    /// - Parameter renewalFails: whether every provider call after the first throws instead of renewing.
+    private func makeTTP(renewalFails: Bool = false) throws -> (PayabliTTP, Tokens) {
         let tokens = Tokens()
         let config = try PayabliConfig(entryPoint: "myEntry", environment: .sandbox, tokenProvider: {
             let call = tokens.next()
             guard call > 1 else { return "seed" }
+            if renewalFails {
+                throw URLError(.notConnectedToInternet)
+            }
             return "renewed-\(call)"
         })
         let session = PayabliSession(config: config, urlSession: StubURLProtocol.makeSession())

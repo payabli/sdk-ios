@@ -201,9 +201,9 @@ extension PayabliTTP {
         syncPublished()
     }
 
-    /// Runs `sequence`, and once more after renewing the token when a device route refused it. Every session sequence
-    /// runs through here. The first refusal lands nowhere; a second, or a failed renewal, reaches the caller and lands
-    /// only when `landsSecondRefusal` is true, so an activation's leaves the session waiting for its code.
+    /// Runs `sequence`, and once more after renewing the token when a device route refused it. The first refusal is
+    /// neither recorded nor landed; a second, or a failed renewal, is recorded, reaches the caller, and lands only when
+    /// `landsSecondRefusal` is true, so an activation's leaves the session waiting for its code.
     ///
     /// - Parameter landsSecondRefusal: whether a failure after the renewal moves the session.
     /// - Parameter sequence: the session work, from its first call.
@@ -219,7 +219,7 @@ extension PayabliTTP {
         do {
             _ = try await session.renewRefusedToken()
         } catch {
-            landIfAsked(error, landsSecondRefusal)
+            recordFailure(error, lands: landsSecondRefusal)
             throw error
         }
         do {
@@ -231,15 +231,22 @@ extension PayabliTTP {
                 httpStatus: refused.httpStatus,
                 rawCode: refused.rawCode
             )
-            landIfAsked(expired, landsSecondRefusal)
+            recordFailure(expired, lands: landsSecondRefusal)
             throw expired
         }
         // Any other failure of the second run was landed by the phase that threw it, which may have chosen a state
         // its error alone would not name.
     }
 
-    private func landIfAsked(_ failure: Error, _ lands: Bool) {
-        guard lands else { return }
+    /// Records the failure a renewed run ends on, and lands it when asked.
+    ///
+    /// - Parameter failure: the failure the caller is given.
+    /// - Parameter lands: whether it moves the session; otherwise the session stays where it was.
+    private func recordFailure(_ failure: Error, lands: Bool) {
+        guard lands else {
+            sessionManager.recordError(failure)
+            return
+        }
         markError(failure)
         syncPublished()
     }
