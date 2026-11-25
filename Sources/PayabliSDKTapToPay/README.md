@@ -248,8 +248,9 @@ app restarts, sends a new key, so past that point read the transaction back inst
 
 Every failure is a `TapToPayError`, apart from a cancellation, which can end the call as
 `CancellationError`. Cancelling the task running `charge` after the transaction has opened doesn't end it
-silently: the transaction is still closed, and the call answers how the sale ended, with its result or a
-`TapToPayError` carrying `paymentTransId` and `capture`. Follow `capture` as for any other error.
+silently: the SDK still sends the transaction's close, and the call answers how the sale ended, with its result
+or a `TapToPayError` carrying `paymentTransId` and `capture`. A close that doesn't land answers
+`.paymentNotClosed`, and `closeCapturedCharge` can send it again. Follow `capture` as for any other error.
 
 A `TapToPayError` carries the catalog entry for its cause:
 
