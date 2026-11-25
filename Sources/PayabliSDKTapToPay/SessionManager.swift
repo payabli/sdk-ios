@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import PayabliSDKCore
 
 /// Which setup a call runs, so a later call of an equal kind on the same `PayabliTTP` joins it until a charge
 /// claims the gate.
@@ -32,30 +33,42 @@ final class SessionManager: ObservableObject {
     /// not one.
     var onMove: ((_ from: PayabliTTPSessionState, _ to: PayabliTTPSessionState) -> Void)?
 
+    private let logger = PayabliLogger(category: .taptopay)
+
     init() {}
 
-    /// Attempt to transition to a new state. Rejects invalid transitions.
+    /// Moves to `target` for the phase that follows, which runs only once the move is made.
+    ///
+    /// - Parameter target: the state the phase runs in.
+    /// - Throws: ``RefusedSessionMove`` when the table refuses the move, a defect in this SDK's own sequence.
+    func advance(to target: PayabliTTPSessionState) throws {
+        let from = sessionState
+        guard write(to: target) else {
+            throw RefusedSessionMove(from: from.diagnosticName, to: target.diagnosticName)
+        }
+    }
+
+    /// Moves to `target`, logging and dropping a refusal: a landing, a charge's progress or end, or a reset, where a
+    /// throw would replace the outcome the caller is about to report.
     ///
     /// - Parameter target: the state to move the session to.
-    /// - Returns: whether the matrix allowed the move.
-    @discardableResult
-    func transition(to target: PayabliTTPSessionState) -> Bool {
+    func settle(to target: PayabliTTPSessionState) {
+        let from = sessionState
+        if !write(to: target) {
+            logger.warning("refused a session state change from \(from.diagnosticName) to \(target.diagnosticName)")
+        }
+    }
+
+    /// Moves to `target` when the table allows it.
+    ///
+    /// - Parameter target: the state to move the session to.
+    /// - Returns: whether the table allowed the move.
+    private func write(to target: PayabliTTPSessionState) -> Bool {
         guard Self.isValidTransition(from: sessionState, to: target) else {
             return false
         }
         move(to: target)
         return true
-    }
-
-    /// Forces `.sessionExpired`, bypassing the transition matrix.
-    ///
-    /// Nothing calls this, and its doc claimed "called on 401s", which no code
-    /// did. Scheduled for deletion; use `transition(to:)`, which the matrix
-    /// still governs.
-    private func forceSessionExpiry() {
-        if sessionState != .sessionExpired {
-            move(to: .sessionExpired)
-        }
     }
 
     /// Records a failure without moving the session.
@@ -65,15 +78,15 @@ final class SessionManager: ObservableObject {
         lastError = error
     }
 
-    /// Lands a failure where the map says it lands. A failure that leaves the
-    /// session where it was moves nothing but `lastError`.
+    /// Lands a failure where the map says it lands, through the table. A failure that leaves the session where it
+    /// was, or whose landing the table refuses from the current state, moves nothing but `lastError`.
     ///
     /// - Parameter error: the failure to land, as the caller caught it.
     /// - Parameter registration: the activation registration the store still holds, for the code remedy.
     func markError(_ error: Error, registration: StoredRegistration) {
         lastError = error
         guard let landing = PayabliTTPSessionState.landing(for: error, registration: registration) else { return }
-        move(to: landing)
+        settle(to: landing)
     }
 
     /// Records how far the reader has got, without leaving the state it belongs
@@ -96,7 +109,7 @@ final class SessionManager: ObservableObject {
     ///
     /// - Returns: the charge's name, or `nil` where the session is not ready.
     func beginCharge() -> Int? {
-        guard sessionState == .ready, transition(to: .charging(activity: .opening)) else { return nil }
+        guard sessionState == .ready, write(to: .charging(activity: .opening)) else { return nil }
         nextCharge += 1
         runningCharge = nextCharge
         return nextCharge
@@ -108,7 +121,7 @@ final class SessionManager: ObservableObject {
     /// - Parameter charge: the charge the activity belongs to.
     func recordChargeActivity(_ activity: TapToPayChargeActivity, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
-        transition(to: .charging(activity: activity))
+        settle(to: .charging(activity: activity))
     }
 
     /// Ends `charge` on `failed(reason)`, only while it still holds the session.
@@ -118,7 +131,7 @@ final class SessionManager: ObservableObject {
     func failCharge(_ reason: PayabliTTPFailureReason, for charge: Int) {
         guard charge == runningCharge, case .charging = sessionState else { return }
         runningCharge = nil
-        move(to: .failed(reason: reason))
+        settle(to: .failed(reason: reason))
     }
 
     /// Returns to ready only while `charge` still holds the session, so a move
@@ -129,13 +142,13 @@ final class SessionManager: ObservableObject {
         guard charge == runningCharge else { return }
         runningCharge = nil
         guard case .charging = sessionState else { return }
-        transition(to: .ready)
+        settle(to: .ready)
     }
 
     /// Returns the session to its starting point. Internal: a host reaches this
     /// only through `initialize()`, never as an operation of its own.
     func reset() {
-        transition(to: .idle)
+        settle(to: .idle)
         lastError = nil
     }
 
@@ -189,8 +202,8 @@ final class SessionManager: ObservableObject {
         switch (current, target) {
         // Starting over is always reachable. `initialize()` is the documented
         // way back to a known state, and it has to work from wherever the
-        // session was left.
-        case (_, .idle):
+        // session was left. Failing is always reachable too.
+        case (_, .idle), (_, .failed):
             return true
 
         case (.idle, .attestingDevice),
@@ -198,30 +211,25 @@ final class SessionManager: ObservableObject {
             return true
 
         case (.attestingDevice, .fetchingConfig),
-             (.attestingDevice, .pendingActivation),
-             (.attestingDevice, .failed):
+             (.attestingDevice, .pendingActivation):
             return true
 
         case (.fetchingConfig, .initializingReader),
-             (.fetchingConfig, .pendingActivation),
-             (.fetchingConfig, .failed):
+             (.fetchingConfig, .pendingActivation):
             return true
 
         case (.initializingReader, .ready),
-             (.initializingReader, .pendingTerms),
-             (.initializingReader, .failed):
+             (.initializingReader, .pendingTerms):
             return true
 
         case (.ready, .sessionExpired),
-             (.ready, .failed),
              (.ready, .charging(.opening)):
             return true
 
         case (.sessionExpired, .reinitializing):
             return true
 
-        case (.reinitializing, .fetchingConfig),
-             (.reinitializing, .failed):
+        case (.reinitializing, .fetchingConfig):
             return true
 
         // Both wait on a person rather than on the SDK, and both leave the same way: the host resolves
@@ -240,14 +248,14 @@ final class SessionManager: ObservableObject {
     }
 
     /// A charge ends back at ready whatever it ended in, or expired when the
-    /// read found the reader session spent, and starting over is always reachable.
+    /// read found the reader session spent. Starting over and failing are always reachable.
     ///
     /// - Parameter activity: the activity the charge is in now.
     /// - Parameter target: the state the charge would move to.
     /// - Returns: whether the charge may make the move.
     private static func chargeMayMove(from activity: TapToPayChargeActivity, to target: PayabliTTPSessionState) -> Bool {
         switch target {
-        case .idle, .ready, .sessionExpired:
+        case .idle, .ready, .sessionExpired, .failed:
             return true
         case let .charging(next):
             return next == activity || advances(activity, next)
@@ -301,4 +309,10 @@ extension PayabliTTPFailureReason {
             name += character.isUppercase ? "_" + character.lowercased() : String(character)
         }
     }
+}
+
+/// A move the transition table refuses, named by the two states' telemetry names.
+struct RefusedSessionMove: Error {
+    let from: String
+    let to: String
 }

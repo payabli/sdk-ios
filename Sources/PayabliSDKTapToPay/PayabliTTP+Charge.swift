@@ -244,10 +244,8 @@ extension PayabliTTP {
             // Expired after the close, so `closing` is published first. Only while the reader that failed is
             // still the current one. The gate keeps every other setup out until the charge returns, so this
             // compares equal unless that guarantee breaks.
-            if generation == SessionSetupGate.shared.readerGeneration,
-               readerFailureInvalidatesSession(error),
-               sessionManager.transition(to: .sessionExpired)
-            {
+            if generation == SessionSetupGate.shared.readerGeneration, readerFailureInvalidatesSession(error) {
+                sessionManager.settle(to: .sessionExpired)
                 syncPublished()
             }
             // The no-record close says this charge took nothing, so it replaces the read's failure — but only

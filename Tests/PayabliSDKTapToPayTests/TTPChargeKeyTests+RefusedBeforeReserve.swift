@@ -81,13 +81,17 @@ extension TTPChargeKeyTests {
     /// - Returns: puts the terminal back to ready.
     private func waitOnActivation(_ ttp: PayabliTTP) -> () -> Void {
         for state: PayabliTTPSessionState in [.idle, .attestingDevice, .pendingActivation(activationId: "activation")] {
-            XCTAssertTrue(ttp.sessionManager.transition(to: state), "the fixture itself is broken if this fails")
+            XCTAssertNoThrow(try ttp.sessionManager.advance(to: state), "the fixture itself is broken if this fails")
         }
         ttp.syncPublished()
         return {
             let setUp: [PayabliTTPSessionState] = [.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready]
             for state in setUp {
-                XCTAssertTrue(ttp.sessionManager.transition(to: state), "the fixture itself is broken if this fails")
+                do {
+                    try ttp.sessionManager.advance(to: state)
+                } catch {
+                    XCTFail("the fixture itself is broken: \(error)")
+                }
             }
             ttp.syncPublished()
         }

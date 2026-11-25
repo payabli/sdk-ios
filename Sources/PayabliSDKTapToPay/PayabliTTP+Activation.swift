@@ -43,7 +43,7 @@ public extension PayabliTTP {
                 entry: entryPoint,
                 activationId: activationId
             )
-            _ = sessionManager.transition(to: .idle)
+            try sessionManager.advance(to: .idle)
             syncPublished()
         } catch is ActivationRegistrationChanged {
             let failure = TapToPayError(

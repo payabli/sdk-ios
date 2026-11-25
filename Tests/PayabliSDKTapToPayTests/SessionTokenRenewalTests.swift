@@ -343,7 +343,7 @@ final class SessionTokenRenewalTests: XCTestCase {
         let (ttp, _, attestation, _) = try makeTTP()
         attestation.isAlreadyAttested = true
         try await ttp.initialize()
-        XCTAssertTrue(ttp.sessionManager.transition(to: .sessionExpired), "the fixture itself is broken")
+        XCTAssertNoThrow(try ttp.sessionManager.advance(to: .sessionExpired), "the fixture itself is broken")
         ttp.syncPublished()
         return ttp
     }

@@ -20,69 +20,86 @@ final class SessionManagerTests: XCTestCase {
 
     func testColdPathTransitions() {
         let sm = SessionManager()
-        XCTAssertTrue(sm.transition(to: .attestingDevice))
-        XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
-        XCTAssertTrue(sm.transition(to: .ready))
+        XCTAssertNoThrow(try sm.advance(to: .attestingDevice))
+        XCTAssertNoThrow(try sm.advance(to: .fetchingConfig))
+        XCTAssertNoThrow(try sm.advance(to: .initializingReader(percent: nil)))
+        XCTAssertNoThrow(try sm.advance(to: .ready))
         XCTAssertTrue(sm.isReady)
     }
 
     func testWarmPathSkipsAttestation() {
         let sm = SessionManager()
-        XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
-        XCTAssertTrue(sm.transition(to: .ready))
+        XCTAssertNoThrow(try sm.advance(to: .fetchingConfig))
+        XCTAssertNoThrow(try sm.advance(to: .initializingReader(percent: nil)))
+        XCTAssertNoThrow(try sm.advance(to: .ready))
     }
 
-    func testSessionExpiredAndReinitialize() {
+    func testSessionExpiredAndReinitialize() throws {
         let sm = SessionManager()
-        _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader(percent: nil))
-        _ = sm.transition(to: .ready)
+        try sm.advance(to: .fetchingConfig)
+        try sm.advance(to: .initializingReader(percent: nil))
+        try sm.advance(to: .ready)
 
-        XCTAssertTrue(sm.transition(to: .sessionExpired))
+        XCTAssertNoThrow(try sm.advance(to: .sessionExpired))
         XCTAssertFalse(sm.isReady)
-        XCTAssertTrue(sm.transition(to: .reinitializing))
-        XCTAssertTrue(sm.transition(to: .fetchingConfig))
-        XCTAssertTrue(sm.transition(to: .initializingReader(percent: nil)))
-        XCTAssertTrue(sm.transition(to: .ready))
+        XCTAssertNoThrow(try sm.advance(to: .reinitializing))
+        XCTAssertNoThrow(try sm.advance(to: .fetchingConfig))
+        XCTAssertNoThrow(try sm.advance(to: .initializingReader(percent: nil)))
+        XCTAssertNoThrow(try sm.advance(to: .ready))
     }
 
-    func testPendingActivationPath() {
+    func testPendingActivationPath() throws {
         let sm = SessionManager()
-        _ = sm.transition(to: .attestingDevice)
-        XCTAssertTrue(sm.transition(to: .pendingActivation(activationId: "dev")))
-        XCTAssertTrue(sm.transition(to: .idle))
+        try sm.advance(to: .attestingDevice)
+        XCTAssertNoThrow(try sm.advance(to: .pendingActivation(activationId: "dev")))
+        XCTAssertNoThrow(try sm.advance(to: .idle))
     }
 
     // MARK: - Invalid transitions
 
     func testRejectsSkippingStates() {
         let sm = SessionManager()
-        XCTAssertFalse(sm.transition(to: .ready))
-        XCTAssertFalse(sm.transition(to: .initializingReader(percent: nil)))
-        XCTAssertFalse(sm.transition(to: .sessionExpired))
+        XCTAssertThrowsError(try sm.advance(to: .ready))
+        XCTAssertThrowsError(try sm.advance(to: .initializingReader(percent: nil)))
+        XCTAssertThrowsError(try sm.advance(to: .sessionExpired))
     }
 
-    func testRejectsReadyToFetching() {
+    func testRejectsReadyToFetching() throws {
         let sm = SessionManager()
-        _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader(percent: nil))
-        _ = sm.transition(to: .ready)
+        try sm.advance(to: .fetchingConfig)
+        try sm.advance(to: .initializingReader(percent: nil))
+        try sm.advance(to: .ready)
         // ready → fetchingConfig must go through sessionExpired + reinitializing.
-        XCTAssertFalse(sm.transition(to: .fetchingConfig))
+        XCTAssertThrowsError(try sm.advance(to: .fetchingConfig))
     }
 
-    // MARK: - Force expiry + error
+    func testARefusedAdvanceThrowsNamingBothStatesAndReportsNothing() throws {
+        let sm = SessionManager()
+        try sm.advance(to: .fetchingConfig)
+        try sm.advance(to: .initializingReader(percent: nil))
+        try sm.advance(to: .ready)
+        var count = 0
+        sm.onMove = { _, _ in count += 1 }
+
+        XCTAssertThrowsError(try sm.advance(to: .fetchingConfig)) { error in
+            let refused = error as? RefusedSessionMove
+            XCTAssertEqual(refused?.from, "ready")
+            XCTAssertEqual(refused?.to, "fetching_config")
+        }
+        XCTAssertEqual(sm.sessionState, .ready)
+        XCTAssertEqual(count, 0)
+    }
+
+    // MARK: - Expiry and failure
 
     /// The route a live caller takes: `charge()` marks a dead reader session
     /// expired from `.ready`, which the matrix already permits.
-    func testReadyToSessionExpiredIsPermitted() {
+    func testReadyToSessionExpiredIsPermitted() throws {
         let sm = SessionManager()
-        _ = sm.transition(to: .fetchingConfig)
-        _ = sm.transition(to: .initializingReader(percent: nil))
-        _ = sm.transition(to: .ready)
-        XCTAssertTrue(sm.transition(to: .sessionExpired))
+        try sm.advance(to: .fetchingConfig)
+        try sm.advance(to: .initializingReader(percent: nil))
+        try sm.advance(to: .ready)
+        XCTAssertNoThrow(try sm.advance(to: .sessionExpired))
         XCTAssertEqual(sm.sessionState, .sessionExpired)
         XCTAssertFalse(sm.isReady)
     }
@@ -115,14 +132,43 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertNil(sm.lastError)
     }
 
-    func testMarkError() {
+    func testMarkError() throws {
         struct DummyError: Error {}
         let sm = SessionManager()
-        _ = sm.transition(to: .attestingDevice)
+        try sm.advance(to: .attestingDevice)
         sm.markError(DummyError(), registration: .none)
         XCTAssertEqual(sm.sessionState, .failed(reason: .sdkInternalError))
         XCTAssertFalse(sm.isReady)
         XCTAssertNotNil(sm.lastError)
+    }
+
+    func testAFailureLandsOnlyOnAnEdgeTheTableDeclares() throws {
+        let sm = SessionManager()
+        try sm.advance(to: .fetchingConfig)
+        try sm.advance(to: .initializingReader(percent: nil))
+        try sm.advance(to: .ready)
+        var count = 0
+        sm.onMove = { _, _ in count += 1 }
+
+        sm.markError(PayabliTTPError.devicePendingActivation(httpStatus: 403), registration: .held(activationId: "dev"))
+
+        XCTAssertEqual(sm.sessionState, .ready)
+        XCTAssertEqual(count, 0)
+        XCTAssertNotNil(sm.lastError)
+    }
+
+    func testEveryStateCanFail() {
+        let states: [PayabliTTPSessionState] = [
+            .idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil),
+            .ready, .sessionExpired, .reinitializing, .pendingActivation(activationId: "dev"),
+            .failed(reason: .sdkInternalError), .pendingTerms, .charging(activity: .waitingForCard)
+        ]
+        for state in states {
+            XCTAssertTrue(
+                SessionManager.isValidTransition(from: state, to: .failed(reason: .serviceUnavailable)),
+                "\(state) cannot fail"
+            )
+        }
     }
 
     /// The terms state is reached from the reader phase and leaves the way `pendingActivation` does:
@@ -193,11 +239,11 @@ final class SessionManagerTests: XCTestCase {
     func testAnEndedChargeLeavesTheNextChargeAlone() throws {
         let sm = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
-            sm.transition(to: state)
+            try sm.advance(to: state)
         }
         let first = try XCTUnwrap(sm.beginCharge())
         for state in [PayabliTTPSessionState.idle, .attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
-            sm.transition(to: state)
+            try sm.advance(to: state)
         }
         let second = try XCTUnwrap(sm.beginCharge())
 
@@ -210,12 +256,12 @@ final class SessionManagerTests: XCTestCase {
         XCTAssertNil(sm.beginCharge(), "a third charge was let in while the second held the reader")
     }
 
-    func testTheSessionIsNotReadyDuringACharge() {
+    func testTheSessionIsNotReadyDuringACharge() throws {
         let sm = SessionManager()
         for state in [PayabliTTPSessionState.attestingDevice, .fetchingConfig, .initializingReader(percent: nil), .ready] {
-            sm.transition(to: state)
+            try sm.advance(to: state)
         }
-        XCTAssertTrue(sm.transition(to: .charging(activity: .opening)))
+        XCTAssertNoThrow(try sm.advance(to: .charging(activity: .opening)))
         XCTAssertFalse(sm.isReady)
     }
 }
