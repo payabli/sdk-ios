@@ -1,19 +1,14 @@
 import Foundation
 
-/// A pending HTTP request assembled by the SDK.
-///
-/// Consumed by `PayabliService`, which resolves it against the environment base URL, runs the
-/// decoration chain over it, and performs the call. The chain sets the credential, and overrides an
-/// `Authorization` header set here.
+/// A pending HTTP request. `PayabliService` resolves it against the environment's base URL and runs the decoration
+/// chain, which sets the credential over any `Authorization` header set here. A log names the request by its `route`
+/// template, or `[REDACTED]` without one, never by its `path`, which can carry an identifier.
 package struct PayabliRequest: Sendable {
     package static let contentTypeHeader = "Content-Type"
     package static let applicationJSON = "application/json"
 
     package let method: HTTPMethod
-    /// The resolved path, which can carry an identifier, so it is never logged.
     package let path: String
-    /// The route as a template, such as `/api/v2/MoneyIn/update/{transId}`: the form a log names the request by.
-    /// Without one, a log writes `[REDACTED]` in its place.
     package let route: String?
     package let query: [URLQueryItem]
     package let headers: [String: String]
